@@ -98,6 +98,16 @@ class PreserveFormatStrategy:
         return "".join(result)
 
 
+class IPMapStrategy:
+    """Delegates to an IPAllocator for IP/prefix sanitization."""
+
+    def __init__(self, allocator: Any) -> None:
+        self._allocator = allocator
+
+    def redact(self, value: str, category: str | None = None) -> str:
+        return self._allocator.allocate(value)
+
+
 class StrategyRegistry:
     """Registry for looking up and applying redaction strategies by name."""
 
