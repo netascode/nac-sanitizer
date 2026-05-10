@@ -1,18 +1,92 @@
 [project]
 name = "nac-sanitizer"
 version = "0.1.0"
-description = "Add your description here"
+description = "Sanitize sensitive values in nac-collector JSON output with reversible mappings."
+license = { text = "MPL-2.0" }
 readme = "README.md"
+authors = [
+    { name = "Christopher Hart", email = "chart2@cisco.com" },
+]
 requires-python = ">=3.11"
-dependencies = []
+keywords = ["network", "automation", "sanitization", "redaction", "cisco", "cli"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: System :: Networking",
+]
+dependencies = [
+    "typer>=0.17.4",
+    "rich>=14.1.0",
+    "jsonpath-ng>=1.7.0",
+    "ruamel.yaml>=0.18.15",
+    "pydantic>=2.11.0",
+]
+
+[project.urls]
+homepage = "https://github.com/netascode/nac-sanitizer"
+repository = "https://github.com/netascode/nac-sanitizer"
+
+[project.scripts]
+nac-sanitizer = "nac_sanitizer.cli.main:app"
 
 [dependency-groups]
 dev = [
-    "bandit>=1.9.4",
+    "bandit[toml]>=1.9.4",
     "pre-commit>=4.6.0",
+    "pytest>=8.4.0",
+    "pytest-cov>=6.2.0",
+    "pytest-mock>=3.15.0",
     "ruff>=0.15.12",
     "ty>=0.0.34",
 ]
 
+[tool.hatch.build.targets.wheel]
+packages = ["nac_sanitizer"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+
+[tool.ruff.lint]
+select = [
+    "E",
+    "W",
+    "F",
+    "I",
+    "B",
+    "C4",
+    "UP",
+]
+ignore = [
+    "E501",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["nac_sanitizer"]
+
 [tool.bandit]
 exclude_dirs = [".venv", "tests"]
+
+[tool.pytest.ini_options]
+markers = ["unit", "integration"]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["nac_sanitizer"]
+
+[tool.coverage.report]
+exclude_lines = ["pragma: no cover", "@abstract", "except ImportError:"]
