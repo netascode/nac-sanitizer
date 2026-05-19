@@ -1,6 +1,13 @@
 repos:
   - repo: local
     hooks:
+      - id: license-headers
+        name: license headers (SPDX)
+        entry: bash scripts/license-headers.sh
+        language: system
+        types: [python]
+        pass_filenames: false
+
       - id: ruff-lint
         name: ruff (lint)
         entry: ruff check --fix
