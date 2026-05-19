@@ -27,7 +27,7 @@ jobs:
         run: bandit -r nac_sanitizer/ -c pyproject.toml -ll -f json -o bandit-security-report.json
 
       - name: Upload security report
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: bandit-security-report
@@ -86,7 +86,7 @@ jobs:
           uv run pytest --cov --cov-report=xml
 
       - name: Upload coverage report
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         if: matrix.python == '3.13'
         with:
           name: coverage-report
