@@ -1,0 +1,36 @@
+name: catalyst_center
+description: "Catalyst Center (DNAC) collector output"
+version: "1.0"
+
+packs:
+  usernames:
+    tier: optional
+    strategy: token
+    paths:
+      - "$..username"
+
+  hostnames:
+    tier: optional
+    strategy: hostname_map
+    paths:
+      - "$..hostname"
+
+  serial_numbers:
+    tier: optional
+    strategy: token
+    paths:
+      - "$..serialNumber"
+
+  mac_addresses:
+    tier: optional
+    strategy: preserve_format
+    paths:
+      - "$..macAddress"
+      - "$..apEthernetMacAddress"
+
+  location_data:
+    tier: optional
+    strategy: token
+    paths:
+      - "$..siteNameHierarchy"
+      - "$..groupNameHierarchy"

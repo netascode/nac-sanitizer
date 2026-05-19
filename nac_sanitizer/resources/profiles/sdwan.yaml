@@ -1,0 +1,35 @@
+name: sdwan
+description: "SD-WAN (vManage) collector output"
+version: "1.0"
+
+packs:
+  credentials:
+    tier: default
+    strategy: token
+    paths:
+      - "$..vipPasskey"
+
+
+  hostnames:
+    tier: optional
+    strategy: hostname_map
+    paths:
+      - "$..host-name"
+
+  serial_numbers:
+    tier: optional
+    strategy: token
+    paths:
+      - "$..board-serial"
+      - "$..serialNumber"
+      - "$..chasisNumber"
+      - "$..uuid"
+
+  location_data:
+    tier: optional
+    strategy: token
+    paths:
+      - "$..latitude"
+      - "$..longitude"
+      - "$..site-name"
+      - "$..site-id"

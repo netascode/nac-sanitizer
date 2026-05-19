@@ -1,0 +1,38 @@
+name: ise
+description: "ISE (Identity Services Engine) collector output"
+version: "1.0"
+
+packs:
+  credentials:
+    tier: default
+    strategy: token
+    paths:
+      - "$..radiusSharedSecret"
+      - "$..sharedSecret"
+      - "$..previousSharedSecret"
+
+  snmp_communities:
+    tier: default
+    strategy: token
+    paths:
+      - "$..roCommunity"
+      - "$..rwCommunity"
+
+
+  usernames:
+    tier: optional
+    strategy: token
+    paths:
+      - "$..userName"
+
+  mac_addresses:
+    tier: optional
+    strategy: preserve_format
+    paths:
+      - "$..mac"
+
+  domains:
+    tier: optional
+    strategy: token
+    paths:
+      - "$..domain"
