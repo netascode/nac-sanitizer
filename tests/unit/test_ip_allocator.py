@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: MPL-2.0
+# Copyright (c) 2025 Christopher Hart
+
 """Tests for the IP address allocator."""
 
 import ipaddress

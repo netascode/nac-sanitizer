@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: MPL-2.0
+# Copyright (c) 2025 Christopher Hart
+
 """IP address and prefix allocation with subnet topology preservation."""
 
 import ipaddress

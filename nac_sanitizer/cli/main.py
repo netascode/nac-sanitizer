@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: MPL-2.0
+# Copyright (c) 2025 Christopher Hart
+
 """CLI entry point for nac-sanitizer."""
 
 from enum import StrEnum

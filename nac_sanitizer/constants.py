@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: MPL-2.0
+# Copyright (c) 2025 Christopher Hart
+
 """Shared constants for nac-sanitizer."""
 
 ROSETTA_FILENAME_PREFIX = "nac-sanitizer-rosetta"

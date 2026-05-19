@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: MPL-2.0
+# Copyright (c) 2025 Christopher Hart
+
 """Pydantic models for nac-sanitizer configuration."""
 
 from pydantic import BaseModel

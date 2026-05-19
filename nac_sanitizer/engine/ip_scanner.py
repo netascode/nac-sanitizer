@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: MPL-2.0
+# Copyright (c) 2025 Christopher Hart
+
 """Value-pattern scanner that identifies and redacts IPs/prefixes across an entire JSON tree."""
 
 import re

@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: MPL-2.0
+# Copyright (c) 2025 Christopher Hart
+
 """Core orchestrator that wires all components into the sanitization pipeline."""
 
 import json
