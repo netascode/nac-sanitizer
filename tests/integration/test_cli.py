@@ -35,9 +35,6 @@ custom_rules:
   - path: "$..password"
     strategy: token
     category: "CREDENTIAL"
-  - path: "$..mgmt_ip"
-    strategy: ip_map
-    category: "IP"
   - path: "$..hostname"
     strategy: hostname_map
     category: "HOST"

@@ -13,7 +13,6 @@ def basic_config() -> SanitizerConfig:
     return SanitizerConfig(
         custom_rules=[
             RedactionRule(path="$..password", strategy="token", category="CREDENTIAL"),
-            RedactionRule(path="$..mgmt_ip", strategy="ip_map", category="IP"),
             RedactionRule(path="$..hostname", strategy="hostname_map", category="HOST"),
         ]
     )
@@ -98,9 +97,7 @@ class TestSingleFileSanitization:
         input_file = tmp_path / "consistent.json"
         input_file.write_text(json.dumps(data))
 
-        config = SanitizerConfig(
-            custom_rules=[RedactionRule(path="$..ip", strategy="ip_map", category="IP")]
-        )
+        config = SanitizerConfig(custom_rules=[])
         sanitizer = Sanitizer(config)
         output_dir = tmp_path / "output"
         sanitizer.run(input_file, output_dir)
@@ -143,9 +140,7 @@ class TestDirectorySanitization:
         (input_dir / "a.json").write_text(json.dumps({"device": {"ip": "10.1.1.1"}}))
         (input_dir / "b.json").write_text(json.dumps({"device": {"ip": "10.1.1.1"}}))
 
-        config = SanitizerConfig(
-            custom_rules=[RedactionRule(path="$..ip", strategy="ip_map", category="IP")]
-        )
+        config = SanitizerConfig(custom_rules=[])
         sanitizer = Sanitizer(config)
         output_dir = tmp_path / "output"
         sanitizer.run(input_dir, output_dir)
@@ -200,7 +195,7 @@ class TestDryRun:
         assert summary["files_scanned"] == 1
         assert summary["total_matches"] > 0
         assert "CREDENTIAL" in summary["by_category"]
-        assert "IP" in summary["by_category"]
+        assert "IP_ADDRESSES" in summary["by_category"]
         assert "HOST" in summary["by_category"]
 
     def test_dry_run_writes_no_files(
