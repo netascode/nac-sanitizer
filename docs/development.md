@@ -8,7 +8,7 @@
 ## Setup
 
 ```bash
-git clone git@github.com:ChristopherJHart/nac-sanitizer.git
+git clone git@github.com:netascode/nac-sanitizer.git
 cd nac-sanitizer
 uv sync --group dev
 ```
