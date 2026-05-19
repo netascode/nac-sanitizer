@@ -25,7 +25,7 @@ class TestProfileRegistry:
         assert "packs" in profile
 
     def test_load_nonexistent_raises_error(self) -> None:
-        with pytest.raises(ProfileNotFoundError, match="not found"):
+        with pytest.raises(ProfileNotFoundError, match="not a recognized profile"):
             ProfileRegistry.load("nonexistent_profile")
 
     def test_load_rules_returns_redaction_rules(self) -> None:

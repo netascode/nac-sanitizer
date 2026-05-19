@@ -36,9 +36,11 @@ class ProfileRegistry:
         try:
             content = profile_file.read_text()
         except (FileNotFoundError, TypeError) as e:
+            available = ", ".join(ProfileRegistry.available())
             raise ProfileNotFoundError(
-                f"Profile not found: '{name}'. "
-                f"Available profiles: {ProfileRegistry.available()}"
+                f"'{name}' is not a recognized profile. "
+                f"Check your --profile argument. "
+                f"Available profiles: {available}"
             ) from e
 
         yaml = YAML(typ="safe")
