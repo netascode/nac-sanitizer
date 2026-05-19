@@ -136,12 +136,14 @@ class TestPoolExhaustion:
     def test_small_pool_exhaustion(self, small_pool_allocator) -> None:
         # /24 pool can only allocate one /24 network
         small_pool_allocator.allocate("10.1.1.0/24")
-        with pytest.raises(PoolExhaustedError, match="No available"):
+        with pytest.raises(
+            PoolExhaustedError, match="Ran out of IPv4 /24 address space"
+        ):
             small_pool_allocator.allocate("10.2.2.0/24")
 
     def test_error_message_includes_details(self, small_pool_allocator) -> None:
         small_pool_allocator.allocate("10.1.1.0/24")
-        with pytest.raises(PoolExhaustedError, match="Total mappings allocated: 1"):
+        with pytest.raises(PoolExhaustedError, match="ip_pools.ipv4"):
             small_pool_allocator.allocate("10.2.2.0/24")
 
 

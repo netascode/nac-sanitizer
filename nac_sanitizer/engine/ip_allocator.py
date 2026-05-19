@@ -149,9 +149,13 @@ class IPAllocator:
                 if not self._overlaps_existing(subnet):
                     return subnet
 
+        pool_cidrs = ", ".join(str(p) for p in pools)
         raise PoolExhaustedError(
-            f"No available IPv{version} /{prefix_len} networks remaining in configured pools. "
-            f"Total mappings allocated: {len(self._subnet_mappings)}"
+            f"Ran out of IPv{version} /{prefix_len} address space for sanitization. "
+            f"All {len(self._subnet_mappings)} allocated subnets have consumed the "
+            f"configured pools ({pool_cidrs}). "
+            f"Add larger or additional pools under 'ip_pools.ipv{version}' "
+            f"in your configuration file to increase capacity."
         )
 
     def _overlaps_existing(self, candidate: IPv4Or6Network) -> bool:
