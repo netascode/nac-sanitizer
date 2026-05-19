@@ -72,6 +72,7 @@ def sanitize(
     """Sanitize nac-collector JSON output."""
     from nac_sanitizer.config.loader import ConfigurationError, load_config
     from nac_sanitizer.engine.ip_allocator import PoolExhaustedError
+    from nac_sanitizer.profiles.registry import ProfileNotFoundError
     from nac_sanitizer.sanitizer import Sanitizer
 
     try:
@@ -88,6 +89,9 @@ def sanitize(
     if dry_run:
         try:
             summary = sanitizer.run_dry(input_path)
+        except ProfileNotFoundError as e:
+            console.print(f"[bold red]Profile error:[/bold red] {e}")
+            raise typer.Exit(1) from e
         except Exception as e:
             console.print(f"[bold red]Error:[/bold red] {e}")
             raise typer.Exit(1) from e
@@ -103,6 +107,9 @@ def sanitize(
 
     try:
         rosetta_path = sanitizer.run(input_path, output)
+    except ProfileNotFoundError as e:
+        console.print(f"[bold red]Profile error:[/bold red] {e}")
+        raise typer.Exit(1) from e
     except PoolExhaustedError as e:
         console.print(f"[bold red]Pool exhausted:[/bold red] {e}")
         raise typer.Exit(1) from e

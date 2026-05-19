@@ -120,19 +120,13 @@ class Sanitizer:
 
     def _build_rule_set(self) -> list[RedactionRule]:
         """Assemble the final rule set from config layers."""
-        from nac_sanitizer.profiles.registry import (
-            ProfileNotFoundError,
-            ProfileRegistry,
-        )
+        from nac_sanitizer.profiles.registry import ProfileRegistry
 
         rules: list[RedactionRule] = []
 
         for profile_name in self._config.profiles:
-            try:
-                profile_rules = ProfileRegistry.load_rules(profile_name)
-                rules.extend(self._filter_by_packs(profile_rules))
-            except ProfileNotFoundError:
-                pass
+            profile_rules = ProfileRegistry.load_rules(profile_name)
+            rules.extend(self._filter_by_packs(profile_rules))
 
         rules.extend(self._config.custom_rules)
         return self._apply_overrides(rules)
