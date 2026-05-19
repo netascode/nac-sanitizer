@@ -1,67 +1,48 @@
+[![Tests](https://github.com/ChristopherJHart/nac-sanitizer/actions/workflows/test.yml/badge.svg)](https://github.com/ChristopherJHart/nac-sanitizer/actions/workflows/test.yml)
+![Python Support](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-informational "Python Support: 3.11, 3.12, 3.13")
+
 # nac-sanitizer
 
-Sanitize sensitive values in [nac-collector](https://github.com/netascode/nac-collector) JSON output with reversible mappings.
-
-## Overview
-
-nac-sanitizer redacts sensitive data (passwords, IP addresses, SNMP community strings, hostnames, and more) from nac-collector JSON output. It produces sanitized JSON that is safe to share with third parties, alongside a Rosetta Stone translation key that enables bidirectional lookup between original and sanitized values.
-
-## Key Features
-
-- **Path-based redaction** - JSONPath expressions target specific fields in structured JSON data
-- **Rosetta Stone** - Bidirectional translation key mapping original values to sanitized values and vice versa
-- **Product profiles** - Built-in redaction rules for SD-WAN, Catalyst Center, and ISE
-- **Redaction packs** - Named bundles of paths grouped by sensitivity concern (credentials, IP addresses, hostnames, etc.)
-- **IP topology preservation** - Sanitized IP addresses maintain subnet relationships for logical readability
-- **Configurable sensitivity tiers** - Default (always redacted), optional (user-electable), and skip (user override)
+A CLI tool to sanitize sensitive values in [nac-collector](https://github.com/netascode/nac-collector) JSON output, producing redacted data safe to share alongside a Rosetta Stone translation key.
 
 ## Installation
 
 ```bash
-pip install nac-sanitizer
+uv tool install git+https://github.com/ChristopherJHart/nac-sanitizer.git
 ```
 
-## Usage
+Or with pip:
 
 ```bash
-# Sanitize a single file
-nac-sanitizer sanitize input.json -o sanitized/
+pip install git+https://github.com/ChristopherJHart/nac-sanitizer.git
+```
 
+## Quick Start
+
+```bash
 # Sanitize with a product profile
-nac-sanitizer sanitize input.json --profile sdwan -o sanitized/
+nac-sanitizer sanitize collector-output.json --profile sdwan -o sanitized/
 
-# Sanitize with a user config
-nac-sanitizer sanitize input.json --config my-config.yaml -o sanitized/
+# Sanitize an entire directory
+nac-sanitizer sanitize ./collector-output/ --profile ise -o sanitized/
 
-# Sanitize an entire collector output directory
-nac-sanitizer sanitize ./collector-output/ -o sanitized/
-
-# Show what would be redacted without writing files
-nac-sanitizer sanitize input.json --dry-run
-
-# Validate a configuration file
-nac-sanitizer validate-config my-config.yaml
+# Preview what would be redacted
+nac-sanitizer sanitize collector-output.json --profile sdwan --dry-run -o sanitized/
 
 # List available profiles
 nac-sanitizer profiles list
 ```
 
-## Development
+## Documentation
 
-Requires Python 3.11+.
+See the [docs/](docs/) directory for detailed guides:
 
-```bash
-# Clone and install in development mode
-git clone git@github.com:ChristopherJHart/nac-sanitizer.git
-cd nac-sanitizer
-uv sync --group dev
-
-# Run checks
-uv run ruff check .
-uv run ty check
-uv run bandit -r nac_sanitizer/
-uv run pytest
-```
+- [Overview](docs/overview.md) - How the tool works, the two redaction mechanisms, and execution flow
+- [Configuration](docs/configuration.md) - Configuration file format, profiles, packs, and overrides
+- [Profiles](docs/profiles.md) - Built-in product profiles and how they work
+- [Rosetta Stone](docs/rosetta_stone.md) - The translation key and how to use it
+- [IP Sanitization](docs/ip_sanitization.md) - How IP addresses and prefixes are handled
+- [Development](docs/development.md) - Contributing, testing, and project structure
 
 ## License
 
