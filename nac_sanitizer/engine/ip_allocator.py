@@ -4,6 +4,7 @@
 """IP address and prefix allocation with subnet topology preservation."""
 
 import ipaddress
+import logging
 import re
 from dataclasses import dataclass, field
 
@@ -13,6 +14,8 @@ from nac_sanitizer.constants import (
     DEFAULT_IPV6_POOLS,
     DEFAULT_IPV6_PREFIX,
 )
+
+logger = logging.getLogger(__name__)
 
 IPv4Or6Network = ipaddress.IPv4Network | ipaddress.IPv6Network
 IPv4Or6Address = ipaddress.IPv4Address | ipaddress.IPv6Address
@@ -75,6 +78,7 @@ class IPAllocator:
         else:
             result = self._allocate_host(value)
 
+        logger.debug("Allocated %s → %s", value, result)
         self._host_map[value] = result
         return result
 

@@ -3,10 +3,13 @@
 
 """Value-pattern scanner that identifies and redacts IPs/prefixes across an entire JSON tree."""
 
+import logging
 import re
 from typing import Any
 
 from nac_sanitizer.engine.ip_allocator import IPAllocator
+
+logger = logging.getLogger(__name__)
 
 _IPV4_PATTERN = re.compile(r"^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(/\d{1,2})?$")
 
@@ -120,6 +123,8 @@ class IPScanner:
         try:
             sanitized = self._allocator.allocate(value)
         except ValueError:
+            logger.debug("IP allocation failed for '%s', keeping original", value)
             return value
+        logger.debug("Redacted IP: %s → %s", value, sanitized)
         self._mappings[value] = sanitized
         return sanitized

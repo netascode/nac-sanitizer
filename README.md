@@ -29,6 +29,9 @@ nac-sanitizer sanitize ./collector-output/ --profile ise -o sanitized/
 # Preview what would be redacted
 nac-sanitizer sanitize collector-output.json --profile sdwan --dry-run -o sanitized/
 
+# Write diagnostic logs to a file
+nac-sanitizer --log-file sanitizer.log sanitize collector-output.json --profile sdwan -o sanitized/
+
 # List available profiles
 nac-sanitizer profiles list
 ```

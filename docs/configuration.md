@@ -114,6 +114,35 @@ Note that narrower pools have less address space available. The three RFC 5737 r
 
 For more detail on how IP sanitization works, see [IP Sanitization](ip_sanitization.md).
 
+## Diagnostic Logging
+
+By default, nac-sanitizer only prints warnings and errors to stderr. For troubleshooting (e.g., understanding why a rule didn't match or which IPs were allocated), you can write detailed diagnostic logs to a file:
+
+```bash
+nac-sanitizer --log-file sanitizer.log sanitize input/ --profile sdwan -o sanitized/
+```
+
+The log file captures all DEBUG and INFO messages, including:
+
+- Which configuration file was loaded
+- How many rules were loaded from each profile (and how many survived pack filtering)
+- Which input files were discovered and processed
+- Per-rule match counts (which JSONPath rules matched and how many values they redacted)
+- IP address allocations (original to sanitized mappings)
+- Strategy failures (with the specific path, value, and error)
+
+Warnings and errors continue to appear on stderr regardless of whether `--log-file` is set.
+
+The `--log-file` option is a **global flag** and must appear before the subcommand:
+
+```bash
+# Correct
+nac-sanitizer --log-file debug.log sanitize input.json -o output/
+
+# Incorrect (will not be recognized)
+nac-sanitizer sanitize input.json -o output/ --log-file debug.log
+```
+
 ## Environment Variables
 
 | Variable               | Description                                            |

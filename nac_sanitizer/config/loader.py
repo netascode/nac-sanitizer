@@ -3,6 +3,7 @@
 
 """Configuration loading and layer merging."""
 
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +11,8 @@ from pydantic import ValidationError
 from ruamel.yaml import YAML
 
 from nac_sanitizer.config.models import SanitizerConfig
+
+logger = logging.getLogger(__name__)
 
 
 class ConfigurationError(Exception):
@@ -31,7 +34,10 @@ def load_config(
     config_data: dict[str, Any] = {}
 
     if config_path:
+        logger.debug("Loading config from: %s", config_path)
         config_data = _parse_yaml_file(config_path)
+    else:
+        logger.debug("No config file specified, using defaults")
 
     if profile_names:
         config_data.setdefault("profiles", [])

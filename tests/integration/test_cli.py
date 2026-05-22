@@ -208,3 +208,71 @@ class TestProfilesListCommand:
         result = runner.invoke(app, ["profiles", "list"])
         # May show "No profiles available" or list profiles depending on state
         assert result.exit_code == 0
+
+
+@pytest.mark.integration
+class TestLogFile:
+    def test_log_file_captures_debug_output(
+        self, sample_input_file, sample_config, tmp_path
+    ) -> None:
+        output_dir = tmp_path / "output"
+        log_path = tmp_path / "sanitizer.log"
+        result = runner.invoke(
+            app,
+            [
+                "--log-file",
+                str(log_path),
+                "sanitize",
+                str(sample_input_file),
+                "-o",
+                str(output_dir),
+                "-c",
+                str(sample_config),
+            ],
+        )
+        assert result.exit_code == 0
+        log_content = log_path.read_text()
+        assert "Processing file" in log_content
+        assert "DEBUG" in log_content
+
+    def test_no_log_file_no_debug_on_stderr(
+        self, sample_input_file, sample_config, tmp_path
+    ) -> None:
+        output_dir = tmp_path / "output"
+        result = runner.invoke(
+            app,
+            [
+                "sanitize",
+                str(sample_input_file),
+                "-o",
+                str(output_dir),
+                "-c",
+                str(sample_config),
+            ],
+        )
+        assert result.exit_code == 0
+        assert "Processing file" not in result.output
+        assert "DEBUG" not in result.output
+
+    def test_warnings_still_appear_on_stderr(self, sample_input_file, tmp_path) -> None:
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(
+            "custom_rules:\n"
+            '  - path: "$..mgmt_ip"\n'
+            "    strategy: nonexistent_strategy\n"
+            '    category: "TEST"\n'
+        )
+        output_dir = tmp_path / "output"
+        result = runner.invoke(
+            app,
+            [
+                "sanitize",
+                str(sample_input_file),
+                "-o",
+                str(output_dir),
+                "-c",
+                str(config_file),
+            ],
+        )
+        assert result.exit_code == 0
+        assert "WARNING" in result.output

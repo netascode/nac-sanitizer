@@ -4,6 +4,7 @@
 """Core orchestrator that wires all components into the sanitization pipeline."""
 
 import json
+import logging
 from pathlib import Path
 
 from nac_sanitizer import __version__
@@ -13,6 +14,8 @@ from nac_sanitizer.engine.ip_scanner import IPScanner
 from nac_sanitizer.engine.resolver import PathResolver
 from nac_sanitizer.engine.strategies import StrategyRegistry
 from nac_sanitizer.rosetta.writer import RosettaWriter
+
+logger = logging.getLogger(__name__)
 
 
 class Sanitizer:
@@ -47,6 +50,7 @@ class Sanitizer:
         output_path.mkdir(parents=True, exist_ok=True)
 
         for file in input_files:
+            logger.debug("Processing file: %s", file)
             self._rosetta.add_source_file(str(file))
             data = self._load_json(file)
             data = self._ip_scanner.scan(data)
@@ -56,6 +60,7 @@ class Sanitizer:
         for original, sanitized in self._ip_scanner.mappings.items():
             self._rosetta.record(original, sanitized, "IP_ADDRESSES")
 
+        logger.info("Sanitization complete: %d files processed", len(input_files))
         return self._rosetta.write(output_path)
 
     def run_dry(self, input_path: Path) -> dict:
@@ -126,10 +131,19 @@ class Sanitizer:
 
         for profile_name in self._config.profiles:
             profile_rules = ProfileRegistry.load_rules(profile_name)
-            rules.extend(self._filter_by_packs(profile_rules))
+            filtered = self._filter_by_packs(profile_rules)
+            logger.debug(
+                "Loaded %d rules from profile '%s' (%d after pack filtering)",
+                len(profile_rules),
+                profile_name,
+                len(filtered),
+            )
+            rules.extend(filtered)
 
         rules.extend(self._config.custom_rules)
-        return self._apply_overrides(rules)
+        final = self._apply_overrides(rules)
+        logger.debug("Final rule set: %d rules", len(final))
+        return final
 
     def _filter_by_packs(self, rules: list[RedactionRule]) -> list[RedactionRule]:
         """Filter profile rules based on pack enable/disable configuration."""
@@ -171,6 +185,7 @@ class Sanitizer:
         """Apply all rules to a JSON data structure."""
         for rule in rules:
             matches = self._resolver.find_matches(rule.path, data)
+            applied = 0
             for match in matches:
                 original = match.value
                 if not isinstance(original, (str, int, float)):
@@ -181,17 +196,34 @@ class Sanitizer:
                     sanitized = self._strategies.apply(
                         rule.strategy, original, rule.category
                     )
-                except (ValueError, KeyError):
+                except (ValueError, KeyError) as e:
+                    logger.warning(
+                        "Strategy '%s' failed for path '%s' value '%s': %s",
+                        rule.strategy,
+                        rule.path,
+                        original,
+                        e,
+                    )
                     continue
                 self._rosetta.record(str(original), sanitized, rule.category)
                 self._resolver.update_value(match, data, sanitized)
+                applied += 1
+            if applied:
+                logger.debug(
+                    "Rule '%s' (%s): %d values redacted",
+                    rule.path,
+                    rule.strategy,
+                    applied,
+                )
         return data
 
     def _discover_input_files(self, path: Path) -> list[Path]:
         """Find all JSON files to process."""
         if path.is_file():
             return [path]
-        return sorted(path.rglob("*.json"))
+        files = sorted(path.rglob("*.json"))
+        logger.debug("Discovered %d input files in %s", len(files), path)
+        return files
 
     def _load_json(self, path: Path) -> object:
         """Load a JSON file."""

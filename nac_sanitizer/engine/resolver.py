@@ -3,10 +3,13 @@
 
 """JSONPath-based path resolution engine."""
 
+import logging
 from typing import Any
 
 from jsonpath_ng.ext.parser import ExtentedJsonPathParser
 from jsonpath_ng.jsonpath import DatumInContext
+
+logger = logging.getLogger(__name__)
 
 
 class PathResolutionError(Exception):
@@ -26,9 +29,11 @@ class PathResolver:
             try:
                 self._cache[path] = self._parser.parse(path)
             except Exception as e:
+                logger.warning("Invalid JSONPath expression: %s", path)
                 raise PathResolutionError(
                     f"Invalid JSONPath expression: {path}\n{e}"
                 ) from e
+            logger.debug("Compiled JSONPath: %s", path)
         return self._cache[path]
 
     def find_matches(self, path: str, data: Any) -> list[DatumInContext]:

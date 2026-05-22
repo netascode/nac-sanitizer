@@ -3,24 +3,18 @@
 
 """CLI entry point for nac-sanitizer."""
 
-from enum import StrEnum
+import logging
 from pathlib import Path
 from typing import Annotated
 
 import typer
 from rich.console import Console
+from rich.logging import RichHandler
 
 from nac_sanitizer import __version__
 
 app = typer.Typer(add_completion=False)
 console = Console(stderr=True)
-
-
-class VerbosityLevel(StrEnum):
-    DEBUG = "debug"
-    INFO = "info"
-    WARNING = "warning"
-    ERROR = "error"
 
 
 def _version_callback(value: bool) -> None:
@@ -35,8 +29,28 @@ def main(
         bool | None,
         typer.Option("--version", callback=_version_callback, is_eager=True),
     ] = None,
+    log_file: Annotated[
+        Path | None,
+        typer.Option("--log-file", help="Write diagnostic logs to this file"),
+    ] = None,
 ) -> None:
     """Sanitize sensitive values in nac-collector JSON output."""
+    root = logging.getLogger()
+    root.handlers.clear()
+
+    stderr_handler = RichHandler(console=console, show_path=False, markup=False)
+    stderr_handler.setLevel(logging.WARNING)
+    root.addHandler(stderr_handler)
+
+    if log_file:
+        file_handler = logging.FileHandler(log_file, mode="w")
+        file_handler.setLevel(logging.DEBUG)
+        file_handler.setFormatter(
+            logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+        )
+        root.addHandler(file_handler)
+
+    root.setLevel(logging.DEBUG if log_file else logging.WARNING)
 
 
 @app.command()
