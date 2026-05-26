@@ -26,11 +26,6 @@ class TestLoadConfigDefaults:
         assert len(config.settings.ip_pools.ipv6_pools) == 2
         assert config.settings.ip_pools.preserve_prefix_length is True
 
-    def test_default_rosetta_settings(self) -> None:
-        config = load_config()
-        assert config.settings.rosetta.format == "json"
-        assert config.settings.rosetta.encrypt is False
-
 
 @pytest.mark.unit
 class TestLoadConfigFromFile:
@@ -61,8 +56,6 @@ custom_rules:
 settings:
   ip_pools:
     preserve_prefix_length: false
-  rosetta:
-    format: json
 """
         )
         config = load_config(config_path=config_file)

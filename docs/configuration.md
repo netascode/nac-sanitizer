@@ -57,9 +57,6 @@ settings:
       - "2001:db8::/32"
       - "fc00::/7"
     preserve_prefix_length: true
-  rosetta:
-    format: json
-    encrypt: false
 ```
 
 ## Sensitivity Tiers

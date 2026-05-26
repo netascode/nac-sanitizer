@@ -47,18 +47,10 @@ class IPPoolSettings(BaseModel):
     default_ipv6_prefix: int = DEFAULT_IPV6_PREFIX
 
 
-class RosettaSettings(BaseModel):
-    """Configuration for Rosetta Stone output."""
-
-    format: str = "json"
-    encrypt: bool = False
-
-
 class GlobalSettings(BaseModel):
     """Top-level settings block."""
 
     ip_pools: IPPoolSettings = IPPoolSettings()
-    rosetta: RosettaSettings = RosettaSettings()
 
 
 class SanitizerConfig(BaseModel):
