@@ -4,11 +4,11 @@ Product profiles are built-in collections of redaction rules specific to a produ
 
 ## Available Profiles
 
-| Profile           | Product                  | Default Packs                      | Optional Packs                                                     |
-| ----------------- | ------------------------ | ---------------------------------- | ------------------------------------------------------------------ |
-| `sdwan`           | SD-WAN (vManage)         | credentials                        | hostnames, serial_numbers, location_data                           |
-| `ise`             | Identity Services Engine | credentials, snmp_communities      | usernames, mac_addresses, domains                                  |
-| `catalyst_center` | Catalyst Center (DNAC)   | (none - credentials masked by API) | usernames, hostnames, serial_numbers, mac_addresses, location_data |
+| Profile           | Product                  | Default Packs                      | Optional Packs                                                      |
+| ----------------- | ------------------------ | ---------------------------------- | ------------------------------------------------------------------- |
+| `sdwan`           | SD-WAN (vManage)         | credentials                        | hostnames, serial numbers, location data                            |
+| `ise`             | Identity Services Engine | credentials, SNMP communities      | usernames, MAC addresses, domains                                   |
+| `catalyst_center` | Catalyst Center (DNAC)   | (none - credentials masked by API) | usernames, hostnames, serial numbers, MAC addresses, location data  |
 
 List available profiles:
 
@@ -58,20 +58,20 @@ The IP scanner handles both forms. Path-based packs target specific device inven
 
 | Pack             | Tier     | Fields Targeted                                        |
 | ---------------- | -------- | ------------------------------------------------------ |
-| `credentials`    | default  | `vipPasskey`                                           |
-| `hostnames`      | optional | `host-name`                                            |
-| `serial_numbers` | optional | `board-serial`, `serialNumber`, `chasisNumber`, `uuid` |
-| `location_data`  | optional | `latitude`, `longitude`, `site-name`, `site-id`        |
+| credentials      | default  | `vipPasskey`                                           |
+| hostnames        | optional | `host-name`                                            |
+| serial numbers   | optional | `board-serial`, `serialNumber`, `chasisNumber`, `uuid` |
+| location data    | optional | `latitude`, `longitude`, `site-name`, `site-id`        |
 
 ## ISE Profile Details
 
 | Pack               | Tier     | Fields Targeted                                              |
 | ------------------ | -------- | ------------------------------------------------------------ |
-| `credentials`      | default  | `radiusSharedSecret`, `sharedSecret`, `previousSharedSecret` |
-| `snmp_communities` | default  | `roCommunity`, `rwCommunity`                                 |
-| `usernames`        | optional | `userName`                                                   |
-| `mac_addresses`    | optional | `mac`                                                        |
-| `domains`          | optional | `domain`                                                     |
+| credentials        | default  | `radiusSharedSecret`, `sharedSecret`, `previousSharedSecret` |
+| SNMP communities   | default  | `roCommunity`, `rwCommunity`                                 |
+| usernames          | optional | `userName`                                                   |
+| MAC addresses      | optional | `mac`                                                        |
+| domains            | optional | `domain`                                                     |
 
 ## Catalyst Center Profile Details
 
@@ -79,8 +79,8 @@ Catalyst Center's API masks credential values as `NO!$DATA!$`, so no credential 
 
 | Pack             | Tier     | Fields Targeted                           |
 | ---------------- | -------- | ----------------------------------------- |
-| `usernames`      | optional | `username`                                |
-| `hostnames`      | optional | `hostname`                                |
-| `serial_numbers` | optional | `serialNumber`                            |
-| `mac_addresses`  | optional | `macAddress`, `apEthernetMacAddress`      |
-| `location_data`  | optional | `siteNameHierarchy`, `groupNameHierarchy` |
+| usernames        | optional | `username`                                |
+| hostnames        | optional | `hostname`                                |
+| serial numbers   | optional | `serialNumber`                            |
+| MAC addresses    | optional | `macAddress`, `apEthernetMacAddress`      |
+| location data    | optional | `siteNameHierarchy`, `groupNameHierarchy` |
