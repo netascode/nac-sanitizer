@@ -70,6 +70,57 @@ class TestProfileRegistry:
 
 
 @pytest.mark.unit
+class TestISEProfileRegistry:
+    def test_ise_profile_available(self) -> None:
+        available = ProfileRegistry.available()
+        assert "ise" in available
+
+    def test_load_ise_profile(self) -> None:
+        profile = ProfileRegistry.load("ise")
+        assert profile["name"] == "ise"
+        assert "packs" in profile
+
+    def test_ise_rules_have_valid_paths(self) -> None:
+        rules = ProfileRegistry.load_rules("ise")
+        resolver = PathResolver()
+        for rule in rules:
+            resolver.parse(rule.path)
+
+    def test_ise_rules_have_valid_strategies(self) -> None:
+        valid_strategies = {
+            "token",
+            "ip_map",
+            "hostname_map",
+            "constant",
+            "hash",
+            "preserve_format",
+        }
+        rules = ProfileRegistry.load_rules("ise")
+        for rule in rules:
+            assert rule.strategy in valid_strategies, (
+                f"Unknown strategy '{rule.strategy}' in path {rule.path}"
+            )
+
+    def test_ise_credentials_pack_is_default_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("ise")
+        cred_rules = [r for r in rules if r.category == "CREDENTIALS"]
+        assert len(cred_rules) > 0
+        assert all(r.tier == "default" for r in cred_rules)
+
+    def test_ise_snmp_communities_pack_is_default_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("ise")
+        snmp_rules = [r for r in rules if r.category == "SNMP_COMMUNITIES"]
+        assert len(snmp_rules) > 0
+        assert all(r.tier == "default" for r in snmp_rules)
+
+    def test_ise_usernames_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("ise")
+        user_rules = [r for r in rules if r.category == "USERNAMES"]
+        assert len(user_rules) > 0
+        assert all(r.tier == "optional" for r in user_rules)
+
+
+@pytest.mark.unit
 class TestProfileIntegration:
     def test_sanitize_with_sdwan_profile(self, tmp_path) -> None:
         """End-to-end: SD-WAN profile redacts known sensitive fields."""
@@ -162,3 +213,208 @@ class TestProfileIntegration:
         result = runner.invoke(app, ["profiles", "list"])
         assert result.exit_code == 0
         assert "sdwan" in result.output
+
+    def test_sanitize_with_ise_profile_redacts_credentials(self, tmp_path) -> None:
+        """ISE profile default-tier credentials pack redacts RADIUS shared secrets."""
+        data = {
+            "network_device": [
+                {
+                    "data": {
+                        "NetworkDevice": {
+                            "name": "lab-switch-01",
+                            "authenticationSettings": {
+                                "networkProtocol": "RADIUS",
+                                "radiusSharedSecret": "S3cur3R@dius!",
+                                "enableKeyWrap": False,
+                            },
+                            "profileName": "Cisco",
+                            "coaPort": 1700,
+                        }
+                    },
+                    "endpoint": "/ers/config/networkdevice/abc-123",
+                }
+            ]
+        }
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["ise"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        raw = json.dumps(sanitized)
+        assert "S3cur3R@dius!" not in raw
+        # Non-sensitive fields preserved
+        assert (
+            sanitized["network_device"][0]["data"]["NetworkDevice"]["name"]
+            == "lab-switch-01"
+        )
+        assert (
+            sanitized["network_device"][0]["data"]["NetworkDevice"]["coaPort"] == 1700
+        )
+
+    def test_sanitize_with_ise_profile_redacts_snmp_communities(self, tmp_path) -> None:
+        """ISE profile default-tier snmp_communities pack redacts RO/RW community strings."""
+        data = {
+            "network_device": [
+                {
+                    "data": {
+                        "NetworkDevice": {
+                            "name": "lab-router-02",
+                            "snmpsettings": {
+                                "version": "TWO_C",
+                                "roCommunity": "pub1ic-str1ng",
+                                "rwCommunity": "priv@te-str1ng",
+                                "pollingInterval": 3600,
+                                "linkTrapQuery": True,
+                            },
+                        }
+                    },
+                    "endpoint": "/ers/config/networkdevice/def-456",
+                }
+            ]
+        }
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["ise"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        raw = json.dumps(sanitized)
+        assert "pub1ic-str1ng" not in raw
+        assert "priv@te-str1ng" not in raw
+        # Non-sensitive SNMP settings preserved
+        nd = sanitized["network_device"][0]["data"]["NetworkDevice"]
+        assert nd["snmpsettings"]["pollingInterval"] == 3600
+        assert nd["snmpsettings"]["linkTrapQuery"] is True
+
+    def test_sanitize_with_ise_profile_redacts_all_secret_variants(
+        self, tmp_path
+    ) -> None:
+        """ISE profile redacts sharedSecret and previousSharedSecret in addition to radiusSharedSecret."""
+        data = {
+            "network_device": [
+                {
+                    "data": {
+                        "NetworkDevice": {
+                            "name": "lab-wlc-03",
+                            "authenticationSettings": {
+                                "radiusSharedSecret": "Current$ecret",
+                                "previousSharedSecret": "Old$ecret123",
+                            },
+                            "tacacsSettings": {
+                                "sharedSecret": "T@cacs$ecret",
+                            },
+                        }
+                    },
+                    "endpoint": "/ers/config/networkdevice/ghi-789",
+                }
+            ]
+        }
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["ise"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        raw = json.dumps(sanitized)
+        assert "Current$ecret" not in raw
+        assert "Old$ecret123" not in raw
+        assert "T@cacs$ecret" not in raw
+
+    def test_ise_optional_packs_excluded_by_default(self, tmp_path) -> None:
+        """ISE optional-tier packs (usernames, mac_addresses, domains) are not applied by default."""
+        data = {
+            "endpoint": [
+                {
+                    "data": {
+                        "ERSEndPoint": {
+                            "id": "aaaa-bbbb-cccc",
+                            "name": "AA:BB:CC:DD:EE:FF",
+                            "mac": "AA:BB:CC:DD:EE:FF",
+                            "staticProfileAssignment": False,
+                        }
+                    },
+                    "endpoint": "/ers/config/endpoint/aaaa-bbbb-cccc",
+                }
+            ],
+            "internal_user": [
+                {
+                    "data": {
+                        "InternalUser": {
+                            "name": "jsmith",
+                            "userName": "jsmith",
+                            "domain": "corp.example.com",
+                        }
+                    },
+                    "endpoint": "/ers/config/internaluser/dddd-eeee",
+                }
+            ],
+        }
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["ise"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        # Optional packs should NOT be redacted by default
+        ers = sanitized["endpoint"][0]["data"]["ERSEndPoint"]
+        assert ers["mac"] == "AA:BB:CC:DD:EE:FF"
+        user = sanitized["internal_user"][0]["data"]["InternalUser"]
+        assert user["userName"] == "jsmith"
+        assert user["domain"] == "corp.example.com"
+
+    def test_ise_optional_packs_applied_when_enabled(self, tmp_path) -> None:
+        """ISE optional-tier packs redact when explicitly enabled."""
+        data = {
+            "endpoint": [
+                {
+                    "data": {
+                        "ERSEndPoint": {
+                            "id": "aaaa-bbbb-cccc",
+                            "mac": "AA:BB:CC:DD:EE:FF",
+                        }
+                    },
+                    "endpoint": "/ers/config/endpoint/aaaa-bbbb-cccc",
+                }
+            ],
+            "internal_user": [
+                {
+                    "data": {
+                        "InternalUser": {
+                            "userName": "jsmith",
+                            "domain": "corp.example.com",
+                        }
+                    },
+                    "endpoint": "/ers/config/internaluser/dddd-eeee",
+                }
+            ],
+        }
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["ise"],
+            packs=PackConfig(enable=["usernames", "mac_addresses", "domains"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        ers = sanitized["endpoint"][0]["data"]["ERSEndPoint"]
+        assert ers["mac"] != "AA:BB:CC:DD:EE:FF"
+        user = sanitized["internal_user"][0]["data"]["InternalUser"]
+        assert user["userName"] != "jsmith"
+        assert user["domain"] != "corp.example.com"
