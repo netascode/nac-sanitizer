@@ -235,3 +235,30 @@ class TestOverrides:
         assert sanitized["devices"][0]["hostname"] == "core-rtr-01"
         # Password should still be redacted
         assert sanitized["devices"][0]["config"]["password"] != "secret123"
+
+
+@pytest.mark.unit
+class TestMalformedJson:
+    def test_malformed_file_skipped_in_run(self, basic_config, tmp_path) -> None:
+        input_dir = tmp_path / "input"
+        input_dir.mkdir()
+        (input_dir / "good.json").write_text(json.dumps({"password": "secret"}))
+        (input_dir / "bad.json").write_text("{not valid json")
+
+        sanitizer = Sanitizer(basic_config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_dir, output_dir)
+
+        assert (output_dir / "good.json").exists()
+        assert not (output_dir / "bad.json").exists()
+
+    def test_malformed_file_skipped_in_dry_run(self, basic_config, tmp_path) -> None:
+        input_dir = tmp_path / "input"
+        input_dir.mkdir()
+        (input_dir / "good.json").write_text(json.dumps({"password": "secret"}))
+        (input_dir / "bad.json").write_text("{not valid json")
+
+        sanitizer = Sanitizer(basic_config)
+        summary = sanitizer.run_dry(input_dir)
+
+        assert summary["total_matches"] > 0

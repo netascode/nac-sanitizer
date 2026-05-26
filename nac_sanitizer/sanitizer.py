@@ -49,10 +49,14 @@ class Sanitizer:
 
         output_path.mkdir(parents=True, exist_ok=True)
 
+        skipped = 0
         for file in input_files:
             logger.debug("Processing file: %s", file)
-            self._rosetta.add_source_file(str(file))
             data = self._load_json(file)
+            if data is None:
+                skipped += 1
+                continue
+            self._rosetta.add_source_file(str(file))
             data = self._ip_scanner.scan(data)
             data = self._sanitize_data(data, rules)
             self._write_output(data, file, input_path, output_path)
@@ -60,7 +64,12 @@ class Sanitizer:
         for original, sanitized in self._ip_scanner.mappings.items():
             self._rosetta.record(original, sanitized, "IP_ADDRESSES")
 
-        logger.info("Sanitization complete: %d files processed", len(input_files))
+        processed = len(input_files) - skipped
+        logger.info(
+            "Sanitization complete: %d files processed, %d skipped",
+            processed,
+            skipped,
+        )
         return self._rosetta.write(output_path)
 
     def run_dry(self, input_path: Path) -> dict:
@@ -78,6 +87,8 @@ class Sanitizer:
 
         for file in input_files:
             data = self._load_json(file)
+            if data is None:
+                continue
 
             ip_count = self._count_ip_values(data)
             if ip_count:
@@ -225,9 +236,13 @@ class Sanitizer:
         logger.debug("Discovered %d input files in %s", len(files), path)
         return files
 
-    def _load_json(self, path: Path) -> object:
-        """Load a JSON file."""
-        return json.loads(path.read_text())
+    def _load_json(self, path: Path) -> object | None:
+        """Load a JSON file, returning None if the file contains invalid JSON."""
+        try:
+            return json.loads(path.read_text())
+        except json.JSONDecodeError as exc:
+            logger.warning("Skipping %s: malformed JSON (%s)", path, exc)
+            return None
 
     def _write_output(
         self, data: object, source_file: Path, input_path: Path, output_path: Path
