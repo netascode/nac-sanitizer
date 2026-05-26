@@ -22,7 +22,7 @@ packs:
     paths:
       - "$..board-serial"
       - "$..serialNumber"
-      - "$..chasisNumber"
+      - "$..chasisNumber"  # genuine vManage API misspelling, not a typo
       - "$..uuid"
 
   location_data:
