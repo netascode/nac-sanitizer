@@ -67,7 +67,7 @@ The IP scanner handles both forms. Path-based packs target specific device inven
 
 | Pack               | Tier     | Fields Targeted                                              |
 | ------------------ | -------- | ------------------------------------------------------------ |
-| credentials        | default  | `radiusSharedSecret`, `sharedSecret`, `previousSharedSecret` |
+| credentials        | default  | `radiusSharedSecret`, `sharedSecret`, `previousSharedSecret`, `password`, `enablePassword` |
 | SNMP communities   | default  | `roCommunity`, `rwCommunity`                                 |
 | usernames          | optional | `userName`                                                   |
 | MAC addresses      | optional | `mac`                                                        |

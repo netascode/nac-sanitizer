@@ -10,6 +10,8 @@ packs:
       - "$..radiusSharedSecret"
       - "$..sharedSecret"
       - "$..previousSharedSecret"
+      - "$..password"
+      - "$..enablePassword"
 
   snmp_communities:
     tier: default

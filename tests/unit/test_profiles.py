@@ -330,6 +330,46 @@ class TestProfileIntegration:
         assert "Old$ecret123" not in raw
         assert "T@cacs$ecret" not in raw
 
+    def test_sanitize_with_ise_profile_redacts_internal_user_passwords(
+        self, tmp_path
+    ) -> None:
+        """ISE profile default-tier credentials pack redacts password and enablePassword from InternalUser."""
+        data = {
+            "internal_user": [
+                {
+                    "data": {
+                        "InternalUser": {
+                            "id": "950ef99a-7a1a-4806-87f1-e4a0373df036",
+                            "name": "jsmith",
+                            "enabled": True,
+                            "password": "Cl3@rT3xt!",
+                            "enablePassword": "En@bl3P@ss!",
+                            "changePassword": False,
+                            "identityGroups": "b73e0f80-42a9-11f1-8113-00505685e554",
+                            "passwordNeverExpires": False,
+                        }
+                    },
+                    "endpoint": "/ers/config/internaluser/950ef99a-7a1a-4806-87f1-e4a0373df036",
+                }
+            ]
+        }
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["ise"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        raw = json.dumps(sanitized)
+        assert "Cl3@rT3xt!" not in raw
+        assert "En@bl3P@ss!" not in raw
+        user = sanitized["internal_user"][0]["data"]["InternalUser"]
+        assert user["name"] == "jsmith"
+        assert user["enabled"] is True
+        assert user["identityGroups"] == "b73e0f80-42a9-11f1-8113-00505685e554"
+
     def test_ise_optional_packs_excluded_by_default(self, tmp_path) -> None:
         """ISE optional-tier packs (usernames, mac_addresses, domains) are not applied by default."""
         data = {
