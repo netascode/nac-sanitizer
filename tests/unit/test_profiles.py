@@ -543,7 +543,7 @@ class TestFMCProfileIntegration:
                         "name": "ACP-Production",
                         "id": "005056BB-0B24-0ed3-0000-004294967565",
                         "links": {
-                            "self": "https://10.225.207.189/api/fmc_config/v1/domain/e276abec-e0f2-11e3-8169-6d9ed49b625f/policy/accesspolicies/005056BB-0B24-0ed3-0000-004294967565"
+                            "self": "https://198.51.100.10/api/fmc_config/v1/domain/e276abec-e0f2-11e3-8169-6d9ed49b625f/policy/accesspolicies/005056BB-0B24-0ed3-0000-004294967565"
                         },
                         "metadata": {
                             "lastUser": {"name": "camschae"},
@@ -565,7 +565,7 @@ class TestFMCProfileIntegration:
         sanitized = json.loads((output_dir / "fmc.json").read_text())
         raw = json.dumps(sanitized)
         assert "camschae" not in raw
-        assert "10.225.207.189" not in raw
+        assert "198.51.100.10" not in raw
         acp = sanitized["access_control_policy"][0]["data"]
         assert acp["type"] == "AccessPolicy"
         assert acp["id"] == "005056BB-0B24-0ed3-0000-004294967565"
@@ -583,7 +583,7 @@ class TestFMCProfileIntegration:
                         "type": "Network",
                         "metadata": {"lastUser": {"name": "admin"}},
                         "links": {
-                            "self": "https://10.225.207.189/api/fmc_config/v1/domain/abc/object/networks/123"
+                            "self": "https://198.51.100.10/api/fmc_config/v1/domain/abc/object/networks/123"
                         },
                     },
                     "endpoint": "/api/fmc_config/v1/domain/abc/object/networks",
@@ -592,12 +592,12 @@ class TestFMCProfileIntegration:
             "device": [
                 {
                     "data": {
-                        "name": "M1-4215-A-1",
+                        "name": "FTD-4100-A-1",
                         "hostName": "fw-prod-01.example.com",
                         "type": "Device",
                         "metadata": {"lastUser": {"name": "admin"}},
                         "links": {
-                            "self": "https://10.225.207.189/api/fmc_config/v1/domain/abc/devices/devicerecords/456"
+                            "self": "https://198.51.100.10/api/fmc_config/v1/domain/abc/devices/devicerecords/456"
                         },
                     },
                     "endpoint": "/api/fmc_config/v1/domain/abc/devices/devicerecords",
@@ -617,11 +617,11 @@ class TestFMCProfileIntegration:
         assert net["name"] == "Internal-Servers-Subnet"
         assert net["description"] == "Production server subnet in Building A"
         dev = sanitized["device"][0]["data"]
-        assert dev["name"] == "M1-4215-A-1"
+        assert dev["name"] == "FTD-4100-A-1"
         assert dev["hostName"] == "fw-prod-01.example.com"
         # Default packs should be redacted
         assert "admin" not in json.dumps(sanitized)
-        assert "10.225.207.189" not in json.dumps(sanitized)
+        assert "198.51.100.10" not in json.dumps(sanitized)
         # IP scanner catches standalone IP values
         assert net["value"] != "10.1.0.0/24"
 
@@ -636,7 +636,7 @@ class TestFMCProfileIntegration:
                         "type": "FQDN",
                         "metadata": {"lastUser": {"name": "netops"}},
                         "links": {
-                            "self": "https://10.225.207.189/api/fmc_config/v1/domain/abc/object/fqdns/789"
+                            "self": "https://198.51.100.10/api/fmc_config/v1/domain/abc/object/fqdns/789"
                         },
                     },
                     "endpoint": "/api/fmc_config/v1/domain/abc/object/fqdns",
@@ -650,7 +650,7 @@ class TestFMCProfileIntegration:
                         "type": "Device",
                         "metadata": {"lastUser": {"name": "netops"}},
                         "links": {
-                            "self": "https://10.225.207.189/api/fmc_config/v1/domain/abc/devices/devicerecords/111"
+                            "self": "https://198.51.100.10/api/fmc_config/v1/domain/abc/devices/devicerecords/111"
                         },
                     },
                     "endpoint": "/api/fmc_config/v1/domain/abc/devices/devicerecords",
