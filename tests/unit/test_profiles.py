@@ -458,3 +458,231 @@ class TestProfileIntegration:
         user = sanitized["internal_user"][0]["data"]["InternalUser"]
         assert user["userName"] != "jsmith"
         assert user["domain"] != "corp.example.com"
+
+
+@pytest.mark.unit
+class TestFMCProfileRegistry:
+    def test_fmc_profile_available(self) -> None:
+        available = ProfileRegistry.available()
+        assert "fmc" in available
+
+    def test_load_fmc_profile(self) -> None:
+        profile = ProfileRegistry.load("fmc")
+        assert profile["name"] == "fmc"
+        assert "packs" in profile
+
+    def test_fmc_rules_have_valid_paths(self) -> None:
+        rules = ProfileRegistry.load_rules("fmc")
+        resolver = PathResolver()
+        for rule in rules:
+            resolver.parse(rule.path)
+
+    def test_fmc_rules_have_valid_strategies(self) -> None:
+        valid_strategies = {
+            "token",
+            "ip_map",
+            "hostname_map",
+            "constant",
+            "hash",
+            "preserve_format",
+        }
+        rules = ProfileRegistry.load_rules("fmc")
+        for rule in rules:
+            assert rule.strategy in valid_strategies, (
+                f"Unknown strategy '{rule.strategy}' in path {rule.path}"
+            )
+
+    def test_fmc_usernames_pack_is_default_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("fmc")
+        user_rules = [r for r in rules if r.category == "USERNAMES"]
+        assert len(user_rules) > 0
+        assert all(r.tier == "default" for r in user_rules)
+
+    def test_fmc_api_urls_pack_is_default_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("fmc")
+        url_rules = [r for r in rules if r.category == "API_URLS"]
+        assert len(url_rules) > 0
+        assert all(r.tier == "default" for r in url_rules)
+
+    def test_fmc_object_names_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("fmc")
+        name_rules = [r for r in rules if r.category == "OBJECT_NAMES"]
+        assert len(name_rules) > 0
+        assert all(r.tier == "optional" for r in name_rules)
+
+    def test_fmc_descriptions_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("fmc")
+        desc_rules = [r for r in rules if r.category == "DESCRIPTIONS"]
+        assert len(desc_rules) > 0
+        assert all(r.tier == "optional" for r in desc_rules)
+
+    def test_fmc_fqdns_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("fmc")
+        fqdn_rules = [r for r in rules if r.category == "FQDNS"]
+        assert len(fqdn_rules) > 0
+        assert all(r.tier == "optional" for r in fqdn_rules)
+
+    def test_fmc_device_names_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("fmc")
+        device_rules = [r for r in rules if r.category == "DEVICE_NAMES"]
+        assert len(device_rules) > 0
+        assert all(r.tier == "optional" for r in device_rules)
+
+
+@pytest.mark.unit
+class TestFMCProfileIntegration:
+    def test_sanitize_with_fmc_profile_redacts_usernames_and_urls(
+        self, tmp_path
+    ) -> None:
+        """FMC profile default-tier packs redact usernames and API URLs."""
+        data = {
+            "access_control_policy": [
+                {
+                    "data": {
+                        "type": "AccessPolicy",
+                        "name": "ACP-Production",
+                        "id": "005056BB-0B24-0ed3-0000-004294967565",
+                        "links": {
+                            "self": "https://10.225.207.189/api/fmc_config/v1/domain/e276abec-e0f2-11e3-8169-6d9ed49b625f/policy/accesspolicies/005056BB-0B24-0ed3-0000-004294967565"
+                        },
+                        "metadata": {
+                            "lastUser": {"name": "camschae"},
+                            "timestamp": 1700000000,
+                        },
+                    },
+                    "endpoint": "/api/fmc_config/v1/domain/e276abec/policy/accesspolicies",
+                }
+            ]
+        }
+        input_file = tmp_path / "fmc.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["fmc"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "fmc.json").read_text())
+        raw = json.dumps(sanitized)
+        assert "camschae" not in raw
+        assert "10.225.207.189" not in raw
+        acp = sanitized["access_control_policy"][0]["data"]
+        assert acp["type"] == "AccessPolicy"
+        assert acp["id"] == "005056BB-0B24-0ed3-0000-004294967565"
+        assert acp["metadata"]["timestamp"] == 1700000000
+
+    def test_fmc_optional_packs_excluded_by_default(self, tmp_path) -> None:
+        """FMC optional-tier packs (object_names, descriptions, fqdns, device_names) not applied by default."""
+        data = {
+            "network": [
+                {
+                    "data": {
+                        "name": "Internal-Servers-Subnet",
+                        "value": "10.1.0.0/24",
+                        "description": "Production server subnet in Building A",
+                        "type": "Network",
+                        "metadata": {"lastUser": {"name": "admin"}},
+                        "links": {
+                            "self": "https://10.225.207.189/api/fmc_config/v1/domain/abc/object/networks/123"
+                        },
+                    },
+                    "endpoint": "/api/fmc_config/v1/domain/abc/object/networks",
+                }
+            ],
+            "device": [
+                {
+                    "data": {
+                        "name": "M1-4215-A-1",
+                        "hostName": "fw-prod-01.example.com",
+                        "type": "Device",
+                        "metadata": {"lastUser": {"name": "admin"}},
+                        "links": {
+                            "self": "https://10.225.207.189/api/fmc_config/v1/domain/abc/devices/devicerecords/456"
+                        },
+                    },
+                    "endpoint": "/api/fmc_config/v1/domain/abc/devices/devicerecords",
+                }
+            ],
+        }
+        input_file = tmp_path / "fmc.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["fmc"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "fmc.json").read_text())
+        net = sanitized["network"][0]["data"]
+        assert net["name"] == "Internal-Servers-Subnet"
+        assert net["description"] == "Production server subnet in Building A"
+        dev = sanitized["device"][0]["data"]
+        assert dev["name"] == "M1-4215-A-1"
+        assert dev["hostName"] == "fw-prod-01.example.com"
+        # Default packs should be redacted
+        assert "admin" not in json.dumps(sanitized)
+        assert "10.225.207.189" not in json.dumps(sanitized)
+        # IP scanner catches standalone IP values
+        assert net["value"] != "10.1.0.0/24"
+
+    def test_fmc_optional_packs_applied_when_enabled(self, tmp_path) -> None:
+        """FMC optional-tier packs redact when explicitly enabled."""
+        data = {
+            "fqdn": [
+                {
+                    "data": {
+                        "name": "Azure-ODS",
+                        "value": "customer.ods.opinsights.azure.com",
+                        "type": "FQDN",
+                        "metadata": {"lastUser": {"name": "netops"}},
+                        "links": {
+                            "self": "https://10.225.207.189/api/fmc_config/v1/domain/abc/object/fqdns/789"
+                        },
+                    },
+                    "endpoint": "/api/fmc_config/v1/domain/abc/object/fqdns",
+                }
+            ],
+            "device": [
+                {
+                    "data": {
+                        "name": "FW-PROD-01",
+                        "hostName": "fw-prod-01.corp.local",
+                        "type": "Device",
+                        "metadata": {"lastUser": {"name": "netops"}},
+                        "links": {
+                            "self": "https://10.225.207.189/api/fmc_config/v1/domain/abc/devices/devicerecords/111"
+                        },
+                    },
+                    "endpoint": "/api/fmc_config/v1/domain/abc/devices/devicerecords",
+                }
+            ],
+        }
+        input_file = tmp_path / "fmc.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["fmc"],
+            packs=PackConfig(enable=["fqdns", "device_names", "object_names"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "fmc.json").read_text())
+        fqdn = sanitized["fqdn"][0]["data"]
+        assert fqdn["value"] != "customer.ods.opinsights.azure.com"
+        dev = sanitized["device"][0]["data"]
+        assert dev["name"] != "FW-PROD-01"
+        assert dev["hostName"] != "fw-prod-01.corp.local"
+        assert fqdn["name"] != "Azure-ODS"
+
+    def test_profiles_list_shows_fmc(self) -> None:
+        """CLI profiles list should show fmc."""
+        from typer.testing import CliRunner
+
+        from nac_sanitizer.cli.main import app
+
+        runner = CliRunner()
+        result = runner.invoke(app, ["profiles", "list"])
+        assert result.exit_code == 0
+        assert "fmc" in result.output

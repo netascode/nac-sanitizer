@@ -1,0 +1,44 @@
+name: fmc
+description: "FMC (Firewall Management Center) collector output"
+version: "1.0"
+
+packs:
+  usernames:
+    tier: default
+    strategy: token
+    paths:
+      - "$..metadata.lastUser.name"
+
+  api_urls:
+    tier: default
+    strategy: token
+    paths:
+      - "$..links.self"
+      - "$..links.parent"
+      - "$..endpoint"
+
+  object_names:
+    tier: optional
+    strategy: token
+    paths:
+      - "$..data.name"
+
+  descriptions:
+    tier: optional
+    strategy: token
+    paths:
+      - "$..data.description"
+
+  fqdns:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.fqdn[*].data.value"
+      - "$.fqdns[*].data.value"
+
+  device_names:
+    tier: optional
+    strategy: hostname_map
+    paths:
+      - "$.device[*].data.name"
+      - "$.device[*].data.hostName"
