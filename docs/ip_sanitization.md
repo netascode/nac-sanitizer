@@ -16,13 +16,15 @@ The scanner matches:
 - IPv4 prefixes: `192.168.1.0/24`
 - IPv6 addresses: `2001:db8::1`
 - IPv6 prefixes: `2001:db8::/32`
+- IPv4 addresses embedded in longer strings (e.g., URLs): `https://10.1.1.1:443/api/v1` → `https://10.0.0.1:443/api/v1`
+
+When an IP is found within a longer string value, only the IP portion is replaced and the surrounding text is preserved. This handles cases like FMC API URLs where the management IP is embedded in endpoint references.
 
 The scanner does **not** match:
 
 - Hostnames: `core-rtr-01`
 - MAC addresses: `00:50:56:9D:A8:63`
 - Interface names: `GigabitEthernet0/0`
-- URLs: `https://10.1.1.1`
 - IP ranges: `9.1.1.134-135`
 - UUIDs: `ef66f799-2217-42a3-92a0-557d5424d5dd`
 

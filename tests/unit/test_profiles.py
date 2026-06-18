@@ -498,12 +498,6 @@ class TestFMCProfileRegistry:
         assert len(user_rules) > 0
         assert all(r.tier == "default" for r in user_rules)
 
-    def test_fmc_api_urls_pack_is_default_tier(self) -> None:
-        rules = ProfileRegistry.load_rules("fmc")
-        url_rules = [r for r in rules if r.category == "API_URLS"]
-        assert len(url_rules) > 0
-        assert all(r.tier == "default" for r in url_rules)
-
     def test_fmc_object_names_pack_is_optional_tier(self) -> None:
         rules = ProfileRegistry.load_rules("fmc")
         name_rules = [r for r in rules if r.category == "OBJECT_NAMES"]

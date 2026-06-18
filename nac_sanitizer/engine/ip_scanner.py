@@ -13,6 +13,10 @@ logger = logging.getLogger(__name__)
 
 _IPV4_PATTERN = re.compile(r"^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(/\d{1,2})?$")
 
+_EMBEDDED_IPV4_PATTERN = re.compile(
+    r"(?<![0-9a-fA-F.:])(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(?:/(\d{1,2}))?(?![0-9.])"
+)
+
 _IPV6_PATTERN = re.compile(r"^([0-9a-fA-F:]{2,39})(/\d{1,3})?$")
 
 
@@ -106,14 +110,24 @@ class IPScanner:
         if isinstance(node, dict):
             for key in node:
                 value = node[key]
-                if isinstance(value, str) and value and is_ip_like(value):
-                    node[key] = self._redact(value)
+                if isinstance(value, str) and value:
+                    if is_ip_like(value):
+                        node[key] = self._redact(value)
+                    else:
+                        replaced = self._redact_embedded(value)
+                        if replaced is not value:
+                            node[key] = replaced
                 elif isinstance(value, (dict, list)):
                     self._walk(value)
         elif isinstance(node, list):
             for i, item in enumerate(node):
-                if isinstance(item, str) and item and is_ip_like(item):
-                    node[i] = self._redact(item)
+                if isinstance(item, str) and item:
+                    if is_ip_like(item):
+                        node[i] = self._redact(item)
+                    else:
+                        replaced = self._redact_embedded(item)
+                        if replaced is not item:
+                            node[i] = replaced
                 elif isinstance(item, (dict, list)):
                     self._walk(item)
 
@@ -128,3 +142,22 @@ class IPScanner:
         logger.debug("Redacted IP: %s → %s", value, sanitized)
         self._mappings[value] = sanitized
         return sanitized
+
+    def _redact_embedded(self, value: str) -> str:
+        """Replace IP addresses found within a longer string (e.g., URLs)."""
+
+        def _replace_match(match: re.Match) -> str:
+            ip_str = match.group(0)
+            addr = match.group(1)
+            octets = addr.split(".")
+            if not all(0 <= int(o) <= 255 for o in octets):
+                return ip_str
+            prefix = match.group(2)
+            if prefix and not (0 <= int(prefix) <= 32):
+                return ip_str
+            if ip_str in _EXCLUDED_VALUES or addr in _EXCLUDED_VALUES:
+                return ip_str
+            return self._redact(ip_str)
+
+        result = _EMBEDDED_IPV4_PATTERN.sub(_replace_match, value)
+        return result if result != value else value

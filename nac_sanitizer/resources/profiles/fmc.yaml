@@ -9,14 +9,6 @@ packs:
     paths:
       - "$..metadata.lastUser.name"
 
-  api_urls:
-    tier: default
-    strategy: token
-    paths:
-      - "$..links.self"
-      - "$..links.parent"
-      - "$..endpoint"
-
   object_names:
     tier: optional
     strategy: token
