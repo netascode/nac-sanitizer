@@ -179,3 +179,64 @@ class TestIPScanner:
         data = {"device": {"ipv6": "2600:1f18:abcd::1"}}
         scanner.scan(data)
         assert data["device"]["ipv6"] != "2600:1f18:abcd::1"
+
+    def test_scan_embedded_ip_in_url(self) -> None:
+        """IPs embedded in URLs are replaced while preserving the URL structure."""
+        allocator = IPAllocator()
+        scanner = IPScanner(allocator)
+        data = {
+            "links": {
+                "self": "https://198.51.100.10:52283/api/fmc_config/v1/domain/abc/object/hosts/123"
+            }
+        }
+        scanner.scan(data)
+        url = data["links"]["self"]
+        assert "198.51.100.10" not in url
+        assert "/api/fmc_config/v1/domain/abc/object/hosts/123" in url
+        assert url.startswith("https://")
+        assert ":52283" in url
+
+    def test_scan_embedded_ip_consistency(self) -> None:
+        """Same IP in a standalone field and a URL receives the same sanitized value."""
+        allocator = IPAllocator()
+        scanner = IPScanner(allocator)
+        data = {
+            "mgmt_ip": "198.51.100.10",
+            "links": {"self": "https://198.51.100.10:443/api/v1/objects"},
+        }
+        scanner.scan(data)
+        sanitized_ip = data["mgmt_ip"]
+        assert f"https://{sanitized_ip}:443/api/v1/objects" == data["links"]["self"]
+
+    def test_scan_embedded_ip_preserves_non_ip_strings(self) -> None:
+        """Strings without IPs are not modified."""
+        allocator = IPAllocator()
+        scanner = IPScanner(allocator)
+        data = {
+            "description": "This is a normal description without IPs",
+            "path": "/api/v1/domain/abc-123/objects",
+            "uuid": "e276abec-e0f2-11e3-8169-6d9ed49b625f",
+        }
+        scanner.scan(data)
+        assert data["description"] == "This is a normal description without IPs"
+        assert data["path"] == "/api/v1/domain/abc-123/objects"
+        assert data["uuid"] == "e276abec-e0f2-11e3-8169-6d9ed49b625f"
+
+    def test_scan_embedded_ip_skips_excluded(self) -> None:
+        """Excluded IPs (0.0.0.0, 255.255.255.255) in strings are not replaced."""
+        allocator = IPAllocator()
+        scanner = IPScanner(allocator)
+        data = {"msg": "default route via 0.0.0.0 is unreachable"}
+        scanner.scan(data)
+        assert data["msg"] == "default route via 0.0.0.0 is unreachable"
+
+    def test_scan_embedded_multiple_ips_in_one_string(self) -> None:
+        """Multiple IPs in a single string are each replaced."""
+        allocator = IPAllocator()
+        scanner = IPScanner(allocator)
+        data = {"range": "from 10.1.1.1 to 10.1.1.254"}
+        scanner.scan(data)
+        assert "10.1.1.1" not in data["range"]
+        assert "10.1.1.254" not in data["range"]
+        assert "from " in data["range"]
+        assert " to " in data["range"]
