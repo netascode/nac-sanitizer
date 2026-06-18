@@ -23,6 +23,9 @@ pip install git+https://github.com/netascode/nac-sanitizer.git
 # Sanitize with a product profile
 nac-sanitizer sanitize collector-output.json --profile sdwan -o sanitized/
 
+# Sanitize FMC collector output
+nac-sanitizer sanitize fmc-backup.json --profile fmc -o sanitized/
+
 # Sanitize an entire directory
 nac-sanitizer sanitize ./collector-output/ --profile ise -o sanitized/
 

@@ -9,6 +9,7 @@ Product profiles are built-in collections of redaction rules specific to a produ
 | `sdwan`           | SD-WAN (vManage)         | credentials                        | hostnames, serial numbers, location data                            |
 | `ise`             | Identity Services Engine | credentials, SNMP communities      | usernames, MAC addresses, domains                                   |
 | `catalyst_center` | Catalyst Center (DNAC)   | (none - credentials masked by API) | usernames, hostnames, serial numbers, MAC addresses, location data  |
+| `fmc`             | Firewall Management Center | usernames, API URLs              | object names, descriptions, FQDNs, device names                     |
 
 List available profiles:
 
@@ -84,3 +85,20 @@ Catalyst Center's API masks credential values as `NO!$DATA!$`, so no credential 
 | serial numbers   | optional | `serialNumber`                            |
 | MAC addresses    | optional | `macAddress`, `apEthernetMacAddress`      |
 | location data    | optional | `siteNameHierarchy`, `groupNameHierarchy` |
+
+## FMC Profile Details
+
+FMC collector output is gathered via the FMC REST API. The exported data contains no plaintext credentials (the API does not expose them), so there is no credentials pack. The primary default-tier targets are usernames embedded in object metadata and the FMC management IP address exposed in API URL fields throughout the data.
+
+FMC backups can be very large (1 GB+) because they include the full Snort intrusion rule database and MITRE ATT&CK group hierarchy. This content is system-defined (identical across all FMC deployments) and contains no customer-sensitive data beyond the management IP in URL fields — the IP scanner does not catch these because they are embedded within longer URL strings rather than appearing as standalone values.
+
+| Pack             | Tier     | Fields Targeted                                                |
+| ---------------- | -------- | -------------------------------------------------------------- |
+| usernames        | default  | `metadata.lastUser.name`                                       |
+| API URLs         | default  | `links.self`, `links.parent`, `endpoint`                       |
+| object names     | optional | `data.name`                                                    |
+| descriptions     | optional | `data.description`                                             |
+| FQDNs            | optional | `fqdn[*].data.value`, `fqdns[*].data.value`                   |
+| device names     | optional | `device[*].data.name`, `device[*].data.hostName`               |
+
+The `api_urls` pack replaces entire URL values with tokens. This is necessary because no substring-replacement strategy currently exists, and these fields are API metadata rather than meaningful configuration data. The management IP is guaranteed to be removed.
