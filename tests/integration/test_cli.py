@@ -4,6 +4,7 @@
 """Integration tests for the CLI layer."""
 
 import json
+import zipfile
 
 import pytest
 from typer.testing import CliRunner
@@ -276,3 +277,179 @@ class TestLogFile:
         )
         assert result.exit_code == 0
         assert "WARNING" in result.output
+
+
+@pytest.mark.integration
+class TestZipInput:
+    @pytest.fixture
+    def sample_zip(self, tmp_path):
+        """Create a zip file containing JSON with sensitive data."""
+        data = {
+            "devices": [
+                {
+                    "hostname": "core-rtr-01",
+                    "mgmt_ip": "10.50.1.1",
+                    "config": {"password": "secret123"},
+                }
+            ]
+        }
+        zip_path = tmp_path / "collector-output.zip"
+        with zipfile.ZipFile(zip_path, "w") as zf:
+            zf.writestr("device.json", json.dumps(data))
+        return zip_path
+
+    @pytest.fixture
+    def sample_zip_nested(self, tmp_path):
+        """Create a zip with nested directory structure."""
+        zip_path = tmp_path / "multi-site.zip"
+        with zipfile.ZipFile(zip_path, "w") as zf:
+            zf.writestr(
+                "site-a/switch.json",
+                json.dumps({"hostname": "sw-a1", "mgmt_ip": "10.1.1.1"}),
+            )
+            zf.writestr(
+                "site-b/router.json",
+                json.dumps({"hostname": "rtr-b1", "mgmt_ip": "10.2.2.1"}),
+            )
+        return zip_path
+
+    def test_zip_input_produces_zip_output(
+        self, sample_zip, sample_config, tmp_path
+    ) -> None:
+        output_dir = tmp_path / "output"
+        result = runner.invoke(
+            app,
+            [
+                "sanitize",
+                str(sample_zip),
+                "-o",
+                str(output_dir),
+                "-c",
+                str(sample_config),
+            ],
+        )
+        assert result.exit_code == 0
+        assert "Sanitization complete" in result.output
+
+        output_zip = tmp_path / "output.zip"
+        assert output_zip.exists()
+        assert not output_dir.exists()
+
+        with zipfile.ZipFile(output_zip, "r") as zf:
+            names = zf.namelist()
+            assert "device.json" in names
+            content = json.loads(zf.read("device.json"))
+            raw = json.dumps(content)
+            assert "secret123" not in raw
+            assert "10.50.1.1" not in raw
+            assert "core-rtr-01" not in raw
+
+    def test_zip_input_with_no_zip_flag(
+        self, sample_zip, sample_config, tmp_path
+    ) -> None:
+        output_dir = tmp_path / "output"
+        result = runner.invoke(
+            app,
+            [
+                "sanitize",
+                str(sample_zip),
+                "-o",
+                str(output_dir),
+                "-c",
+                str(sample_config),
+                "--no-zip",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "Sanitization complete" in result.output
+
+        assert output_dir.exists()
+        assert output_dir.is_dir()
+        assert (output_dir / "device.json").exists()
+
+        sanitized = json.loads((output_dir / "device.json").read_text())
+        raw = json.dumps(sanitized)
+        assert "secret123" not in raw
+        assert "10.50.1.1" not in raw
+
+    def test_zip_input_rosetta_alongside_output(
+        self, sample_zip, sample_config, tmp_path
+    ) -> None:
+        output_dir = tmp_path / "output"
+        result = runner.invoke(
+            app,
+            [
+                "sanitize",
+                str(sample_zip),
+                "-o",
+                str(output_dir),
+                "-c",
+                str(sample_config),
+            ],
+        )
+        assert result.exit_code == 0
+
+        rosetta_files = list(tmp_path.glob("nac-sanitizer-rosetta-*.json"))
+        assert len(rosetta_files) == 1
+        rosetta = json.loads(rosetta_files[0].read_text())
+        assert "metadata" in rosetta
+        assert "mappings" in rosetta
+
+    def test_zip_input_nested_structure(
+        self, sample_zip_nested, sample_config, tmp_path
+    ) -> None:
+        output_dir = tmp_path / "output"
+        result = runner.invoke(
+            app,
+            [
+                "sanitize",
+                str(sample_zip_nested),
+                "-o",
+                str(output_dir),
+                "-c",
+                str(sample_config),
+                "--no-zip",
+            ],
+        )
+        assert result.exit_code == 0
+        assert (output_dir / "site-a" / "switch.json").exists()
+        assert (output_dir / "site-b" / "router.json").exists()
+
+    def test_zip_dry_run(self, sample_zip, sample_config, tmp_path) -> None:
+        output_dir = tmp_path / "output"
+        result = runner.invoke(
+            app,
+            [
+                "sanitize",
+                str(sample_zip),
+                "-o",
+                str(output_dir),
+                "-c",
+                str(sample_config),
+                "--dry-run",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "Dry run summary" in result.output
+        assert "Files scanned: 1" in result.output
+        assert not output_dir.exists()
+
+    def test_no_zip_flag_ignored_for_non_zip_input(
+        self, sample_input_file, sample_config, tmp_path
+    ) -> None:
+        output_dir = tmp_path / "output"
+        result = runner.invoke(
+            app,
+            [
+                "sanitize",
+                str(sample_input_file),
+                "-o",
+                str(output_dir),
+                "-c",
+                str(sample_config),
+                "--no-zip",
+            ],
+        )
+        assert result.exit_code == 0
+        assert output_dir.is_dir()
+        assert (output_dir / "input.json").exists()
