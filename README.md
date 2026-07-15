@@ -20,7 +20,7 @@ pip install git+https://github.com/netascode/nac-sanitizer.git
 ## Updating
 
 ```bash
-uv tool upgrade nac-sanitizer
+uv tool install --reinstall git+https://github.com/netascode/nac-sanitizer.git
 ```
 
 ## Quick Start
