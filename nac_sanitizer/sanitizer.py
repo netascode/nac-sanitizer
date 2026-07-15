@@ -5,7 +5,9 @@
 
 import json
 import logging
+import re
 from pathlib import Path
+from typing import Any
 
 from nac_sanitizer import __version__
 from nac_sanitizer.config.models import RedactionRule, SanitizerConfig
@@ -192,50 +194,121 @@ class Sanitizer:
 
         return filtered
 
+    _SIMPLE_DESCENT_RE = re.compile(r"^\$\.\.([a-zA-Z_][a-zA-Z0-9_-]*)$")
+
     def _sanitize_data(self, data: object, rules: list[RedactionRule]) -> object:
         """Apply all rules to a JSON data structure."""
+        simple_rules: dict[str, RedactionRule] = {}
+        complex_rules: list[RedactionRule] = []
+
         for rule in rules:
-            matches = self._resolver.find_matches(rule.path, data)
-            applied = 0
-            total = len(matches)
-            for match in matches:
-                original = match.value
-                if not isinstance(original, (str, int, float)):
-                    continue
-                if original == "" or original is None:
-                    continue
-                try:
-                    sanitized = self._strategies.apply(
-                        rule.strategy, original, rule.category
-                    )
-                except (ValueError, KeyError) as e:
-                    logger.warning(
-                        "Strategy '%s' failed for path '%s' value '%s': %s",
-                        rule.strategy,
-                        rule.path,
-                        original,
-                        e,
-                    )
-                    continue
-                self._rosetta.record(str(original), sanitized, rule.category)
-                self._resolver.update_value(match, data, sanitized)
-                applied += 1
-                if applied % 1000 == 0:
-                    logger.debug(
-                        "Rule '%s' (%s): %d/%d matches processed",
-                        rule.path,
-                        rule.strategy,
-                        applied,
-                        total,
-                    )
-            if applied:
+            match = self._SIMPLE_DESCENT_RE.match(rule.path)
+            if match:
+                simple_rules[match.group(1)] = rule
+            else:
+                complex_rules.append(rule)
+
+        if simple_rules:
+            self._apply_simple_rules(data, simple_rules)
+
+        for rule in complex_rules:
+            self._apply_jsonpath_rule(data, rule)
+
+        return data
+
+    def _apply_simple_rules(
+        self, data: object, rules: dict[str, RedactionRule]
+    ) -> None:
+        """Apply all $..field rules in a single tree walk."""
+        applied: dict[str, int] = {}
+        self._walk_and_redact(data, rules, applied)
+        for field, count in applied.items():
+            rule = rules[field]
+            logger.debug(
+                "Rule '$..%s' (%s): %d values redacted",
+                field,
+                rule.strategy,
+                count,
+            )
+
+    def _walk_and_redact(
+        self,
+        node: Any,
+        rules: dict[str, RedactionRule],
+        applied: dict[str, int],
+    ) -> None:
+        """Recursively walk JSON and redact matching field names in-place."""
+        if isinstance(node, dict):
+            for key in node:
+                value = node[key]
+                if key in rules and isinstance(value, (str, int, float)):
+                    if value != "" and value is not None:
+                        rule = rules[key]
+                        try:
+                            sanitized = self._strategies.apply(
+                                rule.strategy, value, rule.category
+                            )
+                        except (ValueError, KeyError) as e:
+                            logger.warning(
+                                "Strategy '%s' failed for '$..%s' value '%s': %s",
+                                rule.strategy,
+                                key,
+                                value,
+                                e,
+                            )
+                            continue
+                        self._rosetta.record(str(value), sanitized, rule.category)
+                        node[key] = sanitized
+                        applied[key] = applied.get(key, 0) + 1
+                elif isinstance(value, (dict, list)):
+                    self._walk_and_redact(value, rules, applied)
+        elif isinstance(node, list):
+            for item in node:
+                if isinstance(item, (dict, list)):
+                    self._walk_and_redact(item, rules, applied)
+
+    def _apply_jsonpath_rule(self, data: object, rule: RedactionRule) -> None:
+        """Apply a single complex JSONPath rule using the resolver."""
+        matches = self._resolver.find_matches(rule.path, data)
+        applied = 0
+        total = len(matches)
+        for match in matches:
+            original = match.value
+            if not isinstance(original, (str, int, float)):
+                continue
+            if original == "" or original is None:
+                continue
+            try:
+                sanitized = self._strategies.apply(
+                    rule.strategy, original, rule.category
+                )
+            except (ValueError, KeyError) as e:
+                logger.warning(
+                    "Strategy '%s' failed for path '%s' value '%s': %s",
+                    rule.strategy,
+                    rule.path,
+                    original,
+                    e,
+                )
+                continue
+            self._rosetta.record(str(original), sanitized, rule.category)
+            self._resolver.update_value(match, data, sanitized)
+            applied += 1
+            if applied % 1000 == 0:
                 logger.debug(
-                    "Rule '%s' (%s): %d values redacted",
+                    "Rule '%s' (%s): %d/%d matches processed",
                     rule.path,
                     rule.strategy,
                     applied,
+                    total,
                 )
-        return data
+        if applied:
+            logger.debug(
+                "Rule '%s' (%s): %d values redacted",
+                rule.path,
+                rule.strategy,
+                applied,
+            )
 
     def _discover_input_files(self, path: Path) -> list[Path]:
         """Find all JSON files to process."""
