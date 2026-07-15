@@ -26,7 +26,13 @@ uv tool install --reinstall git+https://github.com/netascode/nac-sanitizer.git
 ## Quick Start
 
 ```bash
-# Sanitize with a product profile
+# Sanitize a .zip file from nac-collector (output is re-zipped by default)
+nac-sanitizer sanitize collector-output.zip --profile sdwan -o sanitized/
+
+# Sanitize a .zip but output uncompressed files instead
+nac-sanitizer sanitize collector-output.zip --profile sdwan -o sanitized/ --no-zip
+
+# Sanitize a single JSON file
 nac-sanitizer sanitize collector-output.json --profile sdwan -o sanitized/
 
 # Sanitize FMC collector output

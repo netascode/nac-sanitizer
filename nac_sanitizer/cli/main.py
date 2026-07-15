@@ -57,7 +57,7 @@ def main(
 def sanitize(
     input_path: Annotated[
         Path,
-        typer.Argument(help="Input JSON file or directory", exists=True),
+        typer.Argument(help="Input JSON file, directory, or .zip archive", exists=True),
     ],
     output: Annotated[
         Path,
@@ -82,12 +82,25 @@ def sanitize(
             "--dry-run", help="Show what would be redacted without writing files"
         ),
     ] = False,
+    no_zip: Annotated[
+        bool,
+        typer.Option(
+            "--no-zip",
+            help="Output sanitized files uncompressed instead of re-zipping",
+        ),
+    ] = False,
 ) -> None:
     """Sanitize nac-collector JSON output."""
     from nac_sanitizer.config.loader import ConfigurationError, load_config
     from nac_sanitizer.engine.ip_allocator import PoolExhaustedError
     from nac_sanitizer.profiles.registry import ProfileNotFoundError
     from nac_sanitizer.sanitizer import Sanitizer
+    from nac_sanitizer.zip_handler import (
+        cleanup_temp_dir,
+        create_zip,
+        extract_zip,
+        is_zip_file,
+    )
 
     try:
         cfg = load_config(
@@ -99,41 +112,64 @@ def sanitize(
         raise typer.Exit(1) from e
 
     sanitizer = Sanitizer(cfg)
+    zip_input = is_zip_file(input_path)
+    tmp_dir = None
 
-    if dry_run:
+    try:
+        effective_input = input_path
+        if zip_input:
+            tmp_dir = extract_zip(input_path)
+            effective_input = tmp_dir
+
+        if dry_run:
+            try:
+                summary = sanitizer.run_dry(effective_input)
+            except ProfileNotFoundError as e:
+                console.print(f"[bold red]Profile error:[/bold red] {e}")
+                raise typer.Exit(1) from e
+            except Exception as e:
+                console.print(f"[bold red]Error:[/bold red] {e}")
+                raise typer.Exit(1) from e
+
+            console.print("\n[bold]Dry run summary[/bold]")
+            console.print(f"  Files scanned: {summary['files_scanned']}")
+            console.print(f"  Total matches: {summary['total_matches']}")
+            if summary["by_category"]:
+                console.print("  By category:")
+                for cat, count in sorted(summary["by_category"].items()):
+                    console.print(f"    {cat}: {count}")
+            raise typer.Exit(0)
+
         try:
-            summary = sanitizer.run_dry(input_path)
+            rosetta_path = sanitizer.run(effective_input, output)
         except ProfileNotFoundError as e:
             console.print(f"[bold red]Profile error:[/bold red] {e}")
+            raise typer.Exit(1) from e
+        except PoolExhaustedError as e:
+            console.print(f"[bold red]Pool exhausted:[/bold red] {e}")
             raise typer.Exit(1) from e
         except Exception as e:
             console.print(f"[bold red]Error:[/bold red] {e}")
             raise typer.Exit(1) from e
 
-        console.print("\n[bold]Dry run summary[/bold]")
-        console.print(f"  Files scanned: {summary['files_scanned']}")
-        console.print(f"  Total matches: {summary['total_matches']}")
-        if summary["by_category"]:
-            console.print("  By category:")
-            for cat, count in sorted(summary["by_category"].items()):
-                console.print(f"    {cat}: {count}")
-        raise typer.Exit(0)
+        if zip_input and not no_zip:
+            output_zip = output.with_suffix(".zip")
+            rosetta_path.rename(output.parent / rosetta_path.name)
+            rosetta_path = output.parent / rosetta_path.name
+            create_zip(output, output_zip)
+            import shutil
 
-    try:
-        rosetta_path = sanitizer.run(input_path, output)
-    except ProfileNotFoundError as e:
-        console.print(f"[bold red]Profile error:[/bold red] {e}")
-        raise typer.Exit(1) from e
-    except PoolExhaustedError as e:
-        console.print(f"[bold red]Pool exhausted:[/bold red] {e}")
-        raise typer.Exit(1) from e
-    except Exception as e:
-        console.print(f"[bold red]Error:[/bold red] {e}")
-        raise typer.Exit(1) from e
-
-    console.print("[green]Sanitization complete.[/green]")
-    console.print(f"  Output: {output}")
-    console.print(f"  Rosetta Stone: {rosetta_path}")
+            shutil.rmtree(output)
+            console.print("[green]Sanitization complete.[/green]")
+            console.print(f"  Output: {output_zip}")
+            console.print(f"  Rosetta Stone: {rosetta_path}")
+        else:
+            console.print("[green]Sanitization complete.[/green]")
+            console.print(f"  Output: {output}")
+            console.print(f"  Rosetta Stone: {rosetta_path}")
+    finally:
+        if tmp_dir:
+            cleanup_temp_dir(tmp_dir)
 
 
 @app.command()
