@@ -197,6 +197,7 @@ class Sanitizer:
         for rule in rules:
             matches = self._resolver.find_matches(rule.path, data)
             applied = 0
+            total = len(matches)
             for match in matches:
                 original = match.value
                 if not isinstance(original, (str, int, float)):
@@ -219,6 +220,14 @@ class Sanitizer:
                 self._rosetta.record(str(original), sanitized, rule.category)
                 self._resolver.update_value(match, data, sanitized)
                 applied += 1
+                if applied % 1000 == 0:
+                    logger.debug(
+                        "Rule '%s' (%s): %d/%d matches processed",
+                        rule.path,
+                        rule.strategy,
+                        applied,
+                        total,
+                    )
             if applied:
                 logger.debug(
                     "Rule '%s' (%s): %d values redacted",
