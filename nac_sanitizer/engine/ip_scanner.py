@@ -67,6 +67,14 @@ def _is_ipv6(value: str) -> bool:
     return True
 
 
+_MIN_IPV4_LEN = 7  # shortest possible: "1.2.3.4"
+
+
+def _could_contain_ipv4(value: str) -> bool:
+    """Fast pre-check: can this string possibly contain an embedded IPv4?"""
+    return len(value) >= _MIN_IPV4_LEN and "." in value
+
+
 _EXCLUDED_VALUES = frozenset(
     {
         "0.0.0.0",
@@ -113,7 +121,7 @@ class IPScanner:
                 if isinstance(value, str) and value:
                     if is_ip_like(value):
                         node[key] = self._redact(value)
-                    else:
+                    elif _could_contain_ipv4(value):
                         replaced = self._redact_embedded(value)
                         if replaced is not value:
                             node[key] = replaced
@@ -124,7 +132,7 @@ class IPScanner:
                 if isinstance(item, str) and item:
                     if is_ip_like(item):
                         node[i] = self._redact(item)
-                    else:
+                    elif _could_contain_ipv4(item):
                         replaced = self._redact_embedded(item)
                         if replaced is not item:
                             node[i] = replaced
