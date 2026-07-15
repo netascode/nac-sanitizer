@@ -7,7 +7,7 @@ import logging
 from typing import Any
 
 from jsonpath_ng.ext.parser import ExtentedJsonPathParser
-from jsonpath_ng.jsonpath import DatumInContext
+from jsonpath_ng.jsonpath import DatumInContext, Fields, Index
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +42,20 @@ class PathResolver:
         return expr.find(data)
 
     def update_value(self, match: DatumInContext, data: Any, new_value: Any) -> Any:
-        """Replace the value at a matched path location in-place."""
-        match.full_path.update_or_create(data, new_value)
+        """Replace the value at a matched path location in-place.
+
+        Uses direct parent-container mutation for O(1) updates instead of
+        jsonpath_ng's update_or_create which re-walks the entire document.
+        """
+        if match.context is not None:
+            parent = match.context.value
+            if isinstance(match.path, Fields):
+                for field in match.path.fields:
+                    parent[field] = new_value
+            elif isinstance(match.path, Index) and len(match.path.indices) == 1:
+                parent[match.path.indices[0]] = new_value
+            else:
+                match.full_path.update_or_create(data, new_value)
+        else:
+            match.full_path.update_or_create(data, new_value)
         return data
