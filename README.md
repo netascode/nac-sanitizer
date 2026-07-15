@@ -17,6 +17,12 @@ Or with pip:
 pip install git+https://github.com/netascode/nac-sanitizer.git
 ```
 
+## Updating
+
+```bash
+uv tool install --reinstall git+https://github.com/netascode/nac-sanitizer.git
+```
+
 ## Quick Start
 
 ```bash
