@@ -36,6 +36,8 @@ def _is_ipv4(value: str) -> bool:
 
 def _is_ipv6(value: str) -> bool:
     """Check if a string looks like an IPv6 address or prefix."""
+    if ":" not in value:
+        return False
     match = _IPV6_PATTERN.match(value)
     if not match:
         return False
