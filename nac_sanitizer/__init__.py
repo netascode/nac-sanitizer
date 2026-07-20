@@ -3,4 +3,7 @@
 
 """nac-sanitizer: Sanitize sensitive values in nac-collector JSON output."""
 
-__version__ = "0.1.0"
+try:
+    from nac_sanitizer._version import __version__  # ty: ignore[unresolved-import]
+except ModuleNotFoundError:
+    __version__ = "0.0.0.dev0"

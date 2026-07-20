@@ -53,6 +53,7 @@ EXCLUDE_PATTERNS=(
     "./dist/*"
     "./.pytest_cache/*"
     "./.mypy_cache/*"
+    "*/_version.py"
 )
 
 build_find_command() {

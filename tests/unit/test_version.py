@@ -3,6 +3,8 @@
 
 """Verify package metadata."""
 
+import re
+
 import pytest
 
 from nac_sanitizer import __version__
@@ -10,4 +12,10 @@ from nac_sanitizer import __version__
 
 @pytest.mark.unit
 def test_version_is_set() -> None:
-    assert __version__ == "0.1.0"
+    assert isinstance(__version__, str)
+    assert len(__version__) > 0
+
+
+@pytest.mark.unit
+def test_version_format() -> None:
+    assert re.match(r"\d+\.\d+", __version__)

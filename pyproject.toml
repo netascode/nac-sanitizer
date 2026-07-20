@@ -1,6 +1,6 @@
 [project]
 name = "nac-sanitizer"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Sanitize sensitive values in nac-collector JSON output with reversible mappings."
 license = { text = "MPL-2.0" }
 readme = "README.md"
@@ -47,11 +47,17 @@ dev = [
     "ty>=0.0.59",
 ]
 
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "nac_sanitizer/_version.py"
+
 [tool.hatch.build.targets.wheel]
 packages = ["nac_sanitizer"]
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [tool.ruff]
@@ -74,6 +80,7 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
+"_version.py" = ["ALL"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["nac_sanitizer"]
