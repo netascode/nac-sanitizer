@@ -68,11 +68,20 @@ def _is_ipv6(value: str) -> bool:
 
 
 _MIN_IPV4_LEN = 7  # shortest possible: "1.2.3.4"
+_DIGITS = frozenset("0123456789")
 
 
 def _could_contain_ipv4(value: str) -> bool:
     """Fast pre-check: can this string possibly contain an embedded IPv4?"""
-    return len(value) >= _MIN_IPV4_LEN and "." in value
+    if len(value) < _MIN_IPV4_LEN or "." not in value:
+        return False
+    # IPv4 addresses always contain digits; skip strings that are purely
+    # alphabetic/symbolic (e.g., "some.hostname.example.com" without digits
+    # won't match the embedded pattern anyway, but the regex is expensive)
+    for ch in value:
+        if ch in _DIGITS:
+            return True
+    return False
 
 
 _EXCLUDED_VALUES = frozenset(
