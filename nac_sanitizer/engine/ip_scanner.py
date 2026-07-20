@@ -128,30 +128,33 @@ class IPScanner:
         self._walk(data)
         return data
 
-    def _walk(self, node: Any) -> None:
-        if isinstance(node, dict):
-            for key in node:
-                value = node[key]
-                if isinstance(value, str) and value:
-                    if is_ip_like(value):
-                        node[key] = self._redact(value)
-                    elif _could_contain_ipv4(value):
-                        replaced = self._redact_embedded(value)
-                        if replaced is not value:
-                            node[key] = replaced
-                elif isinstance(value, (dict, list)):
-                    self._walk(value)
-        elif isinstance(node, list):
-            for i, item in enumerate(node):
-                if isinstance(item, str) and item:
-                    if is_ip_like(item):
-                        node[i] = self._redact(item)
-                    elif _could_contain_ipv4(item):
-                        replaced = self._redact_embedded(item)
-                        if replaced is not item:
-                            node[i] = replaced
-                elif isinstance(item, (dict, list)):
-                    self._walk(item)
+    def _walk(self, root: Any) -> None:
+        stack: list[Any] = [root]
+        while stack:
+            node = stack.pop()
+            if isinstance(node, dict):
+                for key in node:
+                    value = node[key]
+                    if isinstance(value, str) and value:
+                        if is_ip_like(value):
+                            node[key] = self._redact(value)
+                        elif _could_contain_ipv4(value):
+                            replaced = self._redact_embedded(value)
+                            if replaced is not value:
+                                node[key] = replaced
+                    elif isinstance(value, (dict, list)):
+                        stack.append(value)
+            elif isinstance(node, list):
+                for i, item in enumerate(node):
+                    if isinstance(item, str) and item:
+                        if is_ip_like(item):
+                            node[i] = self._redact(item)
+                        elif _could_contain_ipv4(item):
+                            replaced = self._redact_embedded(item)
+                            if replaced is not item:
+                                node[i] = replaced
+                    elif isinstance(item, (dict, list)):
+                        stack.append(item)
 
     def _redact(self, value: str) -> str:
         if value in self._mappings:
