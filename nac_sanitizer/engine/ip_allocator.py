@@ -3,6 +3,7 @@
 
 """IP address and prefix allocation with subnet topology preservation."""
 
+import bisect
 import ipaddress
 import logging
 import re
@@ -62,6 +63,16 @@ class IPAllocator:
     _ipv4_offset: int = field(default=0, init=False)
     _ipv6_offset: int = field(default=0, init=False)
 
+    # O(1) exact network lookup (keyed by network object)
+    _network_exact_map: dict[IPv4Or6Network, int] = field(
+        default_factory=dict, init=False
+    )
+    # Sorted list of (network_address_int, broadcast_address_int, mapping_index)
+    # for O(log n) host containment queries
+    _sorted_originals: list[tuple[int, int, int]] = field(
+        default_factory=list, init=False
+    )
+
     def __post_init__(self) -> None:
         self._ipv4_pool_networks = [ipaddress.IPv4Network(p) for p in self.ipv4_pools]
         self._ipv6_pool_networks = [ipaddress.IPv6Network(p) for p in self.ipv6_pools]
@@ -88,13 +99,16 @@ class IPAllocator:
         except ValueError as e:
             raise ValueError(f"Cannot parse as network: {value}") from e
 
-        for mapping in self._subnet_mappings:
-            if network == mapping.original:
-                return str(mapping.sanitized)
+        idx = self._network_exact_map.get(network)
+        if idx is not None:
+            return str(self._subnet_mappings[idx].sanitized)
 
         prefix_len = network.prefixlen
         sanitized_network = self._next_available_network(network.version, prefix_len)
+        idx = len(self._subnet_mappings)
         self._subnet_mappings.append(SubnetMapping(network, sanitized_network))
+        self._network_exact_map[network] = idx
+        self._register_original_range(network, idx)
         return str(sanitized_network)
 
     def _allocate_host(self, value: str) -> str:
@@ -103,11 +117,15 @@ class IPAllocator:
         except ValueError as e:
             raise ValueError(f"Cannot parse as IP address: {value}") from e
 
-        for mapping in self._subnet_mappings:
-            if addr in mapping.original:
-                offset = int(addr) - int(mapping.original.network_address)
-                sanitized_addr = mapping.sanitized.network_address + offset
-                return str(sanitized_addr)
+        addr_int = int(addr)
+
+        # O(log n) containment check
+        mapping_idx = self._find_containing_mapping(addr_int)
+        if mapping_idx is not None:
+            mapping = self._subnet_mappings[mapping_idx]
+            offset = addr_int - int(mapping.original.network_address)
+            sanitized_addr = mapping.sanitized.network_address + offset
+            return str(sanitized_addr)
 
         default_prefix = (
             self.default_ipv4_prefix if addr.version == 4 else self.default_ipv6_prefix
@@ -116,20 +134,58 @@ class IPAllocator:
             f"{addr}/{default_prefix}", strict=False
         )
 
-        # Check if this inferred network overlaps an existing mapping
-        for mapping in self._subnet_mappings:
-            if mapping.original.overlaps(original_network):
-                original_network = mapping.original
-                offset = int(addr) - int(mapping.original.network_address)
-                sanitized_addr = mapping.sanitized.network_address + offset
-                return str(sanitized_addr)
+        # Check if the inferred network overlaps an existing mapping (O(log n))
+        overlap_idx = self._find_overlapping_mapping(original_network)
+        if overlap_idx is not None:
+            mapping = self._subnet_mappings[overlap_idx]
+            offset = addr_int - int(mapping.original.network_address)
+            sanitized_addr = mapping.sanitized.network_address + offset
+            return str(sanitized_addr)
 
         sanitized_network = self._next_available_network(addr.version, default_prefix)
+        idx = len(self._subnet_mappings)
         self._subnet_mappings.append(SubnetMapping(original_network, sanitized_network))
+        self._network_exact_map[original_network] = idx
+        self._register_original_range(original_network, idx)
 
-        offset = int(addr) - int(original_network.network_address)
+        offset = addr_int - int(original_network.network_address)
         sanitized_addr = sanitized_network.network_address + offset
         return str(sanitized_addr)
+
+    def _register_original_range(self, network: IPv4Or6Network, idx: int) -> None:
+        """Insert the network's address range into the sorted lookup structure."""
+        net_int = int(network.network_address)
+        bcast_int = int(network.broadcast_address)
+        entry = (net_int, bcast_int, idx)
+        pos = bisect.bisect_left(self._sorted_originals, (net_int,))
+        self._sorted_originals.insert(pos, entry)
+
+    def _find_containing_mapping(self, addr_int: int) -> int | None:
+        """O(log n) lookup: find which mapping's original network contains addr_int."""
+        pos = bisect.bisect_right(self._sorted_originals, (addr_int,)) - 1
+        while pos >= 0:
+            net_int, bcast_int, idx = self._sorted_originals[pos]
+            if net_int <= addr_int <= bcast_int:
+                return idx
+            if addr_int - net_int > bcast_int - net_int:
+                break
+            pos -= 1
+        return None
+
+    def _find_overlapping_mapping(self, network: IPv4Or6Network) -> int | None:
+        """O(log n) lookup: find a mapping whose original overlaps the given network."""
+        net_int = int(network.network_address)
+        bcast_int = int(network.broadcast_address)
+
+        pos = bisect.bisect_right(self._sorted_originals, (bcast_int,)) - 1
+        while pos >= 0:
+            entry_net, entry_bcast, idx = self._sorted_originals[pos]
+            if entry_net <= bcast_int and net_int <= entry_bcast:
+                return idx
+            if entry_bcast < net_int:
+                break
+            pos -= 1
+        return None
 
     def _next_available_network(self, version: int, prefix_len: int) -> IPv4Or6Network:
         """Allocate the next available network of the given prefix length from pools."""
