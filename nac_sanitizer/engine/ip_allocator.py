@@ -60,17 +60,21 @@ class IPAllocator:
     _ipv6_pool_networks: list[ipaddress.IPv6Network] = field(
         default_factory=list, init=False
     )
-    _ipv4_offset: int = field(default=0, init=False)
-    _ipv6_offset: int = field(default=0, init=False)
-
     # O(1) exact network lookup (keyed by network object)
     _network_exact_map: dict[IPv4Or6Network, int] = field(
         default_factory=dict, init=False
     )
     # Sorted list of (network_address_int, broadcast_address_int, mapping_index)
-    # for O(log n) host containment queries
+    # for O(log n) host containment queries on original networks
     _sorted_originals: list[tuple[int, int, int]] = field(
         default_factory=list, init=False
+    )
+    # Sorted list of (network_address_int, broadcast_address_int)
+    # for O(log n) overlap checks on sanitized networks
+    _sorted_sanitized: list[tuple[int, int]] = field(default_factory=list, init=False)
+    # Tracks the next sequential offset per (version, prefix_len) for O(1) allocation
+    _allocation_counters: dict[tuple[int, int], int] = field(
+        default_factory=dict, init=False
     )
 
     def __post_init__(self) -> None:
@@ -200,27 +204,74 @@ class IPAllocator:
         prefix_len: int,
         version: int,
     ) -> IPv4Or6Network:
-        """Find the next non-overlapping network from the configured pools."""
+        """Compute the next available subnet via arithmetic offset.
+
+        Instead of enumerating all possible subnets, we maintain a counter per
+        (version, prefix_len) and compute the N-th subnet directly. Cross-prefix
+        overlaps are checked via O(log n) bisect on the sanitized range structure.
+        """
+        key = (version, prefix_len)
+        offset = self._allocation_counters.get(key, 0)
+
+        while True:
+            subnet = self._subnet_at_offset(pools, prefix_len, version, offset)
+            if subnet is None:
+                pool_cidrs = ", ".join(str(p) for p in pools)
+                raise PoolExhaustedError(
+                    f"Ran out of IPv{version} /{prefix_len} address space for "
+                    f"sanitization. All {len(self._subnet_mappings)} allocated subnets "
+                    f"have consumed the configured pools ({pool_cidrs}). "
+                    f"Add larger or additional pools under 'ip_pools.ipv{version}' "
+                    f"in your configuration file to increase capacity."
+                )
+
+            if not self._overlaps_sanitized(subnet):
+                self._allocation_counters[key] = offset + 1
+                self._register_sanitized_range(subnet)
+                return subnet
+            offset += 1
+
+    def _subnet_at_offset(
+        self,
+        pools: list,
+        prefix_len: int,
+        version: int,
+        offset: int,
+    ) -> IPv4Or6Network | None:
+        """Compute the subnet at a given sequential offset across all pools."""
         for pool in pools:
             if pool.prefixlen > prefix_len:
                 continue
+            capacity = 2 ** (prefix_len - pool.prefixlen)
+            if offset < capacity:
+                subnet_size = 2 ** (pool.max_prefixlen - prefix_len)
+                subnet_start = int(pool.network_address) + (offset * subnet_size)
+                if version == 4:
+                    return ipaddress.IPv4Network((subnet_start, prefix_len))
+                else:
+                    return ipaddress.IPv6Network((subnet_start, prefix_len))
+            offset -= capacity
+        return None
 
-            for subnet in pool.subnets(new_prefix=prefix_len):
-                if not self._overlaps_existing(subnet):
-                    return subnet
+    def _register_sanitized_range(self, network: IPv4Or6Network) -> None:
+        """Insert the sanitized network's range into the sorted structure."""
+        net_int = int(network.network_address)
+        bcast_int = int(network.broadcast_address)
+        entry = (net_int, bcast_int)
+        pos = bisect.bisect_left(self._sorted_sanitized, (net_int,))
+        self._sorted_sanitized.insert(pos, entry)
 
-        pool_cidrs = ", ".join(str(p) for p in pools)
-        raise PoolExhaustedError(
-            f"Ran out of IPv{version} /{prefix_len} address space for sanitization. "
-            f"All {len(self._subnet_mappings)} allocated subnets have consumed the "
-            f"configured pools ({pool_cidrs}). "
-            f"Add larger or additional pools under 'ip_pools.ipv{version}' "
-            f"in your configuration file to increase capacity."
-        )
+    def _overlaps_sanitized(self, candidate: IPv4Or6Network) -> bool:
+        """O(log n) check if a candidate overlaps any allocated sanitized network."""
+        net_int = int(candidate.network_address)
+        bcast_int = int(candidate.broadcast_address)
 
-    def _overlaps_existing(self, candidate: IPv4Or6Network) -> bool:
-        """Check if a candidate network overlaps any already-allocated network."""
-        for mapping in self._subnet_mappings:
-            if mapping.sanitized.overlaps(candidate):
+        pos = bisect.bisect_right(self._sorted_sanitized, (bcast_int,)) - 1
+        while pos >= 0:
+            entry_net, entry_bcast = self._sorted_sanitized[pos]
+            if entry_net <= bcast_int and net_int <= entry_bcast:
                 return True
+            if entry_bcast < net_int:
+                break
+            pos -= 1
         return False
