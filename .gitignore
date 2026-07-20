@@ -14,5 +14,8 @@ coverage.xml
 # Virtual environments
 .venv
 
+# hatch-vcs generated version file
+nac_sanitizer/_version.py
+
 # Internal documentation (not for distribution)
 doc/internal/

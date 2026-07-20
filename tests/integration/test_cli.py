@@ -4,6 +4,7 @@
 """Integration tests for the CLI layer."""
 
 import json
+import re
 import zipfile
 
 import pytest
@@ -53,7 +54,7 @@ class TestVersion:
         result = runner.invoke(app, ["--version"])
         assert result.exit_code == 0
         assert "nac-sanitizer" in result.output
-        assert "0.1.0" in result.output
+        assert re.search(r"\d+\.\d+", result.output)
 
 
 @pytest.mark.integration
