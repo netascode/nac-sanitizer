@@ -54,6 +54,9 @@ class IPAllocator:
 
     _host_map: dict[str, str] = field(default_factory=dict, init=False)
     _subnet_mappings: list[SubnetMapping] = field(default_factory=list, init=False)
+    _parsed_networks: dict[str, IPv4Or6Network] = field(
+        default_factory=dict, init=False
+    )
     _ipv4_pool_networks: list[ipaddress.IPv4Network] = field(
         default_factory=list, init=False
     )
@@ -98,10 +101,13 @@ class IPAllocator:
         return result
 
     def _allocate_network(self, value: str) -> str:
-        try:
-            network = ipaddress.ip_network(value, strict=False)
-        except ValueError as e:
-            raise ValueError(f"Cannot parse as network: {value}") from e
+        network = self._parsed_networks.get(value)
+        if network is None:
+            try:
+                network = ipaddress.ip_network(value, strict=False)
+            except ValueError as e:
+                raise ValueError(f"Cannot parse as network: {value}") from e
+            self._parsed_networks[value] = network
 
         idx = self._network_exact_map.get(network)
         if idx is not None:
@@ -134,9 +140,11 @@ class IPAllocator:
         default_prefix = (
             self.default_ipv4_prefix if addr.version == 4 else self.default_ipv6_prefix
         )
-        original_network = ipaddress.ip_network(
-            f"{addr}/{default_prefix}", strict=False
-        )
+        network_str = f"{addr}/{default_prefix}"
+        original_network = self._parsed_networks.get(network_str)
+        if original_network is None:
+            original_network = ipaddress.ip_network(network_str, strict=False)
+            self._parsed_networks[network_str] = original_network
 
         # Check if the inferred network overlaps an existing mapping (O(log n))
         overlap_idx = self._find_overlapping_mapping(original_network)
