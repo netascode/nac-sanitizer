@@ -36,6 +36,8 @@ def _is_ipv4(value: str) -> bool:
 
 def _is_ipv6(value: str) -> bool:
     """Check if a string looks like an IPv6 address or prefix."""
+    if ":" not in value:
+        return False
     match = _IPV6_PATTERN.match(value)
     if not match:
         return False
@@ -69,6 +71,7 @@ def _is_ipv6(value: str) -> bool:
 
 _MIN_IPV4_LEN = 7  # shortest possible: "1.2.3.4"
 _DIGITS = frozenset("0123456789")
+_MAX_IP_LEN = 43  # longest possible: full IPv6 + "/128" (39 + 4)
 
 
 def _could_contain_ipv4(value: str) -> bool:
@@ -101,6 +104,8 @@ _EXCLUDED_VALUES = frozenset(
 
 def is_ip_like(value: str) -> bool:
     """Determine if a string value looks like an IP address or prefix."""
+    if len(value) > _MAX_IP_LEN:
+        return False
     if value in _EXCLUDED_VALUES:
         return False
     return _is_ipv4(value) or _is_ipv6(value)
