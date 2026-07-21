@@ -116,6 +116,12 @@ class IPAllocator:
             and network.version == 4
             and network.prefixlen <= _LARGE_SUBNET_THRESHOLD
         ):
+            logger.info(
+                "Skipping large IPv4 subnet %s (prefix /%d <= /%d threshold)",
+                value,
+                network.prefixlen,
+                _LARGE_SUBNET_THRESHOLD,
+            )
             return value
 
         idx = self._network_exact_map.get(network)
