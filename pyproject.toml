@@ -89,9 +89,6 @@ known-first-party = ["nac_sanitizer"]
 exclude_dirs = [".venv", "tests"]
 skips = ["B104"]
 
-[tool.ty.src]
-exclude = ["scripts/"]
-
 [tool.pytest.ini_options]
 markers = ["unit", "integration"]
 testpaths = ["tests"]
