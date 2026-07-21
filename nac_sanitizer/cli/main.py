@@ -89,6 +89,13 @@ def sanitize(
             help="Output sanitized files uncompressed instead of re-zipping",
         ),
     ] = False,
+    skip_large_subnets: Annotated[
+        bool,
+        typer.Option(
+            "--skip-large-subnets/--no-skip-large-subnets",
+            help="Preserve IPv4 subnets with prefix length /4 or shorter without sanitizing",
+        ),
+    ] = True,
 ) -> None:
     """Sanitize nac-collector JSON output."""
     from nac_sanitizer.config.loader import ConfigurationError, load_config
@@ -102,10 +109,15 @@ def sanitize(
         is_zip_file,
     )
 
+    cli_overrides: dict = {}
+    if not skip_large_subnets:
+        cli_overrides["settings"] = {"ip_pools": {"skip_large_ipv4_subnets": False}}
+
     try:
         cfg = load_config(
             config_path=config,
             profile_names=profile,
+            cli_overrides=cli_overrides if cli_overrides else None,
         )
     except ConfigurationError as e:
         console.print(f"[bold red]Configuration error:[/bold red] {e}")

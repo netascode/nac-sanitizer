@@ -148,6 +148,62 @@ class TestPoolExhaustion:
 
 
 @pytest.mark.unit
+class TestSkipLargeSubnets:
+    def test_slash_0_preserved(self, allocator) -> None:
+        assert allocator.allocate("0.0.0.0/0") == "0.0.0.0/0"
+
+    def test_slash_1_preserved(self, allocator) -> None:
+        assert allocator.allocate("0.0.0.0/1") == "0.0.0.0/1"
+
+    def test_slash_1_alternate_preserved(self, allocator) -> None:
+        assert allocator.allocate("128.0.0.0/1") == "128.0.0.0/1"
+
+    def test_slash_2_preserved(self, allocator) -> None:
+        assert allocator.allocate("192.0.0.0/2") == "192.0.0.0/2"
+
+    def test_slash_3_preserved(self, allocator) -> None:
+        assert allocator.allocate("224.0.0.0/3") == "224.0.0.0/3"
+
+    def test_slash_4_preserved(self, allocator) -> None:
+        assert allocator.allocate("240.0.0.0/4") == "240.0.0.0/4"
+
+    def test_slash_5_still_sanitized(self) -> None:
+        alloc = IPAllocator(ipv4_pools=["0.0.0.0/0"])
+        result = alloc.allocate("10.0.0.0/5")
+        assert result != "10.0.0.0/5"
+        network = ipaddress.ip_network(result)
+        assert network.prefixlen == 5
+
+    def test_slash_8_still_sanitized(self, allocator) -> None:
+        result = allocator.allocate("44.0.0.0/8")
+        assert result != "44.0.0.0/8"
+        network = ipaddress.ip_network(result)
+        assert network.prefixlen == 8
+
+    def test_disabled_flag_sanitizes_large_subnets(self) -> None:
+        alloc = IPAllocator(
+            ipv4_pools=["0.0.0.0/0"],
+            skip_large_ipv4_subnets=False,
+        )
+        result = alloc.allocate("10.0.0.0/4")
+        assert result != "10.0.0.0/4"
+        network = ipaddress.ip_network(result)
+        assert network.prefixlen == 4
+
+    def test_ipv6_large_prefixes_still_sanitized(self) -> None:
+        alloc = IPAllocator(ipv6_pools=["::/0"])
+        result = alloc.allocate("2000::/3")
+        assert result != "2000::/3"
+        network = ipaddress.ip_network(result)
+        assert network.prefixlen == 3
+
+    def test_consistency_when_skipped(self, allocator) -> None:
+        first = allocator.allocate("128.0.0.0/1")
+        second = allocator.allocate("128.0.0.0/1")
+        assert first == second == "128.0.0.0/1"
+
+
+@pytest.mark.unit
 class TestEdgeCases:
     def test_original_in_pool_range_still_sanitized(self, allocator) -> None:
         # Even if the original IP is already in a "safe" range, it gets remapped

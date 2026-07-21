@@ -22,6 +22,7 @@ IPv4Or6Network = ipaddress.IPv4Network | ipaddress.IPv6Network
 IPv4Or6Address = ipaddress.IPv4Address | ipaddress.IPv6Address
 
 _CIDR_PATTERN = re.compile(r".+/\d+$")
+_LARGE_SUBNET_THRESHOLD = 4
 
 
 class PoolExhaustedError(Exception):
@@ -51,6 +52,7 @@ class IPAllocator:
     preserve_prefix_length: bool = True
     default_ipv4_prefix: int = DEFAULT_IPV4_PREFIX
     default_ipv6_prefix: int = DEFAULT_IPV6_PREFIX
+    skip_large_ipv4_subnets: bool = True
 
     _host_map: dict[str, str] = field(default_factory=dict, init=False)
     _subnet_mappings: list[SubnetMapping] = field(default_factory=list, init=False)
@@ -108,6 +110,13 @@ class IPAllocator:
             except ValueError as e:
                 raise ValueError(f"Cannot parse as network: {value}") from e
             self._parsed_networks[value] = network
+
+        if (
+            self.skip_large_ipv4_subnets
+            and network.version == 4
+            and network.prefixlen <= _LARGE_SUBNET_THRESHOLD
+        ):
+            return value
 
         idx = self._network_exact_map.get(network)
         if idx is not None:
