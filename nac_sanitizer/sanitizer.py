@@ -32,6 +32,7 @@ class Sanitizer:
             preserve_prefix_length=config.settings.ip_pools.preserve_prefix_length,
             default_ipv4_prefix=config.settings.ip_pools.default_ipv4_prefix,
             default_ipv6_prefix=config.settings.ip_pools.default_ipv6_prefix,
+            skip_large_ipv4_subnets=config.settings.ip_pools.skip_large_ipv4_subnets,
         )
         self._ip_scanner = IPScanner(self._ip_allocator)
         self._strategies = self._build_strategy_registry()

@@ -86,8 +86,12 @@ def _parse_yaml_file(path: Path) -> dict[str, Any]:
 def _merge_cli_overrides(
     config_data: dict[str, Any], overrides: dict[str, Any]
 ) -> dict[str, Any]:
-    """Merge CLI overrides into config data."""
+    """Merge CLI overrides into config data (deep merge for nested dicts)."""
     for key, value in overrides.items():
-        if value is not None:
+        if value is None:
+            continue
+        if isinstance(value, dict) and isinstance(config_data.get(key), dict):
+            config_data[key] = _merge_cli_overrides(config_data[key], value)
+        else:
             config_data[key] = value
     return config_data

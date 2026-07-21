@@ -45,6 +45,7 @@ class IPPoolSettings(BaseModel):
     preserve_prefix_length: bool = True
     default_ipv4_prefix: int = DEFAULT_IPV4_PREFIX
     default_ipv6_prefix: int = DEFAULT_IPV6_PREFIX
+    skip_large_ipv4_subnets: bool = True
 
 
 class GlobalSettings(BaseModel):
