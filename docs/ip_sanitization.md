@@ -36,6 +36,22 @@ Certain well-known addresses are never redacted because they represent protocol 
 - `255.255.255.255` and subnet masks (`255.255.255.0`, `255.255.0.0`, `255.0.0.0`)
 - `::` and `::/0` (IPv6 equivalents)
 
+## Large Subnet Preservation
+
+By default, IPv4 subnets with a prefix length of `/4` or shorter (`/0`, `/1`, `/2`, `/3`, `/4`) are preserved without sanitization. These very short prefixes represent route summaries or aggregation patterns (e.g., `0.0.0.0/1` and `128.0.0.0/1` as a split-default-route) rather than customer-specific address allocations. They cannot be meaningfully remapped into the configured pools and would otherwise cause a pool exhaustion error.
+
+This behavior is controlled by the `--skip-large-subnets` CLI flag (enabled by default) or the `skip_large_ipv4_subnets` configuration option:
+
+```bash
+# Default behavior: large subnets pass through unchanged
+nac-sanitizer sanitize input.json -o output/
+
+# Disable to force sanitization of all prefix lengths (may require very large pools)
+nac-sanitizer sanitize input.json -o output/ --no-skip-large-subnets
+```
+
+This only applies to IPv4. IPv6 subnets are always subject to sanitization regardless of prefix length.
+
 ## Allocation Pools
 
 Sanitized IPs are allocated from configurable pools. Defaults:

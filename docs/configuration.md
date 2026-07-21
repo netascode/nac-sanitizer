@@ -57,6 +57,7 @@ settings:
       - "2001:db8::/32"
       - "fc00::/7"
     preserve_prefix_length: true
+    skip_large_ipv4_subnets: true
 ```
 
 ## Sensitivity Tiers
@@ -108,6 +109,22 @@ settings:
 ```
 
 Note that narrower pools have less address space available. The three RFC 5737 ranges provide 762 total host addresses across three /24 subnets. If your collector output contains more unique IPs than the pools can accommodate, the tool will report a pool exhaustion error.
+
+### Large Subnet Handling
+
+By default, IPv4 subnets with prefix length `/4` or shorter are preserved unchanged. This prevents pool exhaustion errors when sanitizing configurations that contain route summaries like `0.0.0.0/1` or `128.0.0.0/1` (common in SD-WAN split-default-route patterns).
+
+To disable this and force sanitization of all prefix lengths (requires pools large enough to accommodate them):
+
+```yaml
+settings:
+  ip_pools:
+    skip_large_ipv4_subnets: false
+    ipv4_pools:
+      - "0.0.0.0/0"  # Must be large enough for the requested prefix lengths
+```
+
+The equivalent CLI flag is `--no-skip-large-subnets`.
 
 For more detail on how IP sanitization works, see [IP Sanitization](ip_sanitization.md).
 
