@@ -39,7 +39,7 @@ nac-sanitizer = "nac_sanitizer.cli.main:app"
 [dependency-groups]
 dev = [
     "bandit[toml]>=1.9.4",
-    "pre-commit>=4.6.0",
+    "pre-commit>=4.6.1",
     "pytest>=9.1.1",
     "pytest-cov>=6.2.0",
     "pytest-mock>=3.15.0",
