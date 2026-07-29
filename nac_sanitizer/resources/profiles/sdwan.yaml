@@ -33,3 +33,10 @@ packs:
       - "$..longitude"
       - "$..site-name"
       - "$..site-id"
+
+  url_filter_patterns:
+    tier: default
+    strategy: token
+    paths:
+      - "$.allow_url_list_policy_object[*].data.entries[*].pattern"
+      - "$.block_url_list_policy_object[*].data.entries[*].pattern"

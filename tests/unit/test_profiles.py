@@ -68,6 +68,12 @@ class TestProfileRegistry:
         assert len(host_rules) > 0
         assert all(r.tier == "optional" for r in host_rules)
 
+    def test_sdwan_url_filter_patterns_pack_is_default_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("sdwan")
+        url_rules = [r for r in rules if r.category == "URL_FILTER_PATTERNS"]
+        assert len(url_rules) > 0
+        assert all(r.tier == "default" for r in url_rules)
+
 
 @pytest.mark.unit
 class TestISEProfileRegistry:
@@ -326,6 +332,112 @@ class TestProfileIntegration:
         assert sanitized["device"]["vipPasskey"] == "admin"
         # IP addresses still default - should be redacted
         assert sanitized["device"]["system-ip"] != "10.1.1.1"
+
+    def test_sdwan_url_filter_patterns_redacted_by_default(self, tmp_path) -> None:
+        """SD-WAN profile default-tier url_filter_patterns pack redacts URL patterns."""
+        data = {
+            "allow_url_list_policy_object": [
+                {
+                    "data": {
+                        "name": "Corp-Allow-List",
+                        "type": "urlWhiteList",
+                        "entries": [
+                            {"pattern": "*.internal.corp.example.com"},
+                            {"pattern": "sharepoint.example.com"},
+                        ],
+                    },
+                    "endpoint": "/dataservice/template/policy/list/urlwhitelist/abc-123",
+                }
+            ],
+            "block_url_list_policy_object": [
+                {
+                    "data": {
+                        "name": "Security-Block-List",
+                        "type": "urlBlackList",
+                        "entries": [
+                            {"pattern": "*.malware-domain.com"},
+                            {"pattern": "phishing-site.net"},
+                        ],
+                    },
+                    "endpoint": "/dataservice/template/policy/list/urlblacklist/def-456",
+                }
+            ],
+        }
+        input_file = tmp_path / "sdwan.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["sdwan"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "sdwan.json").read_text())
+        # URL patterns should be redacted to deterministic tokens
+        allow_entries = sanitized["allow_url_list_policy_object"][0]["data"]["entries"]
+        block_entries = sanitized["block_url_list_policy_object"][0]["data"]["entries"]
+        assert allow_entries[0]["pattern"] == "URL_FILTER_PATTERNS-001"
+        assert allow_entries[1]["pattern"] == "URL_FILTER_PATTERNS-002"
+        assert block_entries[0]["pattern"] == "URL_FILTER_PATTERNS-003"
+        assert block_entries[1]["pattern"] == "URL_FILTER_PATTERNS-004"
+        # But names, types, and endpoints should be preserved
+        assert (
+            sanitized["allow_url_list_policy_object"][0]["data"]["name"]
+            == "Corp-Allow-List"
+        )
+        assert (
+            sanitized["allow_url_list_policy_object"][0]["data"]["type"]
+            == "urlWhiteList"
+        )
+        assert (
+            sanitized["allow_url_list_policy_object"][0]["endpoint"]
+            == "/dataservice/template/policy/list/urlwhitelist/abc-123"
+        )
+        assert (
+            sanitized["block_url_list_policy_object"][0]["data"]["name"]
+            == "Security-Block-List"
+        )
+
+    def test_sdwan_url_filter_patterns_can_be_disabled(self, tmp_path) -> None:
+        """SD-WAN url_filter_patterns can be disabled via PackConfig."""
+        data = {
+            "allow_url_list_policy_object": [
+                {
+                    "data": {
+                        "name": "Corp-Allow-List",
+                        "entries": [
+                            {"pattern": "*.internal.corp.example.com"},
+                            {"pattern": "sharepoint.example.com"},
+                        ],
+                    },
+                    "endpoint": "/dataservice/template/policy/list/urlwhitelist/abc-123",
+                }
+            ]
+        }
+        input_file = tmp_path / "sdwan.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["sdwan"],
+            packs=PackConfig(disable=["url_filter_patterns"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "sdwan.json").read_text())
+        # URL patterns should NOT be redacted when disabled
+        assert (
+            sanitized["allow_url_list_policy_object"][0]["data"]["entries"][0][
+                "pattern"
+            ]
+            == "*.internal.corp.example.com"
+        )
+        assert (
+            sanitized["allow_url_list_policy_object"][0]["data"]["entries"][1][
+                "pattern"
+            ]
+            == "sharepoint.example.com"
+        )
 
     def test_profiles_list_shows_sdwan(self) -> None:
         """CLI profiles list should show sdwan."""
