@@ -839,16 +839,14 @@ class TestProfileIntegration:
         sanitized = json.loads((output_dir / "ise.json").read_text())
 
         policy_set = sanitized["network_access_policy_set"][0]["data"]
-        assert policy_set["name"] != "Wired-802.1X-Policy"
+        assert policy_set["name"] == "NETWORK_ACCESS_POLICY_NAMES-001"
 
         condition = sanitized["network_access_condition"][0]["data"]
-        assert condition["name"] != "Wired_802.1X"
+        assert condition["name"] == "NETWORK_ACCESS_POLICY_NAMES-002"
 
         dictionary = sanitized["network_access_dictionary"][0]["data"]
-        assert dictionary["name"] != "CERTIFICATE"
-        assert dictionary["description"] != (
-            "Certificate-based authentication attributes"
-        )
+        assert dictionary["name"] == "NETWORK_ACCESS_POLICY_NAMES-003"
+        assert dictionary["description"] == "NETWORK_ACCESS_POLICY_NAMES-004"
 
         # Fields outside the network_access_policy_names pack are untouched,
         # e.g. the nested policy-set condition's own "name" field (that
@@ -885,21 +883,33 @@ class TestProfileIntegration:
 
         authz_rule = children["network_access_authorization_rule"][0]["data"]
         authz_condition = authz_rule["rule"]["condition"]
-        assert authz_condition["attributeValue"] != "Employee"
-        assert authz_condition["attributeName"] != "Name"
-        assert authz_condition["dictionaryName"] != "IdentityGroup"
+        assert (
+            authz_condition["attributeValue"] == "NETWORK_ACCESS_CONDITION_VALUES-001"
+        )
+        assert authz_condition["attributeName"] == "NETWORK_ACCESS_CONDITION_VALUES-002"
+        assert (
+            authz_condition["dictionaryName"] == "NETWORK_ACCESS_CONDITION_VALUES-003"
+        )
         assert authz_condition["conditionType"] == "ConditionAttributes"
         assert authz_condition["isNegate"] is False
         assert authz_condition["operator"] == "equals"
 
         authn_rule = children["network_access_authentication_rule"][0]["data"]
         cond_children = authn_rule["rule"]["condition"]["children"]
-        assert cond_children[0]["attributeValue"] != "ID:Intune:GUID"
-        assert cond_children[0]["attributeName"] != "Subject Alternative Name"
-        assert cond_children[0]["dictionaryName"] != "CERTIFICATE"
+        assert (
+            cond_children[0]["attributeValue"] == "NETWORK_ACCESS_CONDITION_VALUES-005"
+        )
+        assert (
+            cond_children[0]["attributeName"] == "NETWORK_ACCESS_CONDITION_VALUES-007"
+        )
+        assert (
+            cond_children[0]["dictionaryName"] == "NETWORK_ACCESS_CONDITION_VALUES-009"
+        )
         assert cond_children[0]["conditionType"] == "ConditionAttributes"
         assert cond_children[0]["operator"] == "contains"
-        assert cond_children[1]["attributeValue"] != "Corp-Internal-CA"
+        assert (
+            cond_children[1]["attributeValue"] == "NETWORK_ACCESS_CONDITION_VALUES-006"
+        )
         assert cond_children[1]["operator"] == "equals"
 
     def test_ise_network_access_authz_refs_redacts_when_enabled(self, tmp_path) -> None:
@@ -917,20 +927,20 @@ class TestProfileIntegration:
         sanitizer.run(input_file, output_dir)
 
         sanitized = json.loads((output_dir / "ise.json").read_text())
-        raw = json.dumps(sanitized)
-
-        assert "PermitAccess" not in raw
-        assert "VLAN1210-Profile" not in raw
-        assert "Employees_SGT" not in raw
-        assert "Corp-AD-Store" not in raw
 
         children = sanitized["network_access_policy_set"][0]["children"]
         authz_data = children["network_access_authorization_rule"][0]["data"]
         rule = authz_data["rule"]
+        assert authz_data["profile"] == [
+            "NETWORK_ACCESS_AUTHZ_REFS-002",
+            "NETWORK_ACCESS_AUTHZ_REFS-003",
+        ]
+        assert authz_data["securityGroup"] == "NETWORK_ACCESS_AUTHZ_REFS-004"
         assert rule["id"] == "auth-rule-001"
         assert rule["hitCounts"] == 500000
 
         authn_data = children["network_access_authentication_rule"][0]["data"]
+        assert authn_data["identitySourceName"] == "NETWORK_ACCESS_AUTHZ_REFS-001"
         assert authn_data["ifAuthFail"] == "CONTINUE"
         assert authn_data["ifUserNotFound"] == "CONTINUE"
         assert authn_data["ifProcessFail"] == "CONTINUE"
