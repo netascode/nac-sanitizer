@@ -63,3 +63,9 @@ packs:
     paths:
       - "$.allowed_protocols[*].data.name"
       - "$.allowed_protocols_tacacs[*].data.name"
+
+  downloadable_acl_names:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.downloadable_acl[*].data.name"
