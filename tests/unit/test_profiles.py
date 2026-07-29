@@ -74,6 +74,133 @@ class TestProfileRegistry:
         assert len(url_rules) > 0
         assert all(r.tier == "default" for r in url_rules)
 
+    def test_sdwan_configuration_group_names_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("sdwan")
+        config_group_rules = [
+            r for r in rules if r.category == "CONFIGURATION_GROUP_NAMES"
+        ]
+        assert len(config_group_rules) > 0
+        assert all(r.tier == "optional" for r in config_group_rules)
+
+    def test_sdwan_configuration_group_names_excluded_by_default(
+        self, tmp_path
+    ) -> None:
+        """Configuration group descriptions should NOT be redacted by default."""
+        data = {
+            "configuration_group": [
+                {
+                    "data": {
+                        "id": "b4add882-52df-4d6d-af52-76302dfe7d7b",
+                        "name": "GOLD-BRANCHTYPE2",
+                        "description": "Gold tier branch type 2 configuration for ACME Corp",
+                        "source": None,
+                        "solution": "sdwan",
+                        "lastUpdatedBy": "admin@example.com",
+                        "lastUpdatedOn": 1779119653498,
+                        "profiles": [
+                            {
+                                "id": "cdd24eec-a424-4867-9890-6b9b5dd47270",
+                                "name": "GOLD-SERVICE-BT2-PROFILE",
+                                "type": "service",
+                            }
+                        ],
+                    },
+                    "endpoint": "/dataservice/v1/config-group/b4add882-52df-4d6d-af52-76302dfe7d7b",
+                }
+            ]
+        }
+        input_file = tmp_path / "sdwan.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["sdwan"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "sdwan.json").read_text())
+        # Optional tier pack - should NOT be redacted by default
+        assert (
+            sanitized["configuration_group"][0]["data"]["description"]
+            == "Gold tier branch type 2 configuration for ACME Corp"
+        )
+
+    def test_sdwan_configuration_group_names_redacts_when_enabled(
+        self, tmp_path
+    ) -> None:
+        """Configuration group descriptions should be redacted when pack is enabled."""
+        data = {
+            "configuration_group": [
+                {
+                    "data": {
+                        "id": "b4add882-52df-4d6d-af52-76302dfe7d7b",
+                        "name": "GOLD-BRANCHTYPE2",
+                        "description": "Gold tier branch type 2 configuration for ACME Corp",
+                        "source": None,
+                        "solution": "sdwan",
+                        "lastUpdatedBy": "admin@example.com",
+                        "lastUpdatedOn": 1779119653498,
+                        "profiles": [
+                            {
+                                "id": "cdd24eec-a424-4867-9890-6b9b5dd47270",
+                                "name": "GOLD-SERVICE-BT2-PROFILE",
+                                "type": "service",
+                            }
+                        ],
+                    },
+                    "endpoint": "/dataservice/v1/config-group/b4add882-52df-4d6d-af52-76302dfe7d7b",
+                },
+                {
+                    "data": {
+                        "id": "a1234567-89ab-cdef-0123-456789abcdef",
+                        "name": "SILVER-REMOTE",
+                        "description": "Silver tier remote office configuration",
+                        "source": None,
+                        "solution": "sdwan",
+                        "lastUpdatedBy": "netops@example.com",
+                        "lastUpdatedOn": 1779119653499,
+                        "profiles": [],
+                    },
+                    "endpoint": "/dataservice/v1/config-group/a1234567-89ab-cdef-0123-456789abcdef",
+                },
+            ]
+        }
+        input_file = tmp_path / "sdwan.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["sdwan"],
+            packs=PackConfig(enable=["configuration_group_names"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "sdwan.json").read_text())
+        # Description should be redacted to a deterministic token
+        assert (
+            sanitized["configuration_group"][0]["data"]["description"]
+            == "CONFIGURATION_GROUP_NAMES-001"
+        )
+        assert (
+            sanitized["configuration_group"][1]["data"]["description"]
+            == "CONFIGURATION_GROUP_NAMES-002"
+        )
+        # Other fields should be preserved
+        assert (
+            sanitized["configuration_group"][0]["data"]["id"]
+            == "b4add882-52df-4d6d-af52-76302dfe7d7b"
+        )
+        assert sanitized["configuration_group"][0]["data"]["name"] == "GOLD-BRANCHTYPE2"
+        assert sanitized["configuration_group"][0]["data"]["source"] is None
+        assert sanitized["configuration_group"][0]["data"]["solution"] == "sdwan"
+        assert sanitized["configuration_group"][0]["data"]["profiles"] == [
+            {
+                "id": "cdd24eec-a424-4867-9890-6b9b5dd47270",
+                "name": "GOLD-SERVICE-BT2-PROFILE",
+                "type": "service",
+            }
+        ]
+
 
 @pytest.mark.unit
 class TestISEProfileRegistry:
