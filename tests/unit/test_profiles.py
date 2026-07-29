@@ -357,12 +357,8 @@ class TestProfileIntegration:
         parcels = sanitized["policy_object_feature_profile_parcels"][0]["data"]
 
         # description fields redacted
-        assert (
-            profile["description"] != "Global policy objects profile for ACME network"
-        )
-        assert (
-            parcels["description"] != "Global policy objects for branch security zones"
-        )
+        assert profile["description"] == "POLICY_PROFILE_DESCRIPTIONS-001"
+        assert parcels["description"] == "POLICY_PROFILE_DESCRIPTIONS-002"
 
         # unrelated fields preserved
         assert profile["profileId"] == "po-001"
