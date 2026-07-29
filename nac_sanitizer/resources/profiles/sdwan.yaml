@@ -46,3 +46,18 @@ packs:
     strategy: token
     paths:
       - "$.configuration_group[*].data.description"
+
+  user_identity:
+    tier: default
+    strategy: token
+    paths:
+      - "$..owner"
+      - "$..createdBy"
+      - "$..lastUpdatedBy"
+
+  organization_names:
+    tier: default
+    strategy: token
+    paths:
+      - "$..sp-org-name"
+      - "$..tenant-org-name"

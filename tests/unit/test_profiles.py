@@ -202,6 +202,18 @@ class TestProfileRegistry:
             }
         ]
 
+    def test_sdwan_user_identity_pack_is_default_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("sdwan")
+        identity_rules = [r for r in rules if r.category == "USER_IDENTITY"]
+        assert len(identity_rules) > 0
+        assert all(r.tier == "default" for r in identity_rules)
+
+    def test_sdwan_organization_names_pack_is_default_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("sdwan")
+        org_rules = [r for r in rules if r.category == "ORGANIZATION_NAMES"]
+        assert len(org_rules) > 0
+        assert all(r.tier == "default" for r in org_rules)
+
 
 @pytest.mark.unit
 class TestISEProfileRegistry:
@@ -633,6 +645,145 @@ class TestProfileIntegration:
             ]
             == "sharepoint.example.com"
         )
+
+    @staticmethod
+    def _sdwan_identity_org_data() -> dict:
+        return {
+            "feature_templates": [
+                {
+                    "data": {
+                        "templateId": "ft-001",
+                        "templateName": "GOLD-BRANCH-SYSTEM",
+                        "templateType": "system-vsmart",
+                        "lastUpdatedBy": "admin@cisco.com",
+                        "lastUpdatedOn": 1779119653498,
+                        "createdBy": "netops@cisco.com",
+                        "createdOn": 1773939469900,
+                        "owner": "admin@cisco.com",
+                    },
+                    "endpoint": "/dataservice/template/feature/ft-001",
+                }
+            ],
+            "cli_device_template": [
+                {
+                    "data": {
+                        "csv-templateId": "dt-001",
+                        "csv-deviceId": "dev-001",
+                        "csv-host-name": "branch-router-01",
+                        "sp-org-name": "ACME Corp - Fabric 610415",
+                        "tenant-org-name": "ACME-Corp-Tenant",
+                        "//system/host-name": "branch-router-01",
+                        "//system/gps-location/latitude": "40.7128",
+                        "//system/gps-location/longitude": "-74.0060",
+                    },
+                    "endpoint": "/dataservice/template/device/config/attached/dt-001",
+                }
+            ],
+            "policy_object_feature_profile": [
+                {
+                    "data": {
+                        "id": "po-001",
+                        "name": "GLOBAL-POLICY-OBJECTS",
+                        "description": "Global policy objects profile",
+                        "createdBy": "netops@cisco.com",
+                        "lastUpdatedBy": "admin@cisco.com",
+                        "lastUpdatedOn": 1778254411575,
+                        "solution": "sdwan",
+                    },
+                    "endpoint": "/dataservice/v1/feature-profile/sdwan/policy-object/po-001",
+                }
+            ],
+        }
+
+    def test_sdwan_user_identity_redacted_by_default(self, tmp_path) -> None:
+        """SD-WAN user_identity pack (default tier) redacts owner/createdBy/lastUpdatedBy."""
+        data = self._sdwan_identity_org_data()
+        input_file = tmp_path / "sdwan.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["sdwan"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "sdwan.json").read_text())
+
+        ft = sanitized["feature_templates"][0]["data"]
+        assert ft["templateId"] == "ft-001"
+        assert ft["templateName"] == "GOLD-BRANCH-SYSTEM"
+        assert ft["templateType"] == "system-vsmart"
+        assert ft["lastUpdatedOn"] == 1779119653498
+        assert ft["createdOn"] == 1773939469900
+        assert ft["owner"] == "USER_IDENTITY-001"
+        assert ft["lastUpdatedBy"] == "USER_IDENTITY-001"
+        assert ft["createdBy"] == "USER_IDENTITY-002"
+
+        po = sanitized["policy_object_feature_profile"][0]["data"]
+        assert po["solution"] == "sdwan"
+        assert po["createdBy"] == "USER_IDENTITY-002"
+        assert po["lastUpdatedBy"] == "USER_IDENTITY-001"
+
+    def test_sdwan_organization_names_redacted_by_default(self, tmp_path) -> None:
+        """SD-WAN organization_names pack (default tier) redacts sp-org-name/tenant-org-name."""
+        data = self._sdwan_identity_org_data()
+        input_file = tmp_path / "sdwan.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["sdwan"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "sdwan.json").read_text())
+
+        dt = sanitized["cli_device_template"][0]["data"]
+        assert dt["csv-templateId"] == "dt-001"
+        assert dt["csv-deviceId"] == "dev-001"
+        assert dt["sp-org-name"] == "ORGANIZATION_NAMES-001"
+        assert dt["tenant-org-name"] == "ORGANIZATION_NAMES-002"
+
+    def test_sdwan_user_identity_can_be_disabled(self, tmp_path) -> None:
+        """SD-WAN user_identity pack can be disabled by the user."""
+        data = self._sdwan_identity_org_data()
+        input_file = tmp_path / "sdwan.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["sdwan"],
+            packs=PackConfig(disable=["user_identity"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "sdwan.json").read_text())
+        ft = sanitized["feature_templates"][0]["data"]
+        assert ft["owner"] == "admin@cisco.com"
+        assert ft["createdBy"] == "netops@cisco.com"
+        assert ft["lastUpdatedBy"] == "admin@cisco.com"
+
+        po = sanitized["policy_object_feature_profile"][0]["data"]
+        assert po["createdBy"] == "netops@cisco.com"
+        assert po["lastUpdatedBy"] == "admin@cisco.com"
+
+    def test_sdwan_organization_names_can_be_disabled(self, tmp_path) -> None:
+        """SD-WAN organization_names pack can be disabled by the user."""
+        data = self._sdwan_identity_org_data()
+        input_file = tmp_path / "sdwan.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["sdwan"],
+            packs=PackConfig(disable=["organization_names"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "sdwan.json").read_text())
+        dt = sanitized["cli_device_template"][0]["data"]
+        assert dt["sp-org-name"] == "ACME Corp - Fabric 610415"
+        assert dt["tenant-org-name"] == "ACME-Corp-Tenant"
 
     def test_profiles_list_shows_sdwan(self) -> None:
         """CLI profiles list should show sdwan."""
