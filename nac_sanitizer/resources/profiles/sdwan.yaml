@@ -33,3 +33,13 @@ packs:
       - "$..longitude"
       - "$..site-name"
       - "$..site-id"
+
+  vpn_service_names:
+    tier: optional
+    strategy: token
+    paths:
+      - "$..payload.name"
+      - "$..payload.description"
+      - "$..payload.data.name.value"
+      - "$..payload.data.description.value"
+      - "$..payload.data.entries[*].vpn.value"

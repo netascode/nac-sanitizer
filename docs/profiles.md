@@ -6,7 +6,7 @@ Product profiles are built-in collections of redaction rules specific to a produ
 
 | Profile           | Product                  | Default Packs                      | Optional Packs                                                      |
 | ----------------- | ------------------------ | ---------------------------------- | ------------------------------------------------------------------- |
-| `sdwan`           | SD-WAN (vManage)         | credentials                        | hostnames, serial numbers, location data                            |
+| `sdwan`           | SD-WAN (vManage)         | credentials                        | hostnames, serial numbers, location data, VPN service names          |
 | `ise`             | Identity Services Engine | credentials, SNMP communities      | usernames, MAC addresses, domains                                   |
 | `catalyst_center` | Catalyst Center (DNAC)   | (none - credentials masked by API) | usernames, hostnames, serial numbers, MAC addresses, location data  |
 | `fmc`             | Firewall Management Center | usernames                        | object names, descriptions, FQDNs, device names                     |
@@ -57,12 +57,13 @@ The SD-WAN profile handles vManage collector output, which stores data in two fo
 
 The IP scanner handles both forms. Path-based packs target specific device inventory fields.
 
-| Pack             | Tier     | Fields Targeted                                        |
-| ---------------- | -------- | ------------------------------------------------------ |
-| credentials      | default  | `vipPasskey`                                           |
-| hostnames        | optional | `host-name`                                            |
-| serial numbers   | optional | `board-serial`, `serialNumber`, `chasisNumber`, `uuid` |
-| location data    | optional | `latitude`, `longitude`, `site-name`, `site-id`        |
+| Pack               | Tier     | Fields Targeted                                                                                                          |
+| ------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------ |
+| credentials        | default  | `vipPasskey`                                                                                                             |
+| hostnames          | optional | `host-name`                                                                                                              |
+| serial numbers     | optional | `board-serial`, `serialNumber`, `chasisNumber`, `uuid`                                                                   |
+| location data      | optional | `latitude`, `longitude`, `site-name`, `site-id`                                                                          |
+| VPN service names  | optional | `payload.name`, `payload.description`, `payload.data.name.value`, `payload.data.description.value`, `payload.data.entries[*].vpn.value` (feature profile parcel payloads) |
 
 ## ISE Profile Details
 
