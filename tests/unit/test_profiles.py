@@ -601,23 +601,20 @@ class TestProfileIntegration:
         sanitizer.run(input_file, output_dir)
 
         sanitized = json.loads((output_dir / "ise.json").read_text())
-        raw = json.dumps(sanitized)
-
-        # Sensitive fields should be redacted
-        assert "All_User_ID_Stores" not in raw
-        assert "Certificate-Request-Sequence" not in raw
-        assert (
-            "A built-in Identity Sequence to include all User Identity Stores"
-            not in raw
-        )
-        assert "A built-in Identity Sequence for Certificate Request APIs" not in raw
-        assert "Internal Users" not in raw
-        assert "CORP_AD_wan.example.com" not in raw
-        assert "RSA SecurID" not in raw
-        assert "All_AD_Join_Points" not in raw
 
         seq_0 = sanitized["identity_source_sequence"][0]["data"]
         seq_1 = sanitized["identity_source_sequence"][1]["data"]
+
+        # Sensitive fields should be redacted
+        assert seq_0["name"] == "IDENTITY_SOURCE_SEQUENCES-001"
+        assert seq_1["name"] == "IDENTITY_SOURCE_SEQUENCES-002"
+        assert seq_0["description"] == "IDENTITY_SOURCE_SEQUENCES-003"
+        assert seq_1["description"] == "IDENTITY_SOURCE_SEQUENCES-004"
+        assert seq_0["idSeqItem"][0]["idstore"] == "IDENTITY_SOURCE_SEQUENCES-005"
+        assert seq_0["idSeqItem"][1]["idstore"] == "IDENTITY_SOURCE_SEQUENCES-006"
+        assert seq_0["idSeqItem"][2]["idstore"] == "IDENTITY_SOURCE_SEQUENCES-007"
+        assert seq_1["idSeqItem"][0]["idstore"] == "IDENTITY_SOURCE_SEQUENCES-005"
+        assert seq_1["idSeqItem"][1]["idstore"] == "IDENTITY_SOURCE_SEQUENCES-008"
 
         # Non-sensitive fields should be preserved
         assert seq_0["id"] == "93246270-8c01-11e6-996c-525400b48521"
