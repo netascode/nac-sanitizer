@@ -35,6 +35,138 @@ packs:
       - "$..siteNameHierarchy"
       - "$..groupNameHierarchy"
 
+  credential_descriptions:
+    tier: default
+    strategy: token
+    paths:
+      - "$..cliCredential[*].description"
+      - "$..snmpV3[*].description"
+      - "$..netconfCredential[*].description"
+
+  transit_network_names:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.transit_network[*].data[*].name"
+
+  authentication_descriptions:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.authentication_policy_server[*].data[*].ciscoIseDtos[*].description"
+      - "$.authentication_policy_server[*].data[*].ciscoIseDtos[*].fqdn"
+      - "$.update_authentication_profile[*].data[*].preAuthAcl.description"
+
+  image_names:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.image[*].data[*].name"
+
+  user_pii:
+    tier: default
+    strategy: token
+    paths:
+      - "$..users[*].email"
+      - "$..users[*].firstName"
+      - "$..users[*].lastName"
+
+  device_names:
+    tier: optional
+    strategy: hostname_map
+    paths:
+      - "$..faultyDeviceName"
+      - "$.lan_automation[*].data[*].discoveredDeviceList[*].name"
+
+  device_descriptions:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.network_devices[*].data[*].description"
+      - "$.update_device_management_address[*].data[*].description"
+
+  interface_descriptions:
+    tier: optional
+    strategy: token
+    paths:
+      - "$..interfaceDescription"
+
+  fabric_descriptions:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.fabric_authentication_profile[*].data[*].data[*].description"
+      - "$.fabric_virtual_network[*].data[*].data[*].description"
+      - "$.fabric_virtual_network[*].data[*].data[*].scalableGroupNames[*]"
+
+  virtual_network_names:
+    tier: optional
+    strategy: token
+    paths:
+      - "$..virtualNetworkName"
+      - "$..associatedLayer3VirtualNetworkName"
+
+  vlan_names:
+    tier: optional
+    strategy: token
+    paths:
+      - "$..vlanName"
+      - "$..dataVlanName"
+
+  ip_pool_names:
+    tier: optional
+    strategy: token
+    paths:
+      - "$..ipPoolName"
+      - "$.ip_pools[*].data[*].name"
+
+  security_group_names:
+    tier: optional
+    strategy: token
+    paths:
+      - "$..securityGroupName"
+      - "$..scalableGroupNames[*]"
+
+  site_names:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.area[*].data[*].name"
+      - "$.building[*].data[*].name"
+      - "$.site[*].data[*].name"
+      - "$..nameHierarchy"
+      - "$..siteHierarchy"
+      - "$..siteNames[*]"
+      - "$.ip_pool_reservation[*].data[*].groupName"
+
+  physical_addresses:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.area[*].data[*].additionalInfo[*].attributes.address"
+      - "$.area[*].data[*].additionalInfo[*].attributes.country"
+      - "$.building[*].data[*].additionalInfo[*].attributes.address"
+      - "$.building[*].data[*].additionalInfo[*].attributes.country"
+      - "$.site[*].data[*].address"
+      - "$.site[*].data[*].country"
+
+  domain_names:
+    tier: optional
+    strategy: preserve_format
+    paths:
+      - "$..domainName"
+
+  ip_pool_context:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.ip_pool[*].data[*].ipPoolName"
+      - "$.ip_pool_reservation[*].data[*].groupName"
+      - "$.ip_pool_reservation[*].data[*].siteHierarchy"
+      - "$.ip_pool_reservation[*].data[*].ipPools[*].ipPoolName"
+      - "$.ip_pools[*].data[*].name"
+      - "$.lan_automation[*].data[*].ipPools[*].ipPoolName"
+
   template_content:
     tier: default
     strategy: token
