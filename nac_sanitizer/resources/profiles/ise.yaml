@@ -170,3 +170,17 @@ packs:
       - "$.internal_user[*].data.description"
       - "$.user_identity_group[*].data.name"
       - "$.user_identity_group[*].data.description"
+
+  endpoint_identities:
+    tier: optional
+    strategy: preserve_format
+    paths:
+      - "$.endpoint[*].data.name"
+      - "$.endpoint_identity_group[*].data.name"
+      - "$.endpoint_identity_group[*].data.description"
+
+  endpoint_custom_pii:
+    tier: default
+    strategy: token
+    paths:
+      - "$..customAttributes.customAttributes.UserEmail"
