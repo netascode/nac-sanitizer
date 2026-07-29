@@ -69,3 +69,10 @@ packs:
     strategy: token
     paths:
       - "$.downloadable_acl[*].data.name"
+
+  identity_sources:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.certificate_authentication_profile[*].data.name"
+      - "$..externalIdentityStoreName"
