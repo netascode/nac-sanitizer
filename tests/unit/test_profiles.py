@@ -1037,15 +1037,23 @@ class TestCatalystCenterProfileIntegration:
         sanitizer.run(input_file, output_dir)
 
         sanitized = json.loads((output_dir / "catalyst_center.json").read_text())
-        raw = json.dumps(sanitized)
 
         # Descriptions and FQDNs should be redacted
-        assert "Primary ISE PAN node" not in raw
-        assert "ise-pan-01.corp.example.com" not in raw
-        assert "Pre-auth ACL for guest captive portal redirect" not in raw
+        auth_server = sanitized["authentication_policy_server"][0]["data"][0]
+        assert (
+            auth_server["ciscoIseDtos"][0]["description"]
+            == "AUTHENTICATION_DESCRIPTIONS-001"
+        )
+        assert (
+            auth_server["ciscoIseDtos"][0]["fqdn"] == "AUTHENTICATION_DESCRIPTIONS-002"
+        )
+        auth_profile = sanitized["update_authentication_profile"][0]["data"][0]
+        assert (
+            auth_profile["preAuthAcl"]["description"]
+            == "AUTHENTICATION_DESCRIPTIONS-003"
+        )
 
         # But non-sensitive fields should be preserved
-        auth_server = sanitized["authentication_policy_server"][0]["data"][0]
         assert auth_server["ipAddress"] == "10.0.0.140"
         assert auth_server["protocol"] == "RADI_TACACS"
         assert auth_server["role"] == "primary"
@@ -1053,7 +1061,6 @@ class TestCatalystCenterProfileIntegration:
         assert auth_server["state"] == "ACTIVE"
         assert auth_server["isIseEnabled"] is True
 
-        auth_profile = sanitized["update_authentication_profile"][0]["data"][0]
         assert auth_profile["preAuthAcl"]["enabled"] is True
         assert auth_profile["dot1xToMabFallbackTimeout"] == 21
         assert auth_profile["siteNameHierarchy"] == "Global/US/Building-A"
