@@ -708,6 +708,133 @@ class TestFMCProfileRegistry:
 
 
 @pytest.mark.unit
+class TestCatalystCenterProfileRegistry:
+    def test_catalyst_center_profile_available(self) -> None:
+        available = ProfileRegistry.available()
+        assert "catalyst_center" in available
+
+    def test_load_catalyst_center_profile(self) -> None:
+        profile = ProfileRegistry.load("catalyst_center")
+        assert profile["name"] == "catalyst_center"
+        assert "packs" in profile
+
+    def test_catalyst_center_rules_have_valid_paths(self) -> None:
+        rules = ProfileRegistry.load_rules("catalyst_center")
+        resolver = PathResolver()
+        for rule in rules:
+            resolver.parse(rule.path)
+
+    def test_catalyst_center_rules_have_valid_strategies(self) -> None:
+        valid_strategies = {
+            "token",
+            "ip_map",
+            "hostname_map",
+            "constant",
+            "hash",
+            "preserve_format",
+        }
+        rules = ProfileRegistry.load_rules("catalyst_center")
+        for rule in rules:
+            assert rule.strategy in valid_strategies, (
+                f"Unknown strategy '{rule.strategy}' in path {rule.path}"
+            )
+
+
+@pytest.mark.unit
+class TestCatalystCenterProfileIntegration:
+    @staticmethod
+    def _image_data() -> dict:
+        return {
+            "image": [
+                {
+                    "data": [
+                        {
+                            "imageUuid": "fe242a27-92a9-4bc9-856b-645c4cd9cc73",
+                            "name": "cat9k_iosxe.17.09.03.SPA.bin",
+                            "family": "CAT9K",
+                            "version": "17.09.03.0.4111",
+                            "imageType": "SYSTEM_SW",
+                            "fileSize": "1246984471 bytes",
+                            "isTaggedGolden": False,
+                        },
+                        {
+                            "imageUuid": "ab123456-78cd-90ef-1234-567890abcdef",
+                            "name": "cat9k_iosxe.17.12.01.SPA.bin",
+                            "family": "CAT9K",
+                            "version": "17.12.01.0.5678",
+                            "imageType": "SYSTEM_SW",
+                            "fileSize": "1398765432 bytes",
+                            "isTaggedGolden": True,
+                        },
+                    ],
+                    "endpoint": "/dna/intent/api/v1/image/importation",
+                }
+            ]
+        }
+
+    def test_cc_image_names_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("catalyst_center")
+        image_rules = [r for r in rules if r.category == "IMAGE_NAMES"]
+        assert len(image_rules) > 0
+        assert all(r.tier == "optional" for r in image_rules)
+
+    def test_cc_image_names_excluded_by_default(self, tmp_path) -> None:
+        """Image names are optional tier - should NOT be redacted by default."""
+        data = self._image_data()
+        input_file = tmp_path / "cc.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["catalyst_center"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "cc.json").read_text())
+        img1 = sanitized["image"][0]["data"][0]
+        img2 = sanitized["image"][0]["data"][1]
+        # Optional pack not enabled - names should be preserved
+        assert img1["name"] == "cat9k_iosxe.17.09.03.SPA.bin"
+        assert img2["name"] == "cat9k_iosxe.17.12.01.SPA.bin"
+
+    def test_cc_image_names_redacts_when_enabled(self, tmp_path) -> None:
+        """With PackConfig(enable=['image_names']), image names are redacted."""
+        data = self._image_data()
+        input_file = tmp_path / "cc.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["catalyst_center"],
+            packs=PackConfig(enable=["image_names"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "cc.json").read_text())
+        img1 = sanitized["image"][0]["data"][0]
+        img2 = sanitized["image"][0]["data"][1]
+
+        # Sensitive fields redacted
+        assert img1["name"] != "cat9k_iosxe.17.09.03.SPA.bin"
+        assert img2["name"] != "cat9k_iosxe.17.12.01.SPA.bin"
+
+        # Non-sensitive fields preserved
+        assert img1["imageUuid"] == "fe242a27-92a9-4bc9-856b-645c4cd9cc73"
+        assert img1["family"] == "CAT9K"
+        assert img1["version"] == "17.09.03.0.4111"
+        assert img1["imageType"] == "SYSTEM_SW"
+        assert img1["fileSize"] == "1246984471 bytes"
+        assert img1["isTaggedGolden"] is False
+
+        assert img2["imageUuid"] == "ab123456-78cd-90ef-1234-567890abcdef"
+        assert img2["family"] == "CAT9K"
+        assert img2["version"] == "17.12.01.0.5678"
+        assert img2["imageType"] == "SYSTEM_SW"
+        assert img2["fileSize"] == "1398765432 bytes"
+        assert img2["isTaggedGolden"] is True
+
+
+@pytest.mark.unit
 class TestFMCProfileIntegration:
     def test_sanitize_with_fmc_profile_redacts_usernames_and_urls(
         self, tmp_path

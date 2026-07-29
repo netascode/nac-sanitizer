@@ -34,3 +34,9 @@ packs:
     paths:
       - "$..siteNameHierarchy"
       - "$..groupNameHierarchy"
+
+  image_names:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.image[*].data[*].name"
