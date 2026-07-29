@@ -220,6 +220,14 @@ class TestProfileRegistry:
         assert len(vpn_rules) > 0
         assert all(r.tier == "optional" for r in vpn_rules)
 
+    def test_sdwan_template_definition_values_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("sdwan")
+        template_def_rules = [
+            r for r in rules if r.category == "TEMPLATE_DEFINITION_VALUES"
+        ]
+        assert len(template_def_rules) > 0
+        assert all(r.tier == "optional" for r in template_def_rules)
+
 
 @pytest.mark.unit
 class TestISEProfileRegistry:
@@ -907,6 +915,174 @@ class TestProfileIntegration:
         assert profile_data["profileId"] == "sfp-001"
         assert profile_data["profileType"] == "service"
         assert profile_data["solution"] == "sdwan"
+
+    def test_sdwan_template_definition_values_excluded_by_default(
+        self, tmp_path
+    ) -> None:
+        """Optional-tier template_definition_values pack is not applied by default."""
+        data = {
+            "feature_templates": [
+                {
+                    "data": {
+                        "templateId": "ft-vpn-001",
+                        "templateName": "GOLD-VPN-1100",
+                        "templateType": "cisco_vpn",
+                        "templateDefinition": {
+                            "name": {
+                                "vipObjectType": "object",
+                                "vipType": "constant",
+                                "vipValue": "SVPN 1100 ACME VPN",
+                            },
+                            "description": {
+                                "vipObjectType": "object",
+                                "vipType": "constant",
+                                "vipValue": "Service VPN 1100 for ACME Corp",
+                            },
+                            "vpn-id": {
+                                "vipObjectType": "object",
+                                "vipType": "constant",
+                                "vipValue": 1100,
+                            },
+                        },
+                    },
+                    "endpoint": "/dataservice/template/feature/ft-vpn-001",
+                }
+            ]
+        }
+        input_file = tmp_path / "sdwan.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["sdwan"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "sdwan.json").read_text())
+        template_def = sanitized["feature_templates"][0]["data"]["templateDefinition"]
+        assert template_def["name"]["vipValue"] == "SVPN 1100 ACME VPN"
+        assert (
+            template_def["description"]["vipValue"] == "Service VPN 1100 for ACME Corp"
+        )
+
+    def test_sdwan_template_definition_values_redacts_when_enabled(
+        self, tmp_path
+    ) -> None:
+        """template_definition_values pack redacts vipValue fields when explicitly enabled."""
+        data = {
+            "feature_templates": [
+                {
+                    "data": {
+                        "templateId": "ft-vpn-001",
+                        "templateName": "GOLD-VPN-1100",
+                        "templateType": "cisco_vpn",
+                        "templateDefinition": {
+                            "name": {
+                                "vipObjectType": "object",
+                                "vipType": "constant",
+                                "vipValue": "SVPN 1100 ACME VPN",
+                            },
+                            "description": {
+                                "vipObjectType": "object",
+                                "vipType": "constant",
+                                "vipValue": "Service VPN 1100 for ACME Corp",
+                            },
+                            "vpn-id": {
+                                "vipObjectType": "object",
+                                "vipType": "constant",
+                                "vipValue": 1100,
+                            },
+                        },
+                        "editedTemplateDefinition": {
+                            "name": {
+                                "vipObjectType": "object",
+                                "vipType": "constant",
+                                "vipValue": "SVPN 1100 ACME VPN v2",
+                            },
+                            "description": {
+                                "vipObjectType": "object",
+                                "vipType": "constant",
+                                "vipValue": "Updated Service VPN for ACME",
+                            },
+                            "vpn-id": {
+                                "vipObjectType": "object",
+                                "vipType": "constant",
+                                "vipValue": 1100,
+                            },
+                        },
+                    },
+                    "endpoint": "/dataservice/template/feature/ft-vpn-001",
+                },
+                {
+                    "data": {
+                        "templateId": "ft-pim-001",
+                        "templateName": "GOLD-MULTICAST",
+                        "templateType": "cisco_pim",
+                        "templateDefinition": {
+                            "pim": {
+                                "rp-addr": {
+                                    "vipType": "constant",
+                                    "vipValue": [
+                                        {
+                                            "access-list": {
+                                                "vipType": "constant",
+                                                "vipValue": "ACME-MULTICAST-GROUPS",
+                                            },
+                                            "address": {
+                                                "vipType": "constant",
+                                                "vipValue": "10.0.0.1",
+                                            },
+                                        }
+                                    ],
+                                }
+                            }
+                        },
+                    },
+                    "endpoint": "/dataservice/template/feature/ft-pim-001",
+                },
+            ]
+        }
+        input_file = tmp_path / "sdwan.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["sdwan"],
+            packs=PackConfig(enable=["template_definition_values"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "sdwan.json").read_text())
+
+        vpn_template = sanitized["feature_templates"][0]["data"]
+        template_def = vpn_template["templateDefinition"]
+        edited_template_def = vpn_template["editedTemplateDefinition"]
+        assert template_def["name"]["vipValue"] == "TEMPLATE_DEFINITION_VALUES-001"
+        assert (
+            edited_template_def["name"]["vipValue"] == "TEMPLATE_DEFINITION_VALUES-002"
+        )
+        assert (
+            template_def["description"]["vipValue"] == "TEMPLATE_DEFINITION_VALUES-003"
+        )
+        assert (
+            edited_template_def["description"]["vipValue"]
+            == "TEMPLATE_DEFINITION_VALUES-004"
+        )
+        # Non-string / non-targeted values preserved
+        assert template_def["vpn-id"]["vipValue"] == 1100
+        assert edited_template_def["vpn-id"]["vipValue"] == 1100
+        assert template_def["name"]["vipObjectType"] == "object"
+        assert template_def["name"]["vipType"] == "constant"
+        assert vpn_template["templateId"] == "ft-vpn-001"
+        assert vpn_template["templateType"] == "cisco_vpn"
+
+        pim_template = sanitized["feature_templates"][1]["data"]
+        rp_addr = pim_template["templateDefinition"]["pim"]["rp-addr"]
+        assert (
+            rp_addr["vipValue"][0]["access-list"]["vipValue"]
+            == "TEMPLATE_DEFINITION_VALUES-005"
+        )
+        assert rp_addr["vipValue"][0]["address"]["vipValue"] == "10.0.0.1"
 
     def test_profiles_list_shows_sdwan(self) -> None:
         """CLI profiles list should show sdwan."""

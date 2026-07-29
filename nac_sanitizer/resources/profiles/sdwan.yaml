@@ -71,3 +71,14 @@ packs:
       - "$..payload.data.name.value"
       - "$..payload.data.description.value"
       - "$..payload.data.entries[*].vpn.value"
+
+  template_definition_values:
+    tier: optional
+    strategy: token
+    paths:
+      - "$..templateDefinition.name.vipValue"
+      - "$..editedTemplateDefinition.name.vipValue"
+      - "$..templateDefinition.description.vipValue"
+      - "$..editedTemplateDefinition.description.vipValue"
+      - "$..templateDefinition.pim.rp-addr.vipValue[*].access-list.vipValue"
+      - "$..editedTemplateDefinition.pim.rp-addr.vipValue[*].access-list.vipValue"
