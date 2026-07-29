@@ -559,11 +559,19 @@ class TestProfileIntegration:
         sanitizer.run(input_file, output_dir)
 
         sanitized = json.loads((output_dir / "ise.json").read_text())
-        raw = json.dumps(sanitized)
         # All tier names should be redacted
-        assert "ESSENTIAL" not in raw
-        assert "ADVANTAGE" not in raw
-        assert "PREMIER" not in raw
+        assert (
+            sanitized["license_tier_state"][0]["data"][0]["name"]
+            == "LICENSE_TIER_NAMES-001"
+        )
+        assert (
+            sanitized["license_tier_state"][0]["data"][1]["name"]
+            == "LICENSE_TIER_NAMES-002"
+        )
+        assert (
+            sanitized["license_tier_state"][0]["data"][2]["name"]
+            == "LICENSE_TIER_NAMES-003"
+        )
         # But other fields should be preserved
         assert sanitized["license_tier_state"][0]["data"][0]["status"] == "ENABLED"
         assert (
