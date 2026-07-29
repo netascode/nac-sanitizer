@@ -7,7 +7,7 @@ Product profiles are built-in collections of redaction rules specific to a produ
 | Profile           | Product                  | Default Packs                      | Optional Packs                                                      |
 | ----------------- | ------------------------ | ---------------------------------- | ------------------------------------------------------------------- |
 | `sdwan`           | SD-WAN (vManage)         | credentials                        | hostnames, serial numbers, location data                            |
-| `ise`             | Identity Services Engine | credentials, SNMP communities      | usernames, MAC addresses, domains                                   |
+| `ise`             | Identity Services Engine | credentials, SNMP communities, TrustSec device credentials | usernames, MAC addresses, domains, network device names, network device groups |
 | `catalyst_center` | Catalyst Center (DNAC)   | (none - credentials masked by API) | usernames, hostnames, serial numbers, MAC addresses, location data  |
 | `fmc`             | Firewall Management Center | usernames                        | object names, descriptions, FQDNs, device names                     |
 
@@ -66,13 +66,18 @@ The IP scanner handles both forms. Path-based packs target specific device inven
 
 ## ISE Profile Details
 
-| Pack               | Tier     | Fields Targeted                                              |
-| ------------------ | -------- | ------------------------------------------------------------ |
-| credentials        | default  | `radiusSharedSecret`, `sharedSecret`, `previousSharedSecret`, `password`, `enablePassword` |
-| SNMP communities   | default  | `roCommunity`, `rwCommunity`                                 |
-| usernames          | optional | `userName`                                                   |
-| MAC addresses      | optional | `mac`                                                        |
-| domains            | optional | `domain`                                                     |
+| Pack                          | Tier     | Fields Targeted                                              |
+| ----------------------------- | -------- | ------------------------------------------------------------ |
+| credentials                   | default  | `radiusSharedSecret`, `sharedSecret`, `previousSharedSecret`, `password`, `enablePassword` |
+| SNMP communities              | default  | `roCommunity`, `rwCommunity`                                 |
+| TrustSec device credentials   | default  | `deviceConfigurationDeployment.enableModePassword`, `deviceConfigurationDeployment.execModePassword`, `deviceConfigurationDeployment.execModeUsername` |
+| usernames                     | optional | `userName`                                                   |
+| MAC addresses                 | optional | `mac`                                                        |
+| domains                       | optional | `domain`                                                     |
+| network device names          | optional | `network_device[*].data.name`, `sgaNotificationAndUpdates.coaSourceHost` |
+| network device groups         | optional | `network_device[*].data.NetworkDeviceGroupList[*]`, `network_device_group[*].data.name`, `network_device_group[*].data.description` |
+
+The TrustSec device credentials pack redacts plaintext enable-mode and exec-mode credentials used to push TrustSec/SGA configuration to network devices (`trustsecsettings.deviceConfigurationDeployment`). Because these are plaintext service-account passwords, they are default tier like the other credential packs.
 
 ## Catalyst Center Profile Details
 
