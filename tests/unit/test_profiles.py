@@ -4,7 +4,6 @@
 """Tests for product profile loading and integration."""
 
 import json
-import re
 
 import pytest
 
@@ -746,9 +745,9 @@ class TestProfileIntegration:
 
         device = sanitized["network_device"][0]["data"]
         deploy = device["trustsecsettings"]["deviceConfigurationDeployment"]
-        assert deploy["enableModePassword"] != "En@bl3Secret!"
-        assert deploy["execModePassword"] != "Ex3cSecret!"
-        assert deploy["execModeUsername"] != "ise-deploy-svc"
+        assert deploy["enableModePassword"] == "DEVICE_TRUSTSEC_CREDENTIALS-001"
+        assert deploy["execModePassword"] == "DEVICE_TRUSTSEC_CREDENTIALS-002"
+        assert deploy["execModeUsername"] == "DEVICE_TRUSTSEC_CREDENTIALS-003"
         # Non-sensitive fields preserved
         assert device["profileName"] == "Cisco"
         assert device["coaPort"] == 1700
@@ -789,13 +788,11 @@ class TestProfileIntegration:
 
         sanitized = json.loads((output_dir / "ise.json").read_text())
         device = sanitized["network_device"][0]["data"]
-        assert device["name"] != "core-switch-01.example.com"
-        assert re.fullmatch(r"DEVICE-\d{3}", device["name"])
+        assert device["name"] == "DEVICE-001"
         coa_host = device["trustsecsettings"]["sgaNotificationAndUpdates"][
             "coaSourceHost"
         ]
-        assert coa_host != "ise-pan-01.corp.local"
-        assert re.fullmatch(r"DEVICE-\d{3}", coa_host)
+        assert coa_host == "DEVICE-002"
 
     def test_ise_network_device_groups_redacts_when_enabled(self, tmp_path) -> None:
         """Enabling network_device_groups redacts group list entries, name, and description."""
@@ -813,19 +810,14 @@ class TestProfileIntegration:
 
         sanitized = json.loads((output_dir / "ise.json").read_text())
         device = sanitized["network_device"][0]["data"]
-        original_groups = [
-            "Location#All Locations#Building-A#Floor-3",
-            "Device Type#All Device Types#Switch#Catalyst",
+        assert device["NetworkDeviceGroupList"] == [
+            "NETWORK_DEVICE_GROUPS-001",
+            "NETWORK_DEVICE_GROUPS-002",
         ]
-        for group in device["NetworkDeviceGroupList"]:
-            assert group not in original_groups
 
         groups = sanitized["network_device_group"]
-        assert groups[0]["data"]["name"] != "Location#All Locations#Building-A"
-        assert (
-            groups[0]["data"]["description"]
-            != "Network Device Group for Building A devices"
-        )
+        assert groups[0]["data"]["name"] == "NETWORK_DEVICE_GROUPS-003"
+        assert groups[0]["data"]["description"] == "NETWORK_DEVICE_GROUPS-005"
         # Non-sensitive identifiers preserved
         assert groups[0]["data"]["id"] == "394f7b70-08d2-11f0-b6a6-96c23bf9c01f"
         assert groups[0]["data"]["othername"] == "Location"
