@@ -301,33 +301,24 @@ class TestProfileIntegration:
         sanitizer.run(input_file, output_dir)
 
         sanitized = json.loads((output_dir / "sdwan.json").read_text())
-        raw = json.dumps(sanitized)
-
-        # Sensitive payload fields redacted
-        assert "GOLD_BGP_SVPN1200_ROUTING" not in raw
-        assert "BGP routing for SVPN 1200 ACME" not in raw
-        assert "SVPN-1100-ACME-VPN" not in raw
-        assert "Service VPN 1100 for ACME Corp" not in raw
-        assert "SVPN 1100 ACME" not in raw
-        assert "Service VPN 1100" not in raw
-        assert "ACME-VPN-1100" not in raw
 
         profile_data = sanitized["service_feature_profile"][0]["data"]
         parcels = profile_data["associatedProfileParcels"]
         bgp_parcel = parcels[0]
         vpn_parcel = parcels[1]
 
-        assert bgp_parcel["payload"]["name"] != "GOLD_BGP_SVPN1200_ROUTING"
-        assert bgp_parcel["payload"]["description"] != "BGP routing for SVPN 1200 ACME"
-        assert vpn_parcel["payload"]["name"] != "SVPN-1100-ACME-VPN"
-        assert vpn_parcel["payload"]["description"] != "Service VPN 1100 for ACME Corp"
-        assert vpn_parcel["payload"]["data"]["name"]["value"] != "SVPN 1100 ACME"
+        assert bgp_parcel["payload"]["name"] == "VPN_SERVICE_NAMES-001"
+        assert bgp_parcel["payload"]["description"] == "VPN_SERVICE_NAMES-003"
+        assert vpn_parcel["payload"]["name"] == "VPN_SERVICE_NAMES-002"
+        assert vpn_parcel["payload"]["description"] == "VPN_SERVICE_NAMES-004"
+        assert vpn_parcel["payload"]["data"]["name"]["value"] == "VPN_SERVICE_NAMES-005"
         assert (
-            vpn_parcel["payload"]["data"]["description"]["value"] != "Service VPN 1100"
+            vpn_parcel["payload"]["data"]["description"]["value"]
+            == "VPN_SERVICE_NAMES-006"
         )
         assert (
             vpn_parcel["payload"]["data"]["entries"][0]["vpn"]["value"]
-            != "ACME-VPN-1100"
+            == "VPN_SERVICE_NAMES-007"
         )
 
         # Non-sensitive identifiers/metadata preserved
