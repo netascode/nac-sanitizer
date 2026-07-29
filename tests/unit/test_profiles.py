@@ -864,3 +864,222 @@ class TestFMCProfileIntegration:
         result = runner.invoke(app, ["profiles", "list"])
         assert result.exit_code == 0
         assert "fmc" in result.output
+
+
+def _catalyst_center_overlay_fixture() -> dict:
+    """Anycast gateway, VN-to-fabric-site, and IP pool fixture data (issue #68)."""
+    return {
+        "anycast_gateway": [
+            {
+                "data": [
+                    {
+                        "id": "00059b31-b7cb-44df-a3ea-73fe1792cd76",
+                        "fabricId": "21874c44-380b-45f8-911c-b1b98fd44836",
+                        "virtualNetworkName": "CORP_VN_1200",
+                        "ipPoolName": "Employee-Data-Pool",
+                        "vlanName": "EMPLOYEE_DATA_1110",
+                        "vlanId": 1110,
+                        "trafficType": "DATA",
+                        "securityGroupName": "Employees_SGT",
+                        "isGroupBasedPolicyEnforcementEnabled": True,
+                    },
+                    {
+                        "id": "00136ff1-9dec-4854-bd94-93ef8d9248f2",
+                        "fabricId": "2059987e-64b0-4ae7-8d9d-e4535f8efb30",
+                        "virtualNetworkName": "GUEST_VN",
+                        "ipPoolName": "Guest-Wireless-Pool",
+                        "vlanName": "GUEST_WIFI_903",
+                        "vlanId": 903,
+                        "trafficType": "DATA",
+                        "isGroupBasedPolicyEnforcementEnabled": False,
+                    },
+                ],
+                "endpoint": "/dna/intent/api/v1/business/sda/hostonboarding/ssid-ippool",
+            }
+        ],
+        "virtual_network_to_fabric_site": [
+            {
+                "data": [
+                    {
+                        "virtualNetworkName": "CORP_VN_1200",
+                        "fabricSiteNameHierarchy": "Global/US/NYC-HQ",
+                    }
+                ],
+                "endpoint": "/dna/intent/api/v1/business/sda/virtual-network",
+            }
+        ],
+        "ip_pools": [
+            {
+                "data": [
+                    {
+                        "id": "pool-001",
+                        "name": "Employee-Data-Pool",
+                        "ipPoolCidr": "10.15.0.0/16",
+                    }
+                ],
+                "endpoint": "/dna/intent/api/v2/ippool",
+            }
+        ],
+    }
+
+
+@pytest.mark.unit
+class TestCatalystCenterOverlayProfileRegistry:
+    """Registry-level checks for the anycast_gateway/virtual-network sanitization packs (issue #68)."""
+
+    def test_cc_virtual_network_names_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("catalyst_center")
+        vn_rules = [r for r in rules if r.category == "VIRTUAL_NETWORK_NAMES"]
+        assert len(vn_rules) > 0
+        assert all(r.tier == "optional" for r in vn_rules)
+
+    def test_cc_vlan_names_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("catalyst_center")
+        vlan_rules = [r for r in rules if r.category == "VLAN_NAMES"]
+        assert len(vlan_rules) > 0
+        assert all(r.tier == "optional" for r in vlan_rules)
+
+    def test_cc_ip_pool_names_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("catalyst_center")
+        pool_rules = [r for r in rules if r.category == "IP_POOL_NAMES"]
+        assert len(pool_rules) > 0
+        assert all(r.tier == "optional" for r in pool_rules)
+
+    def test_cc_security_group_names_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("catalyst_center")
+        sgt_rules = [r for r in rules if r.category == "SECURITY_GROUP_NAMES"]
+        assert len(sgt_rules) > 0
+        assert all(r.tier == "optional" for r in sgt_rules)
+
+
+@pytest.mark.unit
+class TestCatalystCenterOverlayProfileIntegration:
+    """End-to-end sanitization checks for anycast_gateway/virtual-network fields (issue #68)."""
+
+    def test_cc_virtual_network_names_excluded_by_default(self, tmp_path) -> None:
+        """Optional-tier virtual_network_names pack is not applied unless enabled."""
+        data = _catalyst_center_overlay_fixture()
+        input_file = tmp_path / "catalyst_center.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["catalyst_center"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "catalyst_center.json").read_text())
+        gw = sanitized["anycast_gateway"][0]["data"]
+        assert gw[0]["virtualNetworkName"] == "CORP_VN_1200"
+        vn_site = sanitized["virtual_network_to_fabric_site"][0]["data"][0]
+        assert vn_site["virtualNetworkName"] == "CORP_VN_1200"
+
+    def test_cc_virtual_network_names_redacts_when_enabled(self, tmp_path) -> None:
+        """virtual_network_names pack redacts virtualNetworkName in anycast_gateway and
+        virtual_network_to_fabric_site, preserving non-sensitive fields."""
+        data = _catalyst_center_overlay_fixture()
+        input_file = tmp_path / "catalyst_center.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["catalyst_center"],
+            packs=PackConfig(enable=["virtual_network_names"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "catalyst_center.json").read_text())
+        raw = json.dumps(sanitized)
+        assert "CORP_VN_1200" not in raw
+        assert "GUEST_VN" not in raw
+
+        gw = sanitized["anycast_gateway"][0]["data"]
+        assert gw[0]["virtualNetworkName"] != "CORP_VN_1200"
+        assert gw[1]["virtualNetworkName"] != "GUEST_VN"
+        # Non-sensitive fields preserved
+        assert gw[0]["id"] == "00059b31-b7cb-44df-a3ea-73fe1792cd76"
+        assert gw[0]["fabricId"] == "21874c44-380b-45f8-911c-b1b98fd44836"
+        assert gw[0]["vlanId"] == 1110
+        assert gw[0]["trafficType"] == "DATA"
+
+        vn_site = sanitized["virtual_network_to_fabric_site"][0]["data"][0]
+        assert vn_site["virtualNetworkName"] != "CORP_VN_1200"
+
+    def test_cc_vlan_names_redacts_when_enabled(self, tmp_path) -> None:
+        """vlan_names pack redacts vlanName while preserving vlanId."""
+        data = _catalyst_center_overlay_fixture()
+        input_file = tmp_path / "catalyst_center.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["catalyst_center"],
+            packs=PackConfig(enable=["vlan_names"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "catalyst_center.json").read_text())
+        raw = json.dumps(sanitized)
+        assert "EMPLOYEE_DATA_1110" not in raw
+        assert "GUEST_WIFI_903" not in raw
+
+        gw = sanitized["anycast_gateway"][0]["data"]
+        assert gw[0]["vlanName"] != "EMPLOYEE_DATA_1110"
+        assert gw[1]["vlanName"] != "GUEST_WIFI_903"
+        assert gw[0]["vlanId"] == 1110
+        assert gw[1]["vlanId"] == 903
+
+    def test_cc_ip_pool_names_redacts_when_enabled(self, tmp_path) -> None:
+        """ip_pool_names pack redacts ipPoolName and ip_pools[].data[].name, preserving ipPoolCidr."""
+        data = _catalyst_center_overlay_fixture()
+        input_file = tmp_path / "catalyst_center.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["catalyst_center"],
+            packs=PackConfig(enable=["ip_pool_names"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "catalyst_center.json").read_text())
+        raw = json.dumps(sanitized)
+        assert "Employee-Data-Pool" not in raw
+        assert "Guest-Wireless-Pool" not in raw
+
+        gw = sanitized["anycast_gateway"][0]["data"]
+        assert gw[0]["ipPoolName"] != "Employee-Data-Pool"
+        assert gw[1]["ipPoolName"] != "Guest-Wireless-Pool"
+
+        pool = sanitized["ip_pools"][0]["data"][0]
+        assert pool["name"] != "Employee-Data-Pool"
+        # ipPoolCidr is handled by the always-on IP scanner (not this pack), which
+        # anonymizes the address while preserving the prefix length/format.
+        assert pool["ipPoolCidr"].endswith("/16")
+        assert pool["id"] == "pool-001"
+
+    def test_cc_security_group_names_redacts_when_enabled(self, tmp_path) -> None:
+        """security_group_names pack redacts securityGroupName."""
+        data = _catalyst_center_overlay_fixture()
+        input_file = tmp_path / "catalyst_center.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["catalyst_center"],
+            packs=PackConfig(enable=["security_group_names"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "catalyst_center.json").read_text())
+        raw = json.dumps(sanitized)
+        assert "Employees_SGT" not in raw
+
+        gw = sanitized["anycast_gateway"][0]["data"]
+        assert gw[0]["securityGroupName"] != "Employees_SGT"
+        # Non-sensitive fields preserved
+        assert gw[0]["virtualNetworkName"] == "CORP_VN_1200"
+        assert gw[0]["vlanId"] == 1110
