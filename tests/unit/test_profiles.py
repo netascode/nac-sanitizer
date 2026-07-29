@@ -864,3 +864,209 @@ class TestFMCProfileIntegration:
         result = runner.invoke(app, ["profiles", "list"])
         assert result.exit_code == 0
         assert "fmc" in result.output
+
+
+@pytest.mark.unit
+class TestCatalystCenterProfileRegistry:
+    def test_catalyst_center_profile_available(self) -> None:
+        available = ProfileRegistry.available()
+        assert "catalyst_center" in available
+
+    def test_load_catalyst_center_profile(self) -> None:
+        profile = ProfileRegistry.load("catalyst_center")
+        assert profile["name"] == "catalyst_center"
+        assert "packs" in profile
+
+    def test_catalyst_center_rules_have_valid_paths(self) -> None:
+        rules = ProfileRegistry.load_rules("catalyst_center")
+        resolver = PathResolver()
+        for rule in rules:
+            resolver.parse(rule.path)
+
+    def test_catalyst_center_rules_have_valid_strategies(self) -> None:
+        valid_strategies = {
+            "token",
+            "ip_map",
+            "hostname_map",
+            "constant",
+            "hash",
+            "preserve_format",
+        }
+        rules = ProfileRegistry.load_rules("catalyst_center")
+        for rule in rules:
+            assert rule.strategy in valid_strategies, (
+                f"Unknown strategy '{rule.strategy}' in path {rule.path}"
+            )
+
+    def test_cc_device_names_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("catalyst_center")
+        device_name_rules = [r for r in rules if r.category == "DEVICE_NAMES"]
+        assert len(device_name_rules) > 0
+        assert all(r.tier == "optional" for r in device_name_rules)
+
+    def test_cc_device_descriptions_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("catalyst_center")
+        device_desc_rules = [r for r in rules if r.category == "DEVICE_DESCRIPTIONS"]
+        assert len(device_desc_rules) > 0
+        assert all(r.tier == "optional" for r in device_desc_rules)
+
+
+@pytest.mark.unit
+class TestCatalystCenterProfileIntegration:
+    @staticmethod
+    def _device_data() -> dict:
+        return {
+            "network_devices": [
+                {
+                    "data": [
+                        {
+                            "family": "Routers",
+                            "description": "IDF-3A Floor 3 Wing A Router",
+                            "type": "Cisco Catalyst 8300",
+                            "softwareVersion": "17.15.4c",
+                            "serialNumber": "FDO12345678",
+                            "macAddress": "00:11:22:33:44:55",
+                            "managementState": "Managed",
+                        }
+                    ],
+                    "endpoint": "/dna/intent/api/v1/network-device",
+                }
+            ],
+            "update_device_management_address": [
+                {
+                    "data": [
+                        {
+                            "deviceId": "abc-123",
+                            "description": "DC1-Core-Switch primary management",
+                            "newIP": "10.1.1.1",
+                            "oldIP": "10.1.1.2",
+                        }
+                    ],
+                    "endpoint": "/dna/intent/api/v1/device-management-address",
+                }
+            ],
+            "device_replacement": [
+                {
+                    "data": [
+                        {
+                            "id": "repl-001",
+                            "faultyDeviceName": "sw-floor3-01.corp.example.com",
+                            "faultyDeviceSerialNumber": "FDO98765432",
+                            "replacementStatus": "READY-FOR-REPLACEMENT",
+                        }
+                    ],
+                    "endpoint": "/dna/intent/api/v1/device-replacement",
+                }
+            ],
+            "lan_automation": [
+                {
+                    "data": [
+                        {
+                            "id": "lan-auto-001",
+                            "discoveredDeviceList": [
+                                {
+                                    "name": "sw-discovered-01.corp.local",
+                                    "serialNumber": "FCW1234ABCD",
+                                }
+                            ],
+                            "ipPools": [{"ipPoolName": "LAN-Auto-Pool"}],
+                        }
+                    ],
+                    "endpoint": "/dna/intent/api/v1/lan-automation/status",
+                }
+            ],
+        }
+
+    def test_cc_device_names_excluded_by_default(self, tmp_path) -> None:
+        """Catalyst Center device_names pack (optional tier) is not applied unless enabled."""
+        data = self._device_data()
+        input_file = tmp_path / "cc.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["catalyst_center"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "cc.json").read_text())
+        replacement = sanitized["device_replacement"][0]["data"][0]
+        assert replacement["faultyDeviceName"] == "sw-floor3-01.corp.example.com"
+        discovered = sanitized["lan_automation"][0]["data"][0]["discoveredDeviceList"][
+            0
+        ]
+        assert discovered["name"] == "sw-discovered-01.corp.local"
+
+    def test_cc_device_names_redacts_when_enabled(self, tmp_path) -> None:
+        """Catalyst Center device_names pack redacts faultyDeviceName and discovered device names when enabled."""
+        data = self._device_data()
+        input_file = tmp_path / "cc.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["catalyst_center"],
+            packs=PackConfig(enable=["device_names"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "cc.json").read_text())
+        raw = json.dumps(sanitized)
+        assert "sw-floor3-01.corp.example.com" not in raw
+        assert "sw-discovered-01.corp.local" not in raw
+
+        replacement = sanitized["device_replacement"][0]["data"][0]
+        assert replacement["faultyDeviceName"].startswith("DEVICE-")
+        assert replacement["replacementStatus"] == "READY-FOR-REPLACEMENT"
+        assert replacement["faultyDeviceSerialNumber"] == "FDO98765432"
+
+        discovered = sanitized["lan_automation"][0]["data"][0]["discoveredDeviceList"][
+            0
+        ]
+        assert discovered["name"].startswith("DEVICE-")
+        assert discovered["serialNumber"] == "FCW1234ABCD"
+
+    def test_cc_device_descriptions_excluded_by_default(self, tmp_path) -> None:
+        """Catalyst Center device_descriptions pack (optional tier) is not applied unless enabled."""
+        data = self._device_data()
+        input_file = tmp_path / "cc.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["catalyst_center"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "cc.json").read_text())
+        device = sanitized["network_devices"][0]["data"][0]
+        assert device["description"] == "IDF-3A Floor 3 Wing A Router"
+        mgmt = sanitized["update_device_management_address"][0]["data"][0]
+        assert mgmt["description"] == "DC1-Core-Switch primary management"
+
+    def test_cc_device_descriptions_redacts_when_enabled(self, tmp_path) -> None:
+        """Catalyst Center device_descriptions pack redacts descriptions in network_devices and update_device_management_address when enabled."""
+        data = self._device_data()
+        input_file = tmp_path / "cc.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["catalyst_center"],
+            packs=PackConfig(enable=["device_descriptions"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "cc.json").read_text())
+        raw = json.dumps(sanitized)
+        assert "IDF-3A Floor 3 Wing A Router" not in raw
+        assert "DC1-Core-Switch primary management" not in raw
+
+        device = sanitized["network_devices"][0]["data"][0]
+        assert device["family"] == "Routers"
+        assert device["type"] == "Cisco Catalyst 8300"
+        assert device["softwareVersion"] == "17.15.4c"
+        assert device["managementState"] == "Managed"
+
+        mgmt = sanitized["update_device_management_address"][0]["data"][0]
+        assert mgmt["deviceId"] == "abc-123"
