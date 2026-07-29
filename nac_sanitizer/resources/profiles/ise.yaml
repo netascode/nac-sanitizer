@@ -139,3 +139,17 @@ packs:
       - "$.identity_source_sequence[*].data.name"
       - "$.identity_source_sequence[*].data.description"
       - "$.identity_source_sequence[*].data.idSeqItem[*].idstore"
+
+  active_directory_groups:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.active_directory_join_point[*].data.name"
+      - "$.active_directory_join_point[*].data.adgroups.groups[*].name"
+
+  personal_info:
+    tier: default
+    strategy: token
+    paths:
+      - "$..advancedSettings.firstName"
+      - "$..advancedSettings.lastName"

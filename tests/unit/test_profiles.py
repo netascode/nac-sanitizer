@@ -217,6 +217,18 @@ class TestISEProfileRegistry:
         assert len(seq_rules) > 0
         assert all(r.tier == "optional" for r in seq_rules)
 
+    def test_ise_active_directory_groups_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("ise")
+        ad_rules = [r for r in rules if r.category == "ACTIVE_DIRECTORY_GROUPS"]
+        assert len(ad_rules) > 0
+        assert all(r.tier == "optional" for r in ad_rules)
+
+    def test_ise_personal_info_pack_is_default_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("ise")
+        pi_rules = [r for r in rules if r.category == "PERSONAL_INFO"]
+        assert len(pi_rules) > 0
+        assert all(r.tier == "default" for r in pi_rules)
+
 
 @pytest.mark.unit
 class TestProfileIntegration:
@@ -2088,6 +2100,122 @@ class TestProfileIntegration:
                     "endpoint": "/ers/config/tacacscommandsets/b672bd70-9f5a-11ee-94be-faa732630355",
                 },
             ],
+        }
+
+    @staticmethod
+    def _active_directory_data() -> dict:
+        return {
+            "active_directory_join_point": [
+                {
+                    "data": {
+                        "id": "ae1e4320-8d6b-11ee-8e9d-c6c118414b7e",
+                        "name": "CORP_AD_wan.example.com",
+                        "description": "",
+                        "domain": "wan.example.com",
+                        "enableDomainAllowedList": True,
+                        "adgroups": {
+                            "groups": [
+                                {"name": "IT-Admins-NYC", "sid": "S-1-5-32-555"},
+                                {
+                                    "name": "VPN-Users-Remote",
+                                    "sid": "S-1-5-21-309816-515",
+                                },
+                                {
+                                    "name": "Finance-Dept-All",
+                                    "sid": "S-1-5-21-309816-516",
+                                },
+                            ]
+                        },
+                        "advancedSettings": {
+                            "enablePassChange": True,
+                            "enableMachineAuth": True,
+                            "firstName": "givenName",
+                            "lastName": "sn",
+                            "email": "mail",
+                            "department": "department",
+                        },
+                    },
+                    "endpoint": "/ers/config/activedirectory/ae1e4320-8d6b-11ee-8e9d-c6c118414b7e",
+                }
+            ]
+        }
+
+    def test_ise_personal_info_redacted_by_default(self, tmp_path) -> None:
+        """ISE personal_info pack (default tier) redacts firstName/lastName under advancedSettings."""
+        data = self._active_directory_data()
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["ise"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+
+        settings = sanitized["active_directory_join_point"][0]["data"][
+            "advancedSettings"
+        ]
+        assert settings["firstName"] == "PERSONAL_INFO-001"
+        assert settings["lastName"] == "PERSONAL_INFO-002"
+        assert settings["enablePassChange"] is True
+        assert settings["enableMachineAuth"] is True
+        assert settings["department"] == "department"
+        # "email" maps to the AD attribute name "mail", not actual PII here
+        assert settings["email"] == "mail"
+
+    def test_ise_active_directory_groups_excluded_by_default(self, tmp_path) -> None:
+        """ISE active_directory_groups pack (optional tier) is not applied unless enabled."""
+        data = self._active_directory_data()
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["ise"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        join_point = sanitized["active_directory_join_point"][0]["data"]
+        assert join_point["name"] == "CORP_AD_wan.example.com"
+        groups = join_point["adgroups"]["groups"]
+        assert {g["name"] for g in groups} == {
+            "IT-Admins-NYC",
+            "VPN-Users-Remote",
+            "Finance-Dept-All",
+        }
+
+    def test_ise_active_directory_groups_redacts_when_enabled(self, tmp_path) -> None:
+        """ISE active_directory_groups pack redacts join point name and AD group names when enabled."""
+        data = self._active_directory_data()
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["ise"],
+            packs=PackConfig(enable=["active_directory_groups"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+
+        join_point = sanitized["active_directory_join_point"][0]["data"]
+        assert join_point["name"] == "ACTIVE_DIRECTORY_GROUPS-001"
+        groups = join_point["adgroups"]["groups"]
+        assert groups[0]["name"] == "ACTIVE_DIRECTORY_GROUPS-002"
+        assert groups[1]["name"] == "ACTIVE_DIRECTORY_GROUPS-003"
+        assert groups[2]["name"] == "ACTIVE_DIRECTORY_GROUPS-004"
+
+        assert join_point["id"] == "ae1e4320-8d6b-11ee-8e9d-c6c118414b7e"
+        assert join_point["domain"] == "wan.example.com"
+        assert join_point["enableDomainAllowedList"] is True
+        assert join_point["description"] == ""
+        assert {g["sid"] for g in groups} == {
+            "S-1-5-32-555",
+            "S-1-5-21-309816-515",
+            "S-1-5-21-309816-516",
         }
 
 
