@@ -34,3 +34,11 @@ packs:
     paths:
       - "$..siteNameHierarchy"
       - "$..groupNameHierarchy"
+
+  user_pii:
+    tier: default
+    strategy: token
+    paths:
+      - "$..users[*].email"
+      - "$..users[*].firstName"
+      - "$..users[*].lastName"
