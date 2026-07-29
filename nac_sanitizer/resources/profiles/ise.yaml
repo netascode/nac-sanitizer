@@ -38,3 +38,10 @@ packs:
     strategy: token
     paths:
       - "$..domain"
+
+  identity_sources:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.certificate_authentication_profile[*].data.name"
+      - "$..externalIdentityStoreName"

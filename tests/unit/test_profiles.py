@@ -119,6 +119,12 @@ class TestISEProfileRegistry:
         assert len(user_rules) > 0
         assert all(r.tier == "optional" for r in user_rules)
 
+    def test_ise_identity_sources_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("ise")
+        id_src_rules = [r for r in rules if r.category == "IDENTITY_SOURCES"]
+        assert len(id_src_rules) > 0
+        assert all(r.tier == "optional" for r in id_src_rules)
+
 
 @pytest.mark.unit
 class TestProfileIntegration:
@@ -458,6 +464,119 @@ class TestProfileIntegration:
         user = sanitized["internal_user"][0]["data"]["InternalUser"]
         assert user["userName"] != "jsmith"
         assert user["domain"] != "corp.example.com"
+
+    def test_ise_identity_sources_excluded_by_default(self, tmp_path) -> None:
+        """ISE identity_sources optional pack is not applied by default."""
+        data = {
+            "certificate_authentication_profile": [
+                {
+                    "data": {
+                        "id": "167942e0-dbea-11ee-94be-faa732630355",
+                        "name": "Azure-TLS-Cert-Profile",
+                        "description": "Azure_TLS_Certificate_Profile",
+                        "externalIdentityStoreName": "[not applicable]",
+                        "certificateAttributeName": "SUBJECT_COMMON_NAME",
+                        "allowedAsUserName": False,
+                        "matchMode": "NEVER",
+                        "usernameFrom": "CERTIFICATE",
+                    },
+                    "endpoint": "/ers/config/certificateprofile/167942e0-dbea-11ee-94be-faa732630355",
+                },
+                {
+                    "data": {
+                        "id": "d59cd630-985d-11ee-94be-faa732630355",
+                        "name": "Corp-Machine-Cert-Profile",
+                        "description": "",
+                        "externalIdentityStoreName": "CORP_AD_wan.example.com",
+                        "certificateAttributeName": "SUBJECT_ALTERNATIVE_NAME",
+                        "allowedAsUserName": False,
+                        "matchMode": "RESOLVE_IDENTITY_AMBIGUITY",
+                        "usernameFrom": "CERTIFICATE",
+                    },
+                    "endpoint": "/ers/config/certificateprofile/d59cd630-985d-11ee-94be-faa732630355",
+                },
+            ]
+        }
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["ise"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        # Optional pack NOT enabled - names and externalIdentityStoreName should NOT be redacted
+        cert1 = sanitized["certificate_authentication_profile"][0]["data"]
+        assert cert1["name"] == "Azure-TLS-Cert-Profile"
+        assert cert1["externalIdentityStoreName"] == "[not applicable]"
+        cert2 = sanitized["certificate_authentication_profile"][1]["data"]
+        assert cert2["name"] == "Corp-Machine-Cert-Profile"
+        assert cert2["externalIdentityStoreName"] == "CORP_AD_wan.example.com"
+        # Other fields should still be preserved
+        assert cert1["id"] == "167942e0-dbea-11ee-94be-faa732630355"
+        assert cert1["certificateAttributeName"] == "SUBJECT_COMMON_NAME"
+
+    def test_ise_identity_sources_redacts_when_enabled(self, tmp_path) -> None:
+        """ISE identity_sources pack redacts name and externalIdentityStoreName when enabled."""
+        data = {
+            "certificate_authentication_profile": [
+                {
+                    "data": {
+                        "id": "167942e0-dbea-11ee-94be-faa732630355",
+                        "name": "Azure-TLS-Cert-Profile",
+                        "description": "Azure_TLS_Certificate_Profile",
+                        "externalIdentityStoreName": "[not applicable]",
+                        "certificateAttributeName": "SUBJECT_COMMON_NAME",
+                        "allowedAsUserName": False,
+                        "matchMode": "NEVER",
+                        "usernameFrom": "CERTIFICATE",
+                    },
+                    "endpoint": "/ers/config/certificateprofile/167942e0-dbea-11ee-94be-faa732630355",
+                },
+                {
+                    "data": {
+                        "id": "d59cd630-985d-11ee-94be-faa732630355",
+                        "name": "Corp-Machine-Cert-Profile",
+                        "description": "",
+                        "externalIdentityStoreName": "CORP_AD_wan.example.com",
+                        "certificateAttributeName": "SUBJECT_ALTERNATIVE_NAME",
+                        "allowedAsUserName": False,
+                        "matchMode": "RESOLVE_IDENTITY_AMBIGUITY",
+                        "usernameFrom": "CERTIFICATE",
+                    },
+                    "endpoint": "/ers/config/certificateprofile/d59cd630-985d-11ee-94be-faa732630355",
+                },
+            ]
+        }
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["ise"],
+            packs=PackConfig(enable=["identity_sources"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        # identity_sources enabled - names and externalIdentityStoreName should be redacted
+        cert1 = sanitized["certificate_authentication_profile"][0]["data"]
+        assert cert1["name"] != "Azure-TLS-Cert-Profile"
+        assert cert1["externalIdentityStoreName"] != "[not applicable]"
+        cert2 = sanitized["certificate_authentication_profile"][1]["data"]
+        assert cert2["name"] != "Corp-Machine-Cert-Profile"
+        assert cert2["externalIdentityStoreName"] != "CORP_AD_wan.example.com"
+        # Non-identity_sources fields should be preserved
+        assert cert1["id"] == "167942e0-dbea-11ee-94be-faa732630355"
+        assert cert1["description"] == "Azure_TLS_Certificate_Profile"
+        assert cert1["certificateAttributeName"] == "SUBJECT_COMMON_NAME"
+        assert cert1["allowedAsUserName"] is False
+        assert cert1["matchMode"] == "NEVER"
+        assert cert2["id"] == "d59cd630-985d-11ee-94be-faa732630355"
+        assert cert2["description"] == ""
+        assert cert2["certificateAttributeName"] == "SUBJECT_ALTERNATIVE_NAME"
 
 
 @pytest.mark.unit
