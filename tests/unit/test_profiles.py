@@ -149,6 +149,12 @@ class TestISEProfileRegistry:
         assert len(repo_rules) > 0
         assert all(r.tier == "optional" for r in repo_rules)
 
+    def test_ise_policy_names_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("ise")
+        policy_rules = [r for r in rules if r.category == "POLICY_NAMES"]
+        assert len(policy_rules) > 0
+        assert all(r.tier == "optional" for r in policy_rules)
+
 
 @pytest.mark.unit
 class TestProfileIntegration:
@@ -740,6 +746,148 @@ class TestProfileIntegration:
         assert sanitized["repository"][0]["data"]["protocol"] == "SFTP"
         assert sanitized["repository"][0]["data"]["enablePki"] is False
         assert sanitized["repository"][1]["data"]["protocol"] == "FTP"
+
+    def test_ise_policy_names_excluded_by_default(self, tmp_path) -> None:
+        """ISE policy_names pack (optional tier) is not redacted by default."""
+        data = {
+            "allowed_protocols": [
+                {
+                    "data": {
+                        "id": "926901b0-8c01-11e6-996c-525400b48521",
+                        "name": "Default-Device-Admin-Protocols",
+                        "description": "Default Allowed Protocol Service Device Admin",
+                        "allowPapAscii": True,
+                        "allowChap": True,
+                        "allowMsChapV1": True,
+                    },
+                    "endpoint": "/ers/config/allowedprotocols/926901b0-8c01-11e6-996c-525400b48521",
+                },
+                {
+                    "data": {
+                        "id": "92613980-8c01-11e6-996c-525400b48521",
+                        "name": "EAP-TLS-Corp-Wireless",
+                        "description": "Default Allowed Protocol Service",
+                        "allowPapAscii": False,
+                        "allowEapTls": True,
+                    },
+                    "endpoint": "/ers/config/allowedprotocols/92613980-8c01-11e6-996c-525400b48521",
+                },
+            ],
+            "allowed_protocols_tacacs": [
+                {
+                    "data": {
+                        "id": "a1b2c3d4-1234-5678-9abc-def012345678",
+                        "name": "TACACS-Default-Protocols",
+                        "description": "Default TACACS Protocol Service",
+                        "allowPapAscii": True,
+                        "allowChap": True,
+                    },
+                    "endpoint": "/ers/config/allowedprotocolstacacs/a1b2c3d4-1234-5678-9abc-def012345678",
+                }
+            ],
+        }
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["ise"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        # Policy names should NOT be redacted by default (optional tier)
+        assert (
+            sanitized["allowed_protocols"][0]["data"]["name"]
+            == "Default-Device-Admin-Protocols"
+        )
+        assert (
+            sanitized["allowed_protocols"][1]["data"]["name"] == "EAP-TLS-Corp-Wireless"
+        )
+        assert (
+            sanitized["allowed_protocols_tacacs"][0]["data"]["name"]
+            == "TACACS-Default-Protocols"
+        )
+        # But other fields should remain
+        assert (
+            sanitized["allowed_protocols"][0]["data"]["id"]
+            == "926901b0-8c01-11e6-996c-525400b48521"
+        )
+        assert (
+            sanitized["allowed_protocols"][0]["data"]["description"]
+            == "Default Allowed Protocol Service Device Admin"
+        )
+        assert sanitized["allowed_protocols"][0]["data"]["allowPapAscii"] is True
+
+    def test_ise_policy_names_redacts_when_enabled(self, tmp_path) -> None:
+        """ISE policy_names pack redacts policy names when explicitly enabled."""
+        data = {
+            "allowed_protocols": [
+                {
+                    "data": {
+                        "id": "926901b0-8c01-11e6-996c-525400b48521",
+                        "name": "Default-Device-Admin-Protocols",
+                        "description": "Default Allowed Protocol Service Device Admin",
+                        "allowPapAscii": True,
+                        "allowChap": True,
+                        "allowMsChapV1": True,
+                    },
+                    "endpoint": "/ers/config/allowedprotocols/926901b0-8c01-11e6-996c-525400b48521",
+                },
+                {
+                    "data": {
+                        "id": "92613980-8c01-11e6-996c-525400b48521",
+                        "name": "EAP-TLS-Corp-Wireless",
+                        "description": "Default Allowed Protocol Service",
+                        "allowPapAscii": False,
+                        "allowEapTls": True,
+                    },
+                    "endpoint": "/ers/config/allowedprotocols/92613980-8c01-11e6-996c-525400b48521",
+                },
+            ],
+            "allowed_protocols_tacacs": [
+                {
+                    "data": {
+                        "id": "a1b2c3d4-1234-5678-9abc-def012345678",
+                        "name": "TACACS-Default-Protocols",
+                        "description": "Default TACACS Protocol Service",
+                        "allowPapAscii": True,
+                        "allowChap": True,
+                    },
+                    "endpoint": "/ers/config/allowedprotocolstacacs/a1b2c3d4-1234-5678-9abc-def012345678",
+                }
+            ],
+        }
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["ise"],
+            packs=PackConfig(enable=["policy_names"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        # Policy names should be redacted
+        assert sanitized["allowed_protocols"][0]["data"]["name"] == "POLICY_NAMES-001"
+        assert sanitized["allowed_protocols"][1]["data"]["name"] == "POLICY_NAMES-002"
+        assert (
+            sanitized["allowed_protocols_tacacs"][0]["data"]["name"]
+            == "POLICY_NAMES-003"
+        )
+        # But other fields should be preserved
+        assert (
+            sanitized["allowed_protocols"][0]["data"]["id"]
+            == "926901b0-8c01-11e6-996c-525400b48521"
+        )
+        assert (
+            sanitized["allowed_protocols"][0]["data"]["description"]
+            == "Default Allowed Protocol Service Device Admin"
+        )
+        assert sanitized["allowed_protocols"][0]["data"]["allowPapAscii"] is True
+        assert sanitized["allowed_protocols"][1]["data"]["allowEapTls"] is True
+        assert sanitized["allowed_protocols_tacacs"][0]["data"]["allowChap"] is True
 
 
 @pytest.mark.unit
