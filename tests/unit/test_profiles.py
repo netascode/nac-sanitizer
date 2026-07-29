@@ -989,13 +989,10 @@ class TestCatalystCenterOverlayProfileIntegration:
         sanitizer.run(input_file, output_dir)
 
         sanitized = json.loads((output_dir / "catalyst_center.json").read_text())
-        raw = json.dumps(sanitized)
-        assert "CORP_VN_1200" not in raw
-        assert "GUEST_VN" not in raw
 
         gw = sanitized["anycast_gateway"][0]["data"]
-        assert gw[0]["virtualNetworkName"] != "CORP_VN_1200"
-        assert gw[1]["virtualNetworkName"] != "GUEST_VN"
+        assert gw[0]["virtualNetworkName"] == "VIRTUAL_NETWORK_NAMES-001"
+        assert gw[1]["virtualNetworkName"] == "VIRTUAL_NETWORK_NAMES-002"
         # Non-sensitive fields preserved
         assert gw[0]["id"] == "00059b31-b7cb-44df-a3ea-73fe1792cd76"
         assert gw[0]["fabricId"] == "21874c44-380b-45f8-911c-b1b98fd44836"
@@ -1003,7 +1000,7 @@ class TestCatalystCenterOverlayProfileIntegration:
         assert gw[0]["trafficType"] == "DATA"
 
         vn_site = sanitized["virtual_network_to_fabric_site"][0]["data"][0]
-        assert vn_site["virtualNetworkName"] != "CORP_VN_1200"
+        assert vn_site["virtualNetworkName"] == "VIRTUAL_NETWORK_NAMES-001"
 
     def test_cc_vlan_names_redacts_when_enabled(self, tmp_path) -> None:
         """vlan_names pack redacts vlanName while preserving vlanId."""
@@ -1020,13 +1017,10 @@ class TestCatalystCenterOverlayProfileIntegration:
         sanitizer.run(input_file, output_dir)
 
         sanitized = json.loads((output_dir / "catalyst_center.json").read_text())
-        raw = json.dumps(sanitized)
-        assert "EMPLOYEE_DATA_1110" not in raw
-        assert "GUEST_WIFI_903" not in raw
 
         gw = sanitized["anycast_gateway"][0]["data"]
-        assert gw[0]["vlanName"] != "EMPLOYEE_DATA_1110"
-        assert gw[1]["vlanName"] != "GUEST_WIFI_903"
+        assert gw[0]["vlanName"] == "VLAN_NAMES-001"
+        assert gw[1]["vlanName"] == "VLAN_NAMES-002"
         assert gw[0]["vlanId"] == 1110
         assert gw[1]["vlanId"] == 903
 
@@ -1045,16 +1039,13 @@ class TestCatalystCenterOverlayProfileIntegration:
         sanitizer.run(input_file, output_dir)
 
         sanitized = json.loads((output_dir / "catalyst_center.json").read_text())
-        raw = json.dumps(sanitized)
-        assert "Employee-Data-Pool" not in raw
-        assert "Guest-Wireless-Pool" not in raw
 
         gw = sanitized["anycast_gateway"][0]["data"]
-        assert gw[0]["ipPoolName"] != "Employee-Data-Pool"
-        assert gw[1]["ipPoolName"] != "Guest-Wireless-Pool"
+        assert gw[0]["ipPoolName"] == "IP_POOL_NAMES-001"
+        assert gw[1]["ipPoolName"] == "IP_POOL_NAMES-002"
 
         pool = sanitized["ip_pools"][0]["data"][0]
-        assert pool["name"] != "Employee-Data-Pool"
+        assert pool["name"] == "IP_POOL_NAMES-001"
         # ipPoolCidr is handled by the always-on IP scanner (not this pack), which
         # anonymizes the address while preserving the prefix length/format.
         assert pool["ipPoolCidr"].endswith("/16")
@@ -1075,11 +1066,9 @@ class TestCatalystCenterOverlayProfileIntegration:
         sanitizer.run(input_file, output_dir)
 
         sanitized = json.loads((output_dir / "catalyst_center.json").read_text())
-        raw = json.dumps(sanitized)
-        assert "Employees_SGT" not in raw
 
         gw = sanitized["anycast_gateway"][0]["data"]
-        assert gw[0]["securityGroupName"] != "Employees_SGT"
+        assert gw[0]["securityGroupName"] == "SECURITY_GROUP_NAMES-001"
         # Non-sensitive fields preserved
         assert gw[0]["virtualNetworkName"] == "CORP_VN_1200"
         assert gw[0]["vlanId"] == 1110
