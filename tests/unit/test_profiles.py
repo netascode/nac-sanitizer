@@ -957,15 +957,20 @@ class TestCatalystCenterProfileRegistry:
         sanitizer.run(input_file, output_dir)
 
         sanitized = json.loads((output_dir / "cc.json").read_text())
-        raw = json.dumps(sanitized)
 
         # Descriptions should be redacted (default tier)
-        assert "Primary network device CLI access for Building A switches" not in raw
-        assert "SNMPv3 credentials for core infrastructure monitoring" not in raw
-        assert "NETCONF access for automated config management" not in raw
+        cred_data = sanitized["credentials_cli"][0]["data"][0]
+        assert (
+            cred_data["cliCredential"][0]["description"]
+            == "CREDENTIAL_DESCRIPTIONS-001"
+        )
+        assert cred_data["snmpV3"][0]["description"] == "CREDENTIAL_DESCRIPTIONS-002"
+        assert (
+            cred_data["netconfCredential"][0]["description"]
+            == "CREDENTIAL_DESCRIPTIONS-003"
+        )
 
         # Non-sensitive fields should be preserved
-        cred_data = sanitized["credentials_cli"][0]["data"][0]
         assert (
             cred_data["cliCredential"][0]["instanceUuid"]
             == "1a8f70b3-984d-438e-896e-2bb199040427"
