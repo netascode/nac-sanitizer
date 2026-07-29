@@ -34,3 +34,17 @@ packs:
     paths:
       - "$..siteNameHierarchy"
       - "$..groupNameHierarchy"
+
+  interface_descriptions:
+    tier: optional
+    strategy: token
+    paths:
+      - "$..interfaceDescription"
+
+  fabric_descriptions:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.fabric_authentication_profile[*].data[*].data[*].description"
+      - "$.fabric_virtual_network[*].data[*].data[*].description"
+      - "$.fabric_virtual_network[*].data[*].data[*].scalableGroupNames[*]"
