@@ -62,3 +62,11 @@ packs:
     strategy: token
     paths:
       - "$.image[*].data[*].name"
+
+  user_pii:
+    tier: default
+    strategy: token
+    paths:
+      - "$..users[*].email"
+      - "$..users[*].firstName"
+      - "$..users[*].lastName"

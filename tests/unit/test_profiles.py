@@ -2660,6 +2660,12 @@ class TestCatalystCenterProfileRegistry:
         assert len(image_rules) > 0
         assert all(r.tier == "optional" for r in image_rules)
 
+    def test_cc_user_pii_pack_is_default_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("catalyst_center")
+        user_pii_rules = [r for r in rules if r.category == "USER_PII"]
+        assert len(user_pii_rules) > 0
+        assert all(r.tier == "default" for r in user_pii_rules)
+
     def test_cc_credential_descriptions_pack_is_default_tier(self) -> None:
         rules = ProfileRegistry.load_rules("catalyst_center")
         cred_desc_rules = [r for r in rules if r.category == "CREDENTIAL_DESCRIPTIONS"]
@@ -3148,3 +3154,108 @@ class TestCatalystCenterProfileRegistry:
         assert img2["imageType"] == "SYSTEM_SW"
         assert img2["fileSize"] == "1398765432 bytes"
         assert img2["isTaggedGolden"] is True
+
+    def test_cc_user_pii_redacted_by_default(self, tmp_path) -> None:
+        """Catalyst Center profile default-tier user_pii pack redacts email, firstName, lastName."""
+        data = {
+            "user": [
+                {
+                    "data": [
+                        {
+                            "users": [
+                                {
+                                    "username": "admin",
+                                    "email": "john.admin@example.com",
+                                    "firstName": "John",
+                                    "lastName": "Admin",
+                                    "roleList": ["SUPER-ADMIN-ROLE"],
+                                    "userId": "abc-123-def",
+                                },
+                                {
+                                    "username": "netops",
+                                    "email": "mary.netops@example.com",
+                                    "firstName": "Mary",
+                                    "lastName": "NetOps",
+                                    "roleList": ["NETWORK-ADMIN-ROLE"],
+                                    "userId": "ghi-456-jkl",
+                                },
+                            ]
+                        }
+                    ],
+                    "endpoint": "/dna/system/api/v1/user",
+                }
+            ]
+        }
+        input_file = tmp_path / "catalyst_center.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["catalyst_center"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "catalyst_center.json").read_text())
+
+        # PII fields should be redacted to deterministic tokens
+        assert sanitized["user"][0]["data"][0]["users"][0]["email"] == "USER_PII-001"
+        assert sanitized["user"][0]["data"][0]["users"][1]["email"] == "USER_PII-002"
+        assert (
+            sanitized["user"][0]["data"][0]["users"][0]["firstName"] == "USER_PII-003"
+        )
+        assert (
+            sanitized["user"][0]["data"][0]["users"][1]["firstName"] == "USER_PII-004"
+        )
+        assert sanitized["user"][0]["data"][0]["users"][0]["lastName"] == "USER_PII-005"
+        assert sanitized["user"][0]["data"][0]["users"][1]["lastName"] == "USER_PII-006"
+
+        # Non-PII fields should be preserved
+        assert sanitized["user"][0]["data"][0]["users"][0]["username"] == "admin"
+        assert sanitized["user"][0]["data"][0]["users"][0]["roleList"] == [
+            "SUPER-ADMIN-ROLE"
+        ]
+        assert sanitized["user"][0]["data"][0]["users"][0]["userId"] == "abc-123-def"
+        assert sanitized["user"][0]["data"][0]["users"][1]["username"] == "netops"
+        assert sanitized["user"][0]["data"][0]["users"][1]["roleList"] == [
+            "NETWORK-ADMIN-ROLE"
+        ]
+        assert sanitized["user"][0]["data"][0]["users"][1]["userId"] == "ghi-456-jkl"
+
+    def test_cc_user_pii_can_be_disabled(self, tmp_path) -> None:
+        """Catalyst Center user_pii pack fields NOT redacted when disabled."""
+        data = {
+            "user": [
+                {
+                    "data": [
+                        {
+                            "users": [
+                                {
+                                    "username": "admin",
+                                    "email": "john.admin@example.com",
+                                    "firstName": "John",
+                                    "lastName": "Admin",
+                                    "roleList": ["SUPER-ADMIN-ROLE"],
+                                    "userId": "abc-123-def",
+                                }
+                            ]
+                        }
+                    ],
+                    "endpoint": "/dna/system/api/v1/user",
+                }
+            ]
+        }
+        input_file = tmp_path / "catalyst_center.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["catalyst_center"],
+            packs=PackConfig(disable=["user_pii"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "catalyst_center.json").read_text())
+        user = sanitized["user"][0]["data"][0]["users"][0]
+        assert user["email"] == "john.admin@example.com"
+        assert user["firstName"] == "John"
+        assert user["lastName"] == "Admin"
