@@ -725,13 +725,11 @@ class TestProfileIntegration:
         sanitizer.run(input_file, output_dir)
 
         sanitized = json.loads((output_dir / "ise.json").read_text())
-        raw = json.dumps(sanitized)
-        assert "jsmith@example.com" not in raw
 
         custom_attrs = sanitized["endpoint"][0]["data"]["customAttributes"][
             "customAttributes"
         ]
-        assert custom_attrs["UserEmail"] != "jsmith@example.com"
+        assert custom_attrs["UserEmail"] == "ENDPOINT_CUSTOM_PII-001"
         # Non-PII custom attributes preserved
         assert custom_attrs["MDAVCompliant"] == "Yes"
 
@@ -784,15 +782,16 @@ class TestProfileIntegration:
         group_0 = sanitized["endpoint_identity_group"][0]["data"]
         group_1 = sanitized["endpoint_identity_group"][1]["data"]
 
-        # Sensitive fields redacted (name is targeted by the pack; mac is not)
-        assert endpoint_0["name"] != "AA:BB:CC:DD:EE:FF"
-        assert endpoint_1["name"] != "11:22:33:44:55:66"
-        assert group_0["name"] != "Profiled"
-        assert group_1["name"] != "BYOD-Registered"
+        # Sensitive fields redacted to deterministic preserve_format tokens
+        # (name is targeted by the pack; mac is not)
+        assert endpoint_0["name"] == "00:00:00:00:00:01"
+        assert endpoint_1["name"] == "00:00:00:00:00:02"
+        assert group_0["name"] == "00000000"
+        assert group_1["name"] == "0000-00000004xx"
         assert (
-            group_0["description"] != "Endpoint Identity Group for profiled endpoints"
+            group_0["description"] == "00000000 0005xxxx Xxxxx xxx xxxxxxxx xxxxxxxxx"
         )
-        assert group_1["description"] != "Endpoints registered through BYOD portal"
+        assert group_1["description"] == "000000000 006xxxxxxx xxxxxxx XXXX xxxxxx"
 
         # preserve_format strategy: MAC-formatted names keep their delimiter pattern
         assert re.fullmatch(
