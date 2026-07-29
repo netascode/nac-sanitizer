@@ -50,6 +50,88 @@ packs:
       - "$.tacacs_command_set[*].data.name"
       - "$.tacacs_command_set[*].data.description"
 
+  repository_config:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.repository[*].data.name"
+      - "$.repository[*].data.path"
+
+  policy_names:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.allowed_protocols[*].data.name"
+      - "$.allowed_protocols_tacacs[*].data.name"
+
+  downloadable_acl_names:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.downloadable_acl[*].data.name"
+
+  identity_sources:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.certificate_authentication_profile[*].data.name"
+      - "$..externalIdentityStoreName"
+
+  license_tier_names:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.license_tier_state[*].data[*].name"
+
+  security_groups:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.trustsec_security_group[*].data.name"
+      - "$.trustsec_security_group[*].data.description"
+      - "$.trustsec_security_group_acl[*].data.name"
+      - "$.trustsec_egress_matrix_cell[*].data.name"
+      - "$.trustsec_egress_matrix_cell_default[*].data.name"
+
+  sxp_config:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.sxp_domain_filter[*].data.vn"
+      - "$.sxp_domain_filter[*].data.domains"
+
+  device_trustsec_credentials:
+    tier: default
+    strategy: token
+    paths:
+      - "$..deviceConfigurationDeployment.enableModePassword"
+      - "$..deviceConfigurationDeployment.execModePassword"
+      - "$..deviceConfigurationDeployment.execModeUsername"
+
+  network_device_names:
+    tier: optional
+    strategy: hostname_map
+    paths:
+      - "$.network_device[*].data.name"
+      - "$..sgaNotificationAndUpdates.coaSourceHost"
+
+  network_device_groups:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.network_device[*].data.NetworkDeviceGroupList[*]"
+      - "$.network_device_group[*].data.name"
+      - "$.network_device_group[*].data.description"
+
+  authorization_profiles:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.authorization_profile[*].data.name"
+      - "$.authorization_profile[*].data.description"
+      - "$.authorization_profile[*].data.vlan.nameID"
+      - "$.authorization_profile[*].data.advancedAttributes[*].rightHandSideAttribueValue.value"
+
   identity_source_sequences:
     tier: optional
     strategy: token
