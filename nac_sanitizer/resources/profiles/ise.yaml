@@ -49,3 +49,20 @@ packs:
       - "$.tacacs_profile[*].data.sessionAttributes.sessionAttributeList[*].value"
       - "$.tacacs_command_set[*].data.name"
       - "$.tacacs_command_set[*].data.description"
+
+  user_personal_info:
+    tier: default
+    strategy: token
+    paths:
+      - "$.internal_user[*].data.name"
+      - "$.internal_user[*].data.firstName"
+      - "$.internal_user[*].data.lastName"
+      - "$.internal_user[*].data.email"
+
+  user_identity_groups:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.internal_user[*].data.description"
+      - "$.user_identity_group[*].data.name"
+      - "$.user_identity_group[*].data.description"

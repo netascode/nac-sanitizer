@@ -143,6 +143,20 @@ class TestISEProfileRegistry:
             "$.tacacs_command_set[*].data.description",
         }
 
+    def test_ise_user_personal_info_pack_is_default_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("ise")
+        personal_info_rules = [r for r in rules if r.category == "USER_PERSONAL_INFO"]
+        assert len(personal_info_rules) > 0
+        assert all(r.tier == "default" for r in personal_info_rules)
+
+    def test_ise_user_identity_groups_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("ise")
+        identity_group_rules = [
+            r for r in rules if r.category == "USER_IDENTITY_GROUPS"
+        ]
+        assert len(identity_group_rules) > 0
+        assert all(r.tier == "optional" for r in identity_group_rules)
+
 
 @pytest.mark.unit
 class TestProfileIntegration:
@@ -642,6 +656,158 @@ class TestProfileIntegration:
         assert cmd_set_0["permitUnmatched"] is True
         assert cmd_set_1["permitUnmatched"] is False
         assert cmd_set_0["commands"] == {"commandList": []}
+
+    @staticmethod
+    def _user_identity_data() -> dict:
+        return {
+            "internal_user": [
+                {
+                    "data": {
+                        "id": "f49babbd-5a20-4fdb-9c58-9ab1477162ca",
+                        "name": "jsmith",
+                        "description": "Network Operations Engineer",
+                        "enabled": True,
+                        "email": "john.smith@example.com",
+                        "firstName": "John",
+                        "lastName": "Smith",
+                        "changePassword": False,
+                        "identityGroups": "bd6d88b0-679e-11ee-8e9d-c6c118414b7e",
+                        "expiryDateEnabled": False,
+                        "passwordIDStore": "Internal Users",
+                    },
+                    "endpoint": "/ers/config/internaluser/f49babbd-5a20-4fdb-9c58-9ab1477162ca",
+                },
+                {
+                    "data": {
+                        "id": "32147735-ec63-4829-acbf-00854d66baeb",
+                        "name": "mjones",
+                        "description": "",
+                        "enabled": True,
+                        "email": "mary.jones@example.com",
+                        "firstName": "Mary",
+                        "lastName": "Jones",
+                        "changePassword": False,
+                        "identityGroups": "46f8f460-1eb1-11ef-91f1-4a5b331df49b",
+                        "expiryDateEnabled": False,
+                        "passwordIDStore": "Internal Users",
+                    },
+                    "endpoint": "/ers/config/internaluser/32147735-ec63-4829-acbf-00854d66baeb",
+                },
+            ],
+            "user_identity_group": [
+                {
+                    "data": {
+                        "id": "a176c430-8c01-11e6-996c-525400b48521",
+                        "name": "ALL_ACCOUNTS",
+                        "description": "Default ALL_ACCOUNTS (default) User Group",
+                        "parent": "NAC Group:NAC:IdentityGroups:User Identity Groups",
+                    },
+                    "endpoint": "/ers/config/identitygroup/a176c430-8c01-11e6-996c-525400b48521",
+                },
+                {
+                    "data": {
+                        "id": "043f1380-f8d1-11ee-8954-a21daf388194",
+                        "name": "Aruba_Helpdesk",
+                        "description": "Aruba helpdesk operators group",
+                        "parent": "NAC Group:NAC:IdentityGroups:User Identity Groups",
+                    },
+                    "endpoint": "/ers/config/identitygroup/043f1380-f8d1-11ee-8954-a21daf388194",
+                },
+            ],
+        }
+
+    def test_ise_user_personal_info_redacted_by_default(self, tmp_path) -> None:
+        """ISE user_personal_info pack (default tier) redacts internal user PII."""
+        data = self._user_identity_data()
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["ise"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        raw = json.dumps(sanitized)
+
+        # Personal info redacted by default
+        assert "jsmith" not in raw
+        assert "mjones" not in raw
+        assert "John" not in raw
+        assert "Smith" not in raw
+        assert "Mary" not in raw
+        assert "Jones" not in raw
+        assert "john.smith@example.com" not in raw
+        assert "mary.jones@example.com" not in raw
+
+        user_0 = sanitized["internal_user"][0]["data"]
+        user_1 = sanitized["internal_user"][1]["data"]
+
+        # Non-personal-info fields preserved
+        assert user_0["id"] == "f49babbd-5a20-4fdb-9c58-9ab1477162ca"
+        assert user_1["id"] == "32147735-ec63-4829-acbf-00854d66baeb"
+        assert user_0["enabled"] is True
+        assert user_0["identityGroups"] == "bd6d88b0-679e-11ee-8e9d-c6c118414b7e"
+        assert user_1["identityGroups"] == "46f8f460-1eb1-11ef-91f1-4a5b331df49b"
+        assert user_0["expiryDateEnabled"] is False
+        assert user_0["passwordIDStore"] == "Internal Users"
+        assert user_1["passwordIDStore"] == "Internal Users"
+
+    def test_ise_user_identity_groups_excluded_by_default(self, tmp_path) -> None:
+        """ISE user_identity_groups pack (optional tier) is not applied unless enabled."""
+        data = self._user_identity_data()
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["ise"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+
+        group_0 = sanitized["user_identity_group"][0]["data"]
+        group_1 = sanitized["user_identity_group"][1]["data"]
+        assert group_0["name"] == "ALL_ACCOUNTS"
+        assert group_0["description"] == "Default ALL_ACCOUNTS (default) User Group"
+        assert group_1["name"] == "Aruba_Helpdesk"
+        assert group_1["description"] == "Aruba helpdesk operators group"
+
+        user_0 = sanitized["internal_user"][0]["data"]
+        assert user_0["description"] == "Network Operations Engineer"
+
+    def test_ise_user_identity_groups_redacts_when_enabled(self, tmp_path) -> None:
+        """ISE user_identity_groups pack redacts group names/descriptions and internal user description when enabled."""
+        data = self._user_identity_data()
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["ise"],
+            packs=PackConfig(enable=["user_identity_groups"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        raw = json.dumps(sanitized)
+
+        # Sensitive fields redacted
+        assert "ALL_ACCOUNTS" not in raw
+        assert "Aruba_Helpdesk" not in raw
+        assert "Default ALL_ACCOUNTS (default) User Group" not in raw
+        assert "Aruba helpdesk operators group" not in raw
+        assert "Network Operations Engineer" not in raw
+
+        group_0 = sanitized["user_identity_group"][0]["data"]
+        group_1 = sanitized["user_identity_group"][1]["data"]
+
+        # Non-sensitive fields preserved
+        assert group_0["id"] == "a176c430-8c01-11e6-996c-525400b48521"
+        assert group_1["id"] == "043f1380-f8d1-11ee-8954-a21daf388194"
+        assert group_0["parent"] == "NAC Group:NAC:IdentityGroups:User Identity Groups"
+        assert group_1["parent"] == "NAC Group:NAC:IdentityGroups:User Identity Groups"
 
 
 @pytest.mark.unit
