@@ -122,3 +122,12 @@ packs:
       - "$.network_device[*].data.NetworkDeviceGroupList[*]"
       - "$.network_device_group[*].data.name"
       - "$.network_device_group[*].data.description"
+
+  authorization_profiles:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.authorization_profile[*].data.name"
+      - "$.authorization_profile[*].data.description"
+      - "$.authorization_profile[*].data.vlan.nameID"
+      - "$.authorization_profile[*].data.advancedAttributes[*].rightHandSideAttribueValue.value"
