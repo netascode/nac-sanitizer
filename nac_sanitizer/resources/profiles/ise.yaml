@@ -49,3 +49,11 @@ packs:
       - "$.tacacs_profile[*].data.sessionAttributes.sessionAttributeList[*].value"
       - "$.tacacs_command_set[*].data.name"
       - "$.tacacs_command_set[*].data.description"
+
+  identity_source_sequences:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.identity_source_sequence[*].data.name"
+      - "$.identity_source_sequence[*].data.description"
+      - "$.identity_source_sequence[*].data.idSeqItem[*].idstore"

@@ -143,6 +143,12 @@ class TestISEProfileRegistry:
             "$.tacacs_command_set[*].data.description",
         }
 
+    def test_ise_identity_source_sequences_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("ise")
+        idseq_rules = [r for r in rules if r.category == "IDENTITY_SOURCE_SEQUENCES"]
+        assert len(idseq_rules) > 0
+        assert all(r.tier == "optional" for r in idseq_rules)
+
 
 @pytest.mark.unit
 class TestProfileIntegration:
@@ -482,6 +488,151 @@ class TestProfileIntegration:
         user = sanitized["internal_user"][0]["data"]["InternalUser"]
         assert user["userName"] != "jsmith"
         assert user["domain"] != "corp.example.com"
+
+    def test_ise_identity_source_sequences_excluded_by_default(self, tmp_path) -> None:
+        """ISE identity_source_sequences pack (optional tier) is not applied unless enabled."""
+        data = {
+            "identity_source_sequence": [
+                {
+                    "data": {
+                        "id": "93246270-8c01-11e6-996c-525400b48521",
+                        "name": "All_User_ID_Stores",
+                        "description": "A built-in Identity Sequence to include all User Identity Stores",
+                        "idSeqItem": [
+                            {"idstore": "Internal Users", "order": 1},
+                            {"idstore": "CORP_AD_wan.example.com", "order": 2},
+                            {"idstore": "RSA SecurID", "order": 3},
+                        ],
+                        "certificateAuthenticationProfile": "Preloaded_Certificate_Profile",
+                        "breakOnStoreFail": False,
+                    },
+                    "endpoint": "/ers/config/idstoresequence/93246270-8c01-11e6-996c-525400b48521",
+                },
+                {
+                    "data": {
+                        "id": "9c6fb000-8c01-11e6-996c-525400b48521",
+                        "name": "Certificate-Request-Sequence",
+                        "description": "A built-in Identity Sequence for Certificate Request APIs",
+                        "idSeqItem": [
+                            {"idstore": "Internal Users", "order": 1},
+                            {"idstore": "All_AD_Join_Points", "order": 2},
+                        ],
+                        "certificateAuthenticationProfile": "",
+                        "breakOnStoreFail": False,
+                    },
+                    "endpoint": "/ers/config/idstoresequence/9c6fb000-8c01-11e6-996c-525400b48521",
+                },
+            ]
+        }
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["ise"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        seq_0 = sanitized["identity_source_sequence"][0]["data"]
+        seq_1 = sanitized["identity_source_sequence"][1]["data"]
+
+        # Sensitive fields should NOT be redacted by default
+        assert seq_0["name"] == "All_User_ID_Stores"
+        assert (
+            seq_0["description"]
+            == "A built-in Identity Sequence to include all User Identity Stores"
+        )
+        assert seq_0["idSeqItem"][0]["idstore"] == "Internal Users"
+        assert seq_0["idSeqItem"][1]["idstore"] == "CORP_AD_wan.example.com"
+        assert seq_0["idSeqItem"][2]["idstore"] == "RSA SecurID"
+
+        assert seq_1["name"] == "Certificate-Request-Sequence"
+        assert (
+            seq_1["description"]
+            == "A built-in Identity Sequence for Certificate Request APIs"
+        )
+        assert seq_1["idSeqItem"][0]["idstore"] == "Internal Users"
+        assert seq_1["idSeqItem"][1]["idstore"] == "All_AD_Join_Points"
+
+    def test_ise_identity_source_sequences_redacts_when_enabled(self, tmp_path) -> None:
+        """ISE identity_source_sequences pack redacts names, descriptions, and idstore when enabled."""
+        data = {
+            "identity_source_sequence": [
+                {
+                    "data": {
+                        "id": "93246270-8c01-11e6-996c-525400b48521",
+                        "name": "All_User_ID_Stores",
+                        "description": "A built-in Identity Sequence to include all User Identity Stores",
+                        "idSeqItem": [
+                            {"idstore": "Internal Users", "order": 1},
+                            {"idstore": "CORP_AD_wan.example.com", "order": 2},
+                            {"idstore": "RSA SecurID", "order": 3},
+                        ],
+                        "certificateAuthenticationProfile": "Preloaded_Certificate_Profile",
+                        "breakOnStoreFail": False,
+                    },
+                    "endpoint": "/ers/config/idstoresequence/93246270-8c01-11e6-996c-525400b48521",
+                },
+                {
+                    "data": {
+                        "id": "9c6fb000-8c01-11e6-996c-525400b48521",
+                        "name": "Certificate-Request-Sequence",
+                        "description": "A built-in Identity Sequence for Certificate Request APIs",
+                        "idSeqItem": [
+                            {"idstore": "Internal Users", "order": 1},
+                            {"idstore": "All_AD_Join_Points", "order": 2},
+                        ],
+                        "certificateAuthenticationProfile": "",
+                        "breakOnStoreFail": False,
+                    },
+                    "endpoint": "/ers/config/idstoresequence/9c6fb000-8c01-11e6-996c-525400b48521",
+                },
+            ]
+        }
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["ise"],
+            packs=PackConfig(enable=["identity_source_sequences"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        raw = json.dumps(sanitized)
+
+        # Sensitive fields should be redacted
+        assert "All_User_ID_Stores" not in raw
+        assert "Certificate-Request-Sequence" not in raw
+        assert (
+            "A built-in Identity Sequence to include all User Identity Stores"
+            not in raw
+        )
+        assert "A built-in Identity Sequence for Certificate Request APIs" not in raw
+        assert "Internal Users" not in raw
+        assert "CORP_AD_wan.example.com" not in raw
+        assert "RSA SecurID" not in raw
+        assert "All_AD_Join_Points" not in raw
+
+        seq_0 = sanitized["identity_source_sequence"][0]["data"]
+        seq_1 = sanitized["identity_source_sequence"][1]["data"]
+
+        # Non-sensitive fields should be preserved
+        assert seq_0["id"] == "93246270-8c01-11e6-996c-525400b48521"
+        assert seq_1["id"] == "9c6fb000-8c01-11e6-996c-525400b48521"
+        assert seq_0["idSeqItem"][0]["order"] == 1
+        assert seq_0["idSeqItem"][1]["order"] == 2
+        assert seq_0["idSeqItem"][2]["order"] == 3
+        assert seq_1["idSeqItem"][0]["order"] == 1
+        assert seq_1["idSeqItem"][1]["order"] == 2
+        assert (
+            seq_0["certificateAuthenticationProfile"] == "Preloaded_Certificate_Profile"
+        )
+        assert seq_1["certificateAuthenticationProfile"] == ""
+        assert seq_0["breakOnStoreFail"] is False
+        assert seq_1["breakOnStoreFail"] is False
 
     @staticmethod
     def _tacacs_data() -> dict:
