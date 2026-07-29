@@ -49,3 +49,26 @@ packs:
       - "$.tacacs_profile[*].data.sessionAttributes.sessionAttributeList[*].value"
       - "$.tacacs_command_set[*].data.name"
       - "$.tacacs_command_set[*].data.description"
+
+  device_trustsec_credentials:
+    tier: default
+    strategy: token
+    paths:
+      - "$..deviceConfigurationDeployment.enableModePassword"
+      - "$..deviceConfigurationDeployment.execModePassword"
+      - "$..deviceConfigurationDeployment.execModeUsername"
+
+  network_device_names:
+    tier: optional
+    strategy: hostname_map
+    paths:
+      - "$.network_device[*].data.name"
+      - "$..sgaNotificationAndUpdates.coaSourceHost"
+
+  network_device_groups:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.network_device[*].data.NetworkDeviceGroupList[*]"
+      - "$.network_device_group[*].data.name"
+      - "$.network_device_group[*].data.description"
