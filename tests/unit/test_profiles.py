@@ -947,27 +947,18 @@ class TestCatalystCenterProfileIntegration:
         sanitizer.run(input_file, output_dir)
 
         sanitized = json.loads((output_dir / "catalyst_center.json").read_text())
-        raw = json.dumps(sanitized)
 
-        # PII fields should be redacted
-        assert "john.admin@example.com" not in raw
-        assert "mary.netops@example.com" not in raw
+        # PII fields should be redacted to deterministic tokens
+        assert sanitized["user"][0]["data"][0]["users"][0]["email"] == "USER_PII-001"
+        assert sanitized["user"][0]["data"][0]["users"][1]["email"] == "USER_PII-002"
         assert (
-            "John" not in raw
-            or sanitized["user"][0]["data"][0]["users"][0]["firstName"] != "John"
+            sanitized["user"][0]["data"][0]["users"][0]["firstName"] == "USER_PII-003"
         )
         assert (
-            "Admin" not in raw
-            or sanitized["user"][0]["data"][0]["users"][0]["lastName"] != "Admin"
+            sanitized["user"][0]["data"][0]["users"][1]["firstName"] == "USER_PII-004"
         )
-        assert (
-            "Mary" not in raw
-            or sanitized["user"][0]["data"][0]["users"][0]["firstName"] != "Mary"
-        )
-        assert (
-            "NetOps" not in raw
-            or sanitized["user"][0]["data"][0]["users"][0]["lastName"] != "NetOps"
-        )
+        assert sanitized["user"][0]["data"][0]["users"][0]["lastName"] == "USER_PII-005"
+        assert sanitized["user"][0]["data"][0]["users"][1]["lastName"] == "USER_PII-006"
 
         # Non-PII fields should be preserved
         assert sanitized["user"][0]["data"][0]["users"][0]["username"] == "admin"
