@@ -372,16 +372,21 @@ class TestProfileIntegration:
         sanitizer.run(input_file, output_dir)
 
         sanitized = json.loads((output_dir / "sdwan.json").read_text())
-        raw = json.dumps(sanitized)
-        assert "SVPN 1100 ACME VPN" not in raw
-        assert "Service VPN 1100 for ACME Corp" not in raw
-        assert "SVPN 1100 ACME VPN v2" not in raw
-        assert "Updated Service VPN for ACME" not in raw
-        assert "ACME-MULTICAST-GROUPS" not in raw
 
         vpn_template = sanitized["feature_templates"][0]["data"]
         template_def = vpn_template["templateDefinition"]
         edited_template_def = vpn_template["editedTemplateDefinition"]
+        assert template_def["name"]["vipValue"] == "TEMPLATE_DEFINITION_VALUES-001"
+        assert (
+            edited_template_def["name"]["vipValue"] == "TEMPLATE_DEFINITION_VALUES-002"
+        )
+        assert (
+            template_def["description"]["vipValue"] == "TEMPLATE_DEFINITION_VALUES-003"
+        )
+        assert (
+            edited_template_def["description"]["vipValue"]
+            == "TEMPLATE_DEFINITION_VALUES-004"
+        )
         # Non-string / non-targeted values preserved
         assert template_def["vpn-id"]["vipValue"] == 1100
         assert edited_template_def["vpn-id"]["vipValue"] == 1100
@@ -392,6 +397,10 @@ class TestProfileIntegration:
 
         pim_template = sanitized["feature_templates"][1]["data"]
         rp_addr = pim_template["templateDefinition"]["pim"]["rp-addr"]
+        assert (
+            rp_addr["vipValue"][0]["access-list"]["vipValue"]
+            == "TEMPLATE_DEFINITION_VALUES-005"
+        )
         assert rp_addr["vipValue"][0]["address"]["vipValue"] == "10.0.0.1"
 
     def test_profiles_list_shows_sdwan(self) -> None:
