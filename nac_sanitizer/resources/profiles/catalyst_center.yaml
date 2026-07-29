@@ -70,3 +70,17 @@ packs:
       - "$..users[*].email"
       - "$..users[*].firstName"
       - "$..users[*].lastName"
+
+  device_names:
+    tier: optional
+    strategy: hostname_map
+    paths:
+      - "$..faultyDeviceName"
+      - "$.lan_automation[*].data[*].discoveredDeviceList[*].name"
+
+  device_descriptions:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.network_devices[*].data[*].description"
+      - "$.update_device_management_address[*].data[*].description"
