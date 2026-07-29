@@ -49,3 +49,10 @@ packs:
       - "$.tacacs_profile[*].data.sessionAttributes.sessionAttributeList[*].value"
       - "$.tacacs_command_set[*].data.name"
       - "$.tacacs_command_set[*].data.description"
+
+  repository_config:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.repository[*].data.name"
+      - "$.repository[*].data.path"
