@@ -214,6 +214,12 @@ class TestProfileRegistry:
         assert len(org_rules) > 0
         assert all(r.tier == "default" for r in org_rules)
 
+    def test_sdwan_vpn_service_names_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("sdwan")
+        vpn_rules = [r for r in rules if r.category == "VPN_SERVICE_NAMES"]
+        assert len(vpn_rules) > 0
+        assert all(r.tier == "optional" for r in vpn_rules)
+
 
 @pytest.mark.unit
 class TestISEProfileRegistry:
@@ -784,6 +790,123 @@ class TestProfileIntegration:
         dt = sanitized["cli_device_template"][0]["data"]
         assert dt["sp-org-name"] == "ACME Corp - Fabric 610415"
         assert dt["tenant-org-name"] == "ACME-Corp-Tenant"
+
+    @staticmethod
+    def _vpn_service_feature_profile_data() -> dict:
+        return {
+            "service_feature_profile": [
+                {
+                    "data": {
+                        "profileId": "sfp-001",
+                        "profileName": "GOLD-SERVICE-PROFILE",
+                        "profileType": "service",
+                        "solution": "sdwan",
+                        "description": "Gold tier service profile",
+                        "associatedProfileParcels": [
+                            {
+                                "parcelId": "parcel-001",
+                                "parcelType": "routing/bgp",
+                                "createdBy": "admin",
+                                "lastUpdatedBy": "admin",
+                                "payload": {
+                                    "name": "GOLD_BGP_SVPN1200_ROUTING",
+                                    "description": "BGP routing for SVPN 1200 ACME",
+                                },
+                                "subparcels": [],
+                            },
+                            {
+                                "parcelId": "parcel-002",
+                                "parcelType": "vpn",
+                                "createdBy": "admin",
+                                "lastUpdatedBy": "admin",
+                                "payload": {
+                                    "name": "SVPN-1100-ACME-VPN",
+                                    "description": "Service VPN 1100 for ACME Corp",
+                                    "data": {
+                                        "name": {"value": "SVPN 1100 ACME"},
+                                        "description": {"value": "Service VPN 1100"},
+                                        "entries": [
+                                            {"vpn": {"value": "ACME-VPN-1100"}}
+                                        ],
+                                    },
+                                },
+                                "subparcels": [],
+                            },
+                        ],
+                    },
+                    "endpoint": "/dataservice/v1/feature-profile/sdwan/service/sfp-001",
+                }
+            ]
+        }
+
+    def test_sdwan_vpn_service_names_excluded_by_default(self, tmp_path) -> None:
+        """SD-WAN vpn_service_names pack (optional tier) is not applied unless enabled."""
+        data = self._vpn_service_feature_profile_data()
+        input_file = tmp_path / "sdwan.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["sdwan"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "sdwan.json").read_text())
+        parcels = sanitized["service_feature_profile"][0]["data"][
+            "associatedProfileParcels"
+        ]
+        bgp_payload = parcels[0]["payload"]
+        vpn_payload = parcels[1]["payload"]
+        assert bgp_payload["name"] == "GOLD_BGP_SVPN1200_ROUTING"
+        assert bgp_payload["description"] == "BGP routing for SVPN 1200 ACME"
+        assert vpn_payload["name"] == "SVPN-1100-ACME-VPN"
+        assert vpn_payload["description"] == "Service VPN 1100 for ACME Corp"
+        assert vpn_payload["data"]["name"]["value"] == "SVPN 1100 ACME"
+        assert vpn_payload["data"]["description"]["value"] == "Service VPN 1100"
+        assert vpn_payload["data"]["entries"][0]["vpn"]["value"] == "ACME-VPN-1100"
+
+    def test_sdwan_vpn_service_names_redacts_when_enabled(self, tmp_path) -> None:
+        """SD-WAN vpn_service_names pack redacts parcel payload names/descriptions when enabled."""
+        data = self._vpn_service_feature_profile_data()
+        input_file = tmp_path / "sdwan.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["sdwan"],
+            packs=PackConfig(enable=["vpn_service_names"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "sdwan.json").read_text())
+
+        profile_data = sanitized["service_feature_profile"][0]["data"]
+        parcels = profile_data["associatedProfileParcels"]
+        bgp_parcel = parcels[0]
+        vpn_parcel = parcels[1]
+
+        assert bgp_parcel["payload"]["name"] == "VPN_SERVICE_NAMES-001"
+        assert bgp_parcel["payload"]["description"] == "VPN_SERVICE_NAMES-003"
+        assert vpn_parcel["payload"]["name"] == "VPN_SERVICE_NAMES-002"
+        assert vpn_parcel["payload"]["description"] == "VPN_SERVICE_NAMES-004"
+        assert vpn_parcel["payload"]["data"]["name"]["value"] == "VPN_SERVICE_NAMES-005"
+        assert (
+            vpn_parcel["payload"]["data"]["description"]["value"]
+            == "VPN_SERVICE_NAMES-006"
+        )
+        assert (
+            vpn_parcel["payload"]["data"]["entries"][0]["vpn"]["value"]
+            == "VPN_SERVICE_NAMES-007"
+        )
+
+        # Non-sensitive identifiers/metadata preserved
+        assert bgp_parcel["parcelId"] == "parcel-001"
+        assert bgp_parcel["parcelType"] == "routing/bgp"
+        assert vpn_parcel["parcelId"] == "parcel-002"
+        assert vpn_parcel["parcelType"] == "vpn"
+        assert profile_data["profileId"] == "sfp-001"
+        assert profile_data["profileType"] == "service"
+        assert profile_data["solution"] == "sdwan"
 
     def test_profiles_list_shows_sdwan(self) -> None:
         """CLI profiles list should show sdwan."""
