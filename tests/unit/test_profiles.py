@@ -119,6 +119,18 @@ class TestISEProfileRegistry:
         assert len(user_rules) > 0
         assert all(r.tier == "optional" for r in user_rules)
 
+    def test_ise_security_groups_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("ise")
+        sg_rules = [r for r in rules if r.category == "SECURITY_GROUPS"]
+        assert len(sg_rules) > 0
+        assert all(r.tier == "optional" for r in sg_rules)
+
+    def test_ise_sxp_config_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("ise")
+        sxp_rules = [r for r in rules if r.category == "SXP_CONFIG"]
+        assert len(sxp_rules) > 0
+        assert all(r.tier == "optional" for r in sxp_rules)
+
 
 @pytest.mark.unit
 class TestProfileIntegration:
@@ -458,6 +470,244 @@ class TestProfileIntegration:
         user = sanitized["internal_user"][0]["data"]["InternalUser"]
         assert user["userName"] != "jsmith"
         assert user["domain"] != "corp.example.com"
+
+    def test_ise_security_groups_excluded_by_default(self, tmp_path) -> None:
+        """ISE security_groups optional-tier pack is not applied by default."""
+        data = {
+            "trustsec_security_group": [
+                {
+                    "data": {
+                        "id": "fba9f273-839e-4b95-9764-61b24315132e",
+                        "name": "Aruba_Wireless_APs",
+                        "description": "Aruba Wireless Access Points",
+                        "value": 902,
+                        "generationId": "10",
+                        "propogateToApic": False,
+                    },
+                    "endpoint": "/ers/config/sgt/fba9f273-839e-4b95-9764-61b24315132e",
+                }
+            ],
+            "trustsec_security_group_acl": [
+                {
+                    "data": {
+                        "id": "e05e3fb0-0a18-11ee-adf3-76129057aa4e",
+                        "name": "Allow_DHCP_DNS",
+                        "description": "Sample contract to allow DHCP and DNS",
+                        "generationId": "0",
+                        "aclcontent": "permit udp dst eq 67\npermit udp dst eq 68\npermit tcp dst eq 53\ndeny ip",
+                    },
+                    "endpoint": "/ers/config/sgacl/e05e3fb0-0a18-11ee-adf3-76129057aa4e",
+                }
+            ],
+            "trustsec_egress_matrix_cell": [
+                {
+                    "data": {
+                        "id": "92c1a900-8c01-11e6-996c-525400b48521",
+                        "name": "Auditors-to-Servers",
+                        "description": "Default egress rule",
+                        "sourceSgtId": "92bb1950-8c01-11e6-996c-525400b48521",
+                        "destinationSgtId": "92bb1950-8c01-11e6-996c-525400b48521",
+                        "matrixCellStatus": "ENABLED",
+                        "defaultRule": "PERMIT_IP",
+                        "sgacls": ["92951ac0-8c01-11e6-996c-525400b48521"],
+                    },
+                    "endpoint": "/ers/config/egressmatrixcell/92c1a900-8c01-11e6-996c-525400b48521",
+                }
+            ],
+            "trustsec_egress_matrix_cell_default": [
+                {
+                    "data": {
+                        "id": "09543131-192d-11ef-91f1-4a5b331df49b",
+                        "name": "Default-Cell-Deny",
+                        "sourceSgtId": "fba9f273-839e-4b95-9764-61b24315132e",
+                        "destinationSgtId": "63860f29-2aac-4759-a3e6-260d3d227ef5",
+                        "matrixCellStatus": "ENABLED",
+                        "defaultRule": "DENY_IP",
+                        "sgacls": ["92919850-8c01-11e6-996c-525400b48521"],
+                    },
+                    "endpoint": "/ers/config/egressmatrixcell/09543131-192d-11ef-91f1-4a5b331df49b",
+                }
+            ],
+        }
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["ise"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        sg = sanitized["trustsec_security_group"][0]["data"]
+        assert sg["name"] == "Aruba_Wireless_APs"
+        assert sg["description"] == "Aruba Wireless Access Points"
+        acl = sanitized["trustsec_security_group_acl"][0]["data"]
+        assert acl["name"] == "Allow_DHCP_DNS"
+        cell = sanitized["trustsec_egress_matrix_cell"][0]["data"]
+        assert cell["name"] == "Auditors-to-Servers"
+        default_cell = sanitized["trustsec_egress_matrix_cell_default"][0]["data"]
+        assert default_cell["name"] == "Default-Cell-Deny"
+
+    def test_ise_security_groups_redacts_when_enabled(self, tmp_path) -> None:
+        """ISE security_groups pack redacts SGT/SGACL/matrix cell names when enabled."""
+        data = {
+            "trustsec_security_group": [
+                {
+                    "data": {
+                        "id": "fba9f273-839e-4b95-9764-61b24315132e",
+                        "name": "Aruba_Wireless_APs",
+                        "description": "Aruba Wireless Access Points",
+                        "value": 902,
+                        "generationId": "10",
+                        "propogateToApic": False,
+                    },
+                    "endpoint": "/ers/config/sgt/fba9f273-839e-4b95-9764-61b24315132e",
+                }
+            ],
+            "trustsec_security_group_acl": [
+                {
+                    "data": {
+                        "id": "e05e3fb0-0a18-11ee-adf3-76129057aa4e",
+                        "name": "Allow_DHCP_DNS",
+                        "description": "Sample contract to allow DHCP and DNS",
+                        "generationId": "0",
+                        "aclcontent": "permit udp dst eq 67\npermit udp dst eq 68\npermit tcp dst eq 53\ndeny ip",
+                    },
+                    "endpoint": "/ers/config/sgacl/e05e3fb0-0a18-11ee-adf3-76129057aa4e",
+                }
+            ],
+            "trustsec_egress_matrix_cell": [
+                {
+                    "data": {
+                        "id": "92c1a900-8c01-11e6-996c-525400b48521",
+                        "name": "Auditors-to-Servers",
+                        "description": "Default egress rule",
+                        "sourceSgtId": "92bb1950-8c01-11e6-996c-525400b48521",
+                        "destinationSgtId": "92bb1950-8c01-11e6-996c-525400b48521",
+                        "matrixCellStatus": "ENABLED",
+                        "defaultRule": "PERMIT_IP",
+                        "sgacls": ["92951ac0-8c01-11e6-996c-525400b48521"],
+                    },
+                    "endpoint": "/ers/config/egressmatrixcell/92c1a900-8c01-11e6-996c-525400b48521",
+                }
+            ],
+            "trustsec_egress_matrix_cell_default": [
+                {
+                    "data": {
+                        "id": "09543131-192d-11ef-91f1-4a5b331df49b",
+                        "name": "Default-Cell-Deny",
+                        "sourceSgtId": "fba9f273-839e-4b95-9764-61b24315132e",
+                        "destinationSgtId": "63860f29-2aac-4759-a3e6-260d3d227ef5",
+                        "matrixCellStatus": "ENABLED",
+                        "defaultRule": "DENY_IP",
+                        "sgacls": ["92919850-8c01-11e6-996c-525400b48521"],
+                    },
+                    "endpoint": "/ers/config/egressmatrixcell/09543131-192d-11ef-91f1-4a5b331df49b",
+                }
+            ],
+        }
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["ise"],
+            packs=PackConfig(enable=["security_groups"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+
+        sg = sanitized["trustsec_security_group"][0]["data"]
+        assert sg["name"] != "Aruba_Wireless_APs"
+        assert sg["description"] != "Aruba Wireless Access Points"
+        assert sg["id"] == "fba9f273-839e-4b95-9764-61b24315132e"
+        assert sg["value"] == 902
+        assert sg["generationId"] == "10"
+
+        acl = sanitized["trustsec_security_group_acl"][0]["data"]
+        assert acl["name"] != "Allow_DHCP_DNS"
+        assert (
+            acl["aclcontent"]
+            == "permit udp dst eq 67\npermit udp dst eq 68\npermit tcp dst eq 53\ndeny ip"
+        )
+
+        cell = sanitized["trustsec_egress_matrix_cell"][0]["data"]
+        assert cell["name"] != "Auditors-to-Servers"
+        assert cell["sgacls"] == ["92951ac0-8c01-11e6-996c-525400b48521"]
+        assert cell["matrixCellStatus"] == "ENABLED"
+        assert cell["defaultRule"] == "PERMIT_IP"
+
+        default_cell = sanitized["trustsec_egress_matrix_cell_default"][0]["data"]
+        assert default_cell["name"] != "Default-Cell-Deny"
+        assert default_cell["sgacls"] == ["92919850-8c01-11e6-996c-525400b48521"]
+        assert default_cell["matrixCellStatus"] == "ENABLED"
+        assert default_cell["defaultRule"] == "DENY_IP"
+
+    def test_ise_sxp_config_excluded_by_default(self, tmp_path) -> None:
+        """ISE sxp_config optional-tier pack is not applied by default."""
+        data = {
+            "sxp_domain_filter": [
+                {
+                    "data": {
+                        "id": "25cae136-f670-46bc-8e6f-14badb95b94b",
+                        "subnet": "",
+                        "domains": "sda-infra-vn",
+                        "sgt": "",
+                        "vn": "INFRA_VN",
+                    },
+                    "endpoint": "/ers/config/filterpolicy/25cae136-f670-46bc-8e6f-14badb95b94b",
+                }
+            ]
+        }
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["ise"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        filt = sanitized["sxp_domain_filter"][0]["data"]
+        assert filt["vn"] == "INFRA_VN"
+        assert filt["domains"] == "sda-infra-vn"
+
+    def test_ise_sxp_config_redacts_when_enabled(self, tmp_path) -> None:
+        """ISE sxp_config pack redacts vn and domains when enabled."""
+        data = {
+            "sxp_domain_filter": [
+                {
+                    "data": {
+                        "id": "25cae136-f670-46bc-8e6f-14badb95b94b",
+                        "subnet": "",
+                        "domains": "sda-infra-vn",
+                        "sgt": "",
+                        "vn": "INFRA_VN",
+                    },
+                    "endpoint": "/ers/config/filterpolicy/25cae136-f670-46bc-8e6f-14badb95b94b",
+                }
+            ]
+        }
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["ise"],
+            packs=PackConfig(enable=["sxp_config"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        filt = sanitized["sxp_domain_filter"][0]["data"]
+        assert filt["vn"] != "INFRA_VN"
+        assert filt["domains"] != "sda-infra-vn"
+        assert filt["id"] == "25cae136-f670-46bc-8e6f-14badb95b94b"
+        assert filt["subnet"] == ""
+        assert filt["sgt"] == ""
 
 
 @pytest.mark.unit

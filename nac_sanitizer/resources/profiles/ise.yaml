@@ -38,3 +38,20 @@ packs:
     strategy: token
     paths:
       - "$..domain"
+
+  security_groups:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.trustsec_security_group[*].data.name"
+      - "$.trustsec_security_group[*].data.description"
+      - "$.trustsec_security_group_acl[*].data.name"
+      - "$.trustsec_egress_matrix_cell[*].data.name"
+      - "$.trustsec_egress_matrix_cell_default[*].data.name"
+
+  sxp_config:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.sxp_domain_filter[*].data.vn"
+      - "$.sxp_domain_filter[*].data.domains"
