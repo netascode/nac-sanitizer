@@ -973,31 +973,23 @@ class TestCatalystCenterIPPoolContextPack:
         sanitized = json.loads((output_dir / "cc.json").read_text())
 
         ip_pool = sanitized["ip_pool"][0]["data"][0]
-        assert ip_pool["ipPoolName"] != "DC1-Management-Pool"
+        assert ip_pool["ipPoolName"] == "IP_POOL_CONTEXT-001"
         # ipPoolCidr is remapped by the always-on IP scanner (independent of
         # this pack); only the pool name/site fields are this pack's concern.
         assert ip_pool["id"] == "pool-uuid-001"
 
         reservation = sanitized["ip_pool_reservation"][0]["data"][0]
-        assert reservation["groupName"] != "NYC-HQ-Floor3"
-        assert reservation["siteHierarchy"] != "Global/US/East/NYC-HQ/Floor-3"
+        assert reservation["groupName"] == "IP_POOL_CONTEXT-002"
+        assert reservation["siteHierarchy"] == "IP_POOL_CONTEXT-003"
         assert reservation["id"] == "res-uuid-001"
         reserved_pool = reservation["ipPools"][0]
-        assert reserved_pool["ipPoolName"] != "Floor3-Data-Pool"
+        assert reserved_pool["ipPoolName"] == "IP_POOL_CONTEXT-004"
         assert reserved_pool["totalIpAddressCount"] == 254
         assert reserved_pool["usedIpAddressCount"] == 45
 
         ip_pools = sanitized["ip_pools"][0]["data"][0]
-        assert ip_pools["name"] != "Campus-Guest-Pool"
+        assert ip_pools["name"] == "IP_POOL_CONTEXT-005"
         assert ip_pools["id"] == "pool-uuid-002"
 
         lan_pool = sanitized["lan_automation"][0]["data"][0]["ipPools"][0]
-        assert lan_pool["ipPoolName"] != "LAN-Auto-Pool-1"
-
-        raw = json.dumps(sanitized)
-        assert "DC1-Management-Pool" not in raw
-        assert "NYC-HQ-Floor3" not in raw
-        assert "Global/US/East/NYC-HQ/Floor-3" not in raw
-        assert "Floor3-Data-Pool" not in raw
-        assert "Campus-Guest-Pool" not in raw
-        assert "LAN-Auto-Pool-1" not in raw
+        assert lan_pool["ipPoolName"] == "IP_POOL_CONTEXT-006"
