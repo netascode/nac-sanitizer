@@ -994,9 +994,7 @@ class TestCatalystCenterTemplatePacks:
 
         sanitized = json.loads((output_dir / "cc.json").read_text())
         tmpl = sanitized["template"][0]["data"][0]
-        assert (
-            tmpl["templateContent"] != data["template"][0]["data"][0]["templateContent"]
-        )
+        assert tmpl["templateContent"] == "TEMPLATE_CONTENT-001"
         assert "{{hostname}}" not in json.dumps(sanitized)
         # Non-sensitive fields preserved
         assert tmpl["id"] == "tmpl-001"
@@ -1040,12 +1038,17 @@ class TestCatalystCenterTemplatePacks:
         assert "wireless-team@example.com" not in raw
         assert "senior-eng@example.com" not in raw
 
+        tmpl = sanitized["template"][0]["data"][0]
+        assert tmpl["author"] == "TEMPLATE_AUTHORS-001"
+
         ext_versions_info = sanitized["extended_templates"][0]["data"][0]["data"][0][
             "versionsInfo"
         ][0]
         ver_versions_info = sanitized["template_version"][0]["data"][0]["data"][0][
             "versionsInfo"
         ][0]
+        assert ext_versions_info["author"] == "TEMPLATE_AUTHORS-002"
+        assert ver_versions_info["author"] == "TEMPLATE_AUTHORS-003"
         # Non-sensitive version field preserved
         assert ext_versions_info["version"] == "1"
         assert ver_versions_info["version"] == "2"
@@ -1070,13 +1073,24 @@ class TestCatalystCenterTemplatePacks:
         assert "Day0-Switch-Config" not in raw
         assert "Day1-QoS-Policy" not in raw
         assert "Day zero provisioning for access switches" not in raw
-        assert "production" not in raw
-        assert "campus" not in raw
         assert "Campus-Deployment-Project" not in raw
         assert "Templates for campus network deployment" not in raw
 
         tmpl = sanitized["template"][0]["data"][0]
         proj = sanitized["project"][0]["data"][0]
+
+        assert tmpl["name"] == "TEMPLATE_METADATA-001"
+        assert tmpl["description"] == "TEMPLATE_METADATA-002"
+        assert tmpl["tags"] == [
+            {"name": "TEMPLATE_METADATA-003"},
+            {"name": "TEMPLATE_METADATA-004"},
+        ]
+        assert proj["name"] == "TEMPLATE_METADATA-010"
+        assert proj["description"] == "TEMPLATE_METADATA-011"
+        assert proj["templates"] == [
+            {"name": "TEMPLATE_METADATA-001"},
+            {"name": "TEMPLATE_METADATA-012"},
+        ]
 
         # Non-sensitive fields preserved
         assert tmpl["id"] == "tmpl-001"
