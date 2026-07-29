@@ -337,11 +337,17 @@ class TestProfileIntegration:
         assert "Gold tier system feature template" not in raw
 
         fdt = sanitized["feature_device_template"][0]["data"]
+        assert fdt["templateName"] == "TEMPLATE_NAMES-001"
+        assert fdt["templateDescription"] == "TEMPLATE_NAMES-002"
         assert fdt["templateId"] == "fdt-001"
         assert fdt["deviceType"] == "vedge-cloud"
         assert fdt["deviceRole"] == "sdwan-edge"
 
+        assert sanitized["device"][0]["data"]["templateName"] == "TEMPLATE_NAMES-001"
+
         ft = sanitized["feature_templates"][0]["data"]
+        assert ft["templateName"] == "TEMPLATE_NAMES-003"
+        assert ft["templateDescription"] == "TEMPLATE_NAMES-004"
         assert ft["templateId"] == "ft-001"
         assert ft["templateType"] == "cisco_system"
 
@@ -383,12 +389,8 @@ class TestProfileIntegration:
 
         sanitized = json.loads((output_dir / "sdwan.json").read_text())
         ft = sanitized["feature_templates"][0]["data"]
-        assert ft["templateConfiguration"] != (
-            "system\n host-name branch-01\n system-ip 10.255.0.1\n site-id 100\n!"
-        )
-        assert ft["templateConfigurationEdited"] != (
-            "system\n host-name branch-02\n system-ip 10.255.0.2\n!"
-        )
+        assert ft["templateConfiguration"] == "CLI_TEMPLATE_CONFIGS-001"
+        assert ft["templateConfigurationEdited"] == "CLI_TEMPLATE_CONFIGS-002"
         assert ft["templateId"] == "ft-001"
         assert ft["templateType"] == "cisco_system"
 
