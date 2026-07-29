@@ -1028,12 +1028,12 @@ class TestCatalystCenterSiteHierarchyIntegration:
         site = sanitized["site"][0]["data"][0]
         pool = sanitized["ip_pool_reservation"][0]["data"][0]
 
-        assert area["name"] != "US-East-Region"
-        assert building["name"] != "NYC-HQ-Building"
-        assert site["name"] != "Global"
-        assert site["nameHierarchy"] != "Global/US/East/NYC-HQ/Floor-3"
-        assert pool["siteHierarchy"] != "Global/US/East/NYC-HQ/Floor-3"
-        assert pool["groupName"] != "NYC-HQ-Floor3"
+        assert area["name"] == "SITE_NAMES-002"
+        assert building["name"] == "SITE_NAMES-003"
+        assert site["name"] == "SITE_NAMES-004"
+        assert site["nameHierarchy"] == "SITE_NAMES-001"
+        assert pool["siteHierarchy"] == "SITE_NAMES-001"
+        assert pool["groupName"] == "SITE_NAMES-005"
 
         # Non-sensitive fields preserved
         assert area["id"] == "a5e44366-e8ef-4a76-80a3-b5aa1f558bf3"
@@ -1061,10 +1061,10 @@ class TestCatalystCenterSiteHierarchyIntegration:
             "attributes"
         ]
 
-        assert area_attrs["address"] != "123 Main St, New York, NY"
-        assert area_attrs["country"] != "United States"
-        assert building_attrs["address"] != "456 Corporate Blvd, New York, NY"
-        assert building_attrs["country"] != "United States"
+        assert area_attrs["address"] == "PHYSICAL_ADDRESSES-001"
+        assert area_attrs["country"] == "PHYSICAL_ADDRESSES-002"
+        assert building_attrs["address"] == "PHYSICAL_ADDRESSES-003"
+        assert building_attrs["country"] == "PHYSICAL_ADDRESSES-002"
 
         # Non-sensitive fields preserved
         assert (
