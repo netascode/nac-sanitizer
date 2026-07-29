@@ -815,8 +815,8 @@ class TestCatalystCenterProfileIntegration:
         img2 = sanitized["image"][0]["data"][1]
 
         # Sensitive fields redacted
-        assert img1["name"] != "cat9k_iosxe.17.09.03.SPA.bin"
-        assert img2["name"] != "cat9k_iosxe.17.12.01.SPA.bin"
+        assert img1["name"] == "IMAGE_NAMES-001"
+        assert img2["name"] == "IMAGE_NAMES-002"
 
         # Non-sensitive fields preserved
         assert img1["imageUuid"] == "fe242a27-92a9-4bc9-856b-645c4cd9cc73"
