@@ -5008,3 +5008,132 @@ class TestCatalystCenterSiteHierarchyIntegration:
         assert area_attrs["latitude"] == "40.7128"
         assert building_attrs["type"] == "building"
         assert building_attrs["latitude"] == "40.7306"
+
+
+@pytest.mark.unit
+class TestCatalystCenterIPPoolContextPack:
+    def test_cc_ip_pool_context_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("catalyst_center")
+        pool_rules = [r for r in rules if r.category == "IP_POOL_CONTEXT"]
+        assert len(pool_rules) > 0
+        assert all(r.tier == "optional" for r in pool_rules)
+
+    def _ip_pool_data(self) -> dict:
+        return {
+            "ip_pool": [
+                {
+                    "data": [
+                        {
+                            "ipPoolName": "DC1-Management-Pool",
+                            "ipPoolCidr": "10.10.0.0/16",
+                            "id": "pool-uuid-001",
+                        }
+                    ],
+                    "endpoint": "/dna/intent/api/v2/ippool",
+                }
+            ],
+            "ip_pool_reservation": [
+                {
+                    "data": [
+                        {
+                            "id": "res-uuid-001",
+                            "groupName": "NYC-HQ-Floor3",
+                            "siteHierarchy": "Global/US/East/NYC-HQ/Floor-3",
+                            "ipPools": [
+                                {
+                                    "ipPoolName": "Floor3-Data-Pool",
+                                    "totalIpAddressCount": 254,
+                                    "usedIpAddressCount": 45,
+                                }
+                            ],
+                        }
+                    ],
+                    "endpoint": "/dna/intent/api/v2/reserve-ip-subpool",
+                }
+            ],
+            "ip_pools": [
+                {
+                    "data": [
+                        {
+                            "id": "pool-uuid-002",
+                            "name": "Campus-Guest-Pool",
+                            "ipPoolCidr": "172.16.0.0/16",
+                        }
+                    ],
+                    "endpoint": "/dna/intent/api/v2/ippool",
+                }
+            ],
+            "lan_automation": [
+                {
+                    "data": [
+                        {
+                            "id": "lan-001",
+                            "ipPools": [{"ipPoolName": "LAN-Auto-Pool-1"}],
+                        }
+                    ],
+                    "endpoint": "/dna/intent/api/v1/lan-automation/status",
+                }
+            ],
+        }
+
+    def test_cc_ip_pool_context_excluded_by_default(self, tmp_path) -> None:
+        """IP pool context is optional tier - not applied unless enabled."""
+        data = self._ip_pool_data()
+        input_file = tmp_path / "cc.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["catalyst_center"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "cc.json").read_text())
+        assert sanitized["ip_pool"][0]["data"][0]["ipPoolName"] == "DC1-Management-Pool"
+        reservation = sanitized["ip_pool_reservation"][0]["data"][0]
+        assert reservation["groupName"] == "NYC-HQ-Floor3"
+        assert reservation["siteHierarchy"] == "Global/US/East/NYC-HQ/Floor-3"
+        assert reservation["ipPools"][0]["ipPoolName"] == "Floor3-Data-Pool"
+        assert sanitized["ip_pools"][0]["data"][0]["name"] == "Campus-Guest-Pool"
+        assert (
+            sanitized["lan_automation"][0]["data"][0]["ipPools"][0]["ipPoolName"]
+            == "LAN-Auto-Pool-1"
+        )
+
+    def test_cc_ip_pool_context_redacts_when_enabled(self, tmp_path) -> None:
+        """When enabled, all IP pool name/site fields are redacted while
+        identifiers and usage counters are preserved."""
+        data = self._ip_pool_data()
+        input_file = tmp_path / "cc.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["catalyst_center"],
+            packs=PackConfig(enable=["ip_pool_context"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "cc.json").read_text())
+
+        ip_pool = sanitized["ip_pool"][0]["data"][0]
+        assert ip_pool["ipPoolName"] == "IP_POOL_CONTEXT-001"
+        # ipPoolCidr is remapped by the always-on IP scanner (independent of
+        # this pack); only the pool name/site fields are this pack's concern.
+        assert ip_pool["id"] == "pool-uuid-001"
+
+        reservation = sanitized["ip_pool_reservation"][0]["data"][0]
+        assert reservation["groupName"] == "IP_POOL_CONTEXT-002"
+        assert reservation["siteHierarchy"] == "IP_POOL_CONTEXT-003"
+        assert reservation["id"] == "res-uuid-001"
+        reserved_pool = reservation["ipPools"][0]
+        assert reserved_pool["ipPoolName"] == "IP_POOL_CONTEXT-004"
+        assert reserved_pool["totalIpAddressCount"] == 254
+        assert reserved_pool["usedIpAddressCount"] == 45
+
+        ip_pools = sanitized["ip_pools"][0]["data"][0]
+        assert ip_pools["name"] == "IP_POOL_CONTEXT-005"
+        assert ip_pools["id"] == "pool-uuid-002"
+
+        lan_pool = sanitized["lan_automation"][0]["data"][0]["ipPools"][0]
+        assert lan_pool["ipPoolName"] == "IP_POOL_CONTEXT-006"

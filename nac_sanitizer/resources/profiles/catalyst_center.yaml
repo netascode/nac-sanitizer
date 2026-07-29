@@ -155,3 +155,14 @@ packs:
     strategy: preserve_format
     paths:
       - "$..domainName"
+
+  ip_pool_context:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.ip_pool[*].data[*].ipPoolName"
+      - "$.ip_pool_reservation[*].data[*].groupName"
+      - "$.ip_pool_reservation[*].data[*].siteHierarchy"
+      - "$.ip_pool_reservation[*].data[*].ipPools[*].ipPoolName"
+      - "$.ip_pools[*].data[*].name"
+      - "$.lan_automation[*].data[*].ipPools[*].ipPoolName"

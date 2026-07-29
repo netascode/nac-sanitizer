@@ -8,7 +8,7 @@ Product profiles are built-in collections of redaction rules specific to a produ
 | ----------------- | ------------------------ | ---------------------------------- | ------------------------------------------------------------------- |
 | `sdwan`           | SD-WAN (vManage)         | credentials                        | hostnames, serial numbers, location data                            |
 | `ise`             | Identity Services Engine | credentials, SNMP communities, TrustSec device credentials | usernames, MAC addresses, domains, network device names, network device groups |
-| `catalyst_center` | Catalyst Center (DNAC)   | (none - credentials masked by API) | usernames, hostnames, serial numbers, MAC addresses, location data, virtual network names, VLAN names, IP pool names, security group names, site names, physical addresses, domain names |
+| `catalyst_center` | Catalyst Center (DNAC)   | (none - credentials masked by API) | usernames, hostnames, serial numbers, MAC addresses, location data, virtual network names, VLAN names, IP pool names, security group names, site names, physical addresses, domain names, IP pool context |
 | `fmc`             | Firewall Management Center | usernames                        | object names, descriptions, FQDNs, device names                     |
 
 List available profiles:
@@ -90,6 +90,7 @@ Catalyst Center's API masks credential values as `NO!$DATA!$`, so no credential 
 | serial numbers   | optional | `serialNumber`                            |
 | MAC addresses    | optional | `macAddress`, `apEthernetMacAddress`      |
 | location data    | optional | `siteNameHierarchy`, `groupNameHierarchy` |
+| IP pool context  | optional | `ipPoolName`, `groupName`, `siteHierarchy` (in `ip_pool`, `ip_pool_reservation`, `ip_pools`, `lan_automation`) |
 
 ## FMC Profile Details
 
