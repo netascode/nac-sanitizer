@@ -252,6 +252,12 @@ class TestProfileRegistry:
         assert len(desc_rules) > 0
         assert all(r.tier == "optional" for r in desc_rules)
 
+    def test_sdwan_policy_object_names_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("sdwan")
+        policy_object_rules = [r for r in rules if r.category == "POLICY_OBJECT_NAMES"]
+        assert len(policy_object_rules) > 0
+        assert all(r.tier == "optional" for r in policy_object_rules)
+
 
 @pytest.mark.unit
 class TestISEProfileRegistry:
@@ -1561,6 +1567,213 @@ class TestProfileIntegration:
                 "referenceCount": 0,
             }
         ]
+
+    @staticmethod
+    def _policy_object_data() -> dict:
+        return {
+            "vpn_list_policy_object": [
+                {
+                    "data": {
+                        "listId": "vpn-001",
+                        "name": "CLASSIFIED",
+                        "type": "vpn",
+                        "entries": [{"vpn": "200"}],
+                        "readOnly": False,
+                        "referenceCount": 5,
+                    },
+                    "endpoint": "/template/policy/list/vpn//CLASSIFIED",
+                },
+                {
+                    "data": {
+                        "listId": "vpn-002",
+                        "name": "CORPORATE-VPN",
+                        "type": "vpn",
+                        "entries": [{"vpn": "1100"}],
+                        "readOnly": False,
+                        "referenceCount": 3,
+                    },
+                    "endpoint": "/template/policy/list/vpn//CORPORATE-VPN",
+                },
+            ],
+            "site_list_policy_object": [
+                {
+                    "data": {
+                        "listId": "site-001",
+                        "name": "ALL-DATACENTERS",
+                        "type": "site",
+                        "entries": [{"siteId": "1-9"}],
+                        "readOnly": False,
+                        "referenceCount": 0,
+                    },
+                    "endpoint": "/template/policy/list/site//ALL-DATACENTERS",
+                }
+            ],
+            "ipv4_prefix_list_policy_object": [
+                {
+                    "data": {
+                        "listId": "pfx-001",
+                        "name": "DC-MGMT-PREFIXES",
+                        "type": "dataPrefix",
+                        "entries": [{"ipPrefix": "10.10.0.0/16"}],
+                        "readOnly": False,
+                    },
+                    "endpoint": "/template/policy/list/dataprefix//DC-MGMT-PREFIXES",
+                }
+            ],
+            "data_ipv4_prefix_list_policy_object": [
+                {
+                    "data": {
+                        "listId": "dpfx-001",
+                        "name": "BRANCH-SUBNETS",
+                        "type": "dataPrefix",
+                        "entries": [{"ipPrefix": "172.16.20.0/24"}],
+                        "readOnly": False,
+                    },
+                    "endpoint": "/template/policy/list/dataprefix//BRANCH-SUBNETS",
+                }
+            ],
+            "preferred_color_group_policy_object": [
+                {
+                    "data": {
+                        "listId": "pcg-001",
+                        "name": "PREFER-MPLS-BKUP-INET",
+                        "type": "preferredColorGroup",
+                        "entries": [
+                            {
+                                "primaryColor": "mpls",
+                                "secondaryColor": "biz-internet",
+                            }
+                        ],
+                        "readOnly": False,
+                    },
+                    "endpoint": "/template/policy/list/preferredcolorgroup//PREFER-MPLS-BKUP-INET",
+                }
+            ],
+            "standard_community_list_policy_object": [
+                {
+                    "data": {
+                        "listId": "comm-001",
+                        "name": "BACKBONE-COMMUNITIES",
+                        "type": "community",
+                        "entries": [{"community": "65000:100"}],
+                        "readOnly": False,
+                    },
+                    "endpoint": "/template/policy/list/community//BACKBONE-COMMUNITIES",
+                }
+            ],
+        }
+
+    def test_sdwan_policy_object_names_excluded_by_default(self, tmp_path) -> None:
+        """SD-WAN policy_object_names pack (optional tier) is not applied by default."""
+        data = self._policy_object_data()
+        input_file = tmp_path / "sdwan.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["sdwan"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "sdwan.json").read_text())
+        for key, expected in data.items():
+            for expected_item, actual_item in zip(
+                expected, sanitized[key], strict=True
+            ):
+                assert actual_item["data"]["name"] == expected_item["data"]["name"]
+                assert actual_item["endpoint"] == expected_item["endpoint"]
+
+    def test_sdwan_policy_object_names_redacts_when_enabled(self, tmp_path) -> None:
+        """SD-WAN policy_object_names pack redacts names/endpoints when enabled."""
+        data = self._policy_object_data()
+        input_file = tmp_path / "sdwan.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["sdwan"],
+            packs=PackConfig(enable=["policy_object_names"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "sdwan.json").read_text())
+        raw = json.dumps(sanitized)
+
+        # All object names redacted
+        assert "CLASSIFIED" not in raw
+        assert "CORPORATE-VPN" not in raw
+        assert "ALL-DATACENTERS" not in raw
+        assert "DC-MGMT-PREFIXES" not in raw
+        assert "BRANCH-SUBNETS" not in raw
+        assert "PREFER-MPLS-BKUP-INET" not in raw
+        assert "BACKBONE-COMMUNITIES" not in raw
+
+        expected_names = {
+            "vpn_list_policy_object": [
+                "POLICY_OBJECT_NAMES-001",
+                "POLICY_OBJECT_NAMES-002",
+            ],
+            "site_list_policy_object": ["POLICY_OBJECT_NAMES-003"],
+            "ipv4_prefix_list_policy_object": ["POLICY_OBJECT_NAMES-004"],
+            "data_ipv4_prefix_list_policy_object": ["POLICY_OBJECT_NAMES-005"],
+            "preferred_color_group_policy_object": ["POLICY_OBJECT_NAMES-006"],
+            "standard_community_list_policy_object": ["POLICY_OBJECT_NAMES-007"],
+        }
+        expected_endpoints = {
+            "vpn_list_policy_object": [
+                "POLICY_OBJECT_NAMES-008",
+                "POLICY_OBJECT_NAMES-009",
+            ],
+            "site_list_policy_object": ["POLICY_OBJECT_NAMES-010"],
+            "ipv4_prefix_list_policy_object": ["POLICY_OBJECT_NAMES-011"],
+            "data_ipv4_prefix_list_policy_object": ["POLICY_OBJECT_NAMES-012"],
+            "preferred_color_group_policy_object": ["POLICY_OBJECT_NAMES-013"],
+            "standard_community_list_policy_object": ["POLICY_OBJECT_NAMES-014"],
+        }
+        for key in data:
+            for i, actual_item in enumerate(sanitized[key]):
+                assert actual_item["data"]["name"] == expected_names[key][i]
+                assert actual_item["endpoint"] == expected_endpoints[key][i]
+
+        # Non-sensitive fields preserved
+        vpn_0 = sanitized["vpn_list_policy_object"][0]["data"]
+        assert vpn_0["listId"] == "vpn-001"
+        assert vpn_0["type"] == "vpn"
+        assert vpn_0["entries"] == [{"vpn": "200"}]
+        assert vpn_0["readOnly"] is False
+        assert vpn_0["referenceCount"] == 5
+
+        site_0 = sanitized["site_list_policy_object"][0]["data"]
+        assert site_0["listId"] == "site-001"
+        assert site_0["type"] == "site"
+        assert site_0["entries"] == [{"siteId": "1-9"}]
+
+        # Note: the "ipPrefix" entry values are IP-shaped strings, so the
+        # sanitizer's separate, always-on IP scanner redacts them too. That
+        # is expected, unrelated behavior - independent of the
+        # policy_object_names pack under test here. We only assert that the
+        # entries structure (keys) is preserved, not the literal IP value.
+        pfx_0 = sanitized["ipv4_prefix_list_policy_object"][0]["data"]
+        assert pfx_0["listId"] == "pfx-001"
+        assert pfx_0["type"] == "dataPrefix"
+        assert list(pfx_0["entries"][0].keys()) == ["ipPrefix"]
+
+        dpfx_0 = sanitized["data_ipv4_prefix_list_policy_object"][0]["data"]
+        assert dpfx_0["listId"] == "dpfx-001"
+        assert dpfx_0["type"] == "dataPrefix"
+        assert list(dpfx_0["entries"][0].keys()) == ["ipPrefix"]
+
+        pcg_0 = sanitized["preferred_color_group_policy_object"][0]["data"]
+        assert pcg_0["listId"] == "pcg-001"
+        assert pcg_0["type"] == "preferredColorGroup"
+        assert pcg_0["entries"] == [
+            {"primaryColor": "mpls", "secondaryColor": "biz-internet"}
+        ]
+
+        comm_0 = sanitized["standard_community_list_policy_object"][0]["data"]
+        assert comm_0["listId"] == "comm-001"
+        assert comm_0["type"] == "community"
+        assert comm_0["entries"] == [{"community": "65000:100"}]
 
     def test_profiles_list_shows_sdwan(self) -> None:
         """CLI profiles list should show sdwan."""

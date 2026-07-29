@@ -116,3 +116,20 @@ packs:
     paths:
       - "$.policy_object_feature_profile[*].data.description"
       - "$.policy_object_feature_profile_parcels[*].data.description"
+
+  policy_object_names:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.vpn_list_policy_object[*].data.name"
+      - "$.site_list_policy_object[*].data.name"
+      - "$.ipv4_prefix_list_policy_object[*].data.name"
+      - "$.data_ipv4_prefix_list_policy_object[*].data.name"
+      - "$.preferred_color_group_policy_object[*].data.name"
+      - "$.standard_community_list_policy_object[*].data.name"
+      - "$.vpn_list_policy_object[*].endpoint"
+      - "$.site_list_policy_object[*].endpoint"
+      - "$.ipv4_prefix_list_policy_object[*].endpoint"
+      - "$.data_ipv4_prefix_list_policy_object[*].endpoint"
+      - "$.preferred_color_group_policy_object[*].endpoint"
+      - "$.standard_community_list_policy_object[*].endpoint"
