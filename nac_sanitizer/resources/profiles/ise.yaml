@@ -38,3 +38,9 @@ packs:
     strategy: token
     paths:
       - "$..domain"
+
+  downloadable_acl_names:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.downloadable_acl[*].data.name"

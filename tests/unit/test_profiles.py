@@ -119,6 +119,12 @@ class TestISEProfileRegistry:
         assert len(user_rules) > 0
         assert all(r.tier == "optional" for r in user_rules)
 
+    def test_ise_downloadable_acl_names_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("ise")
+        dacl_rules = [r for r in rules if r.category == "DOWNLOADABLE_ACL_NAMES"]
+        assert len(dacl_rules) > 0
+        assert all(r.tier == "optional" for r in dacl_rules)
+
 
 @pytest.mark.unit
 class TestProfileIntegration:
@@ -458,6 +464,119 @@ class TestProfileIntegration:
         user = sanitized["internal_user"][0]["data"]["InternalUser"]
         assert user["userName"] != "jsmith"
         assert user["domain"] != "corp.example.com"
+
+    def test_ise_downloadable_acl_names_excluded_by_default(self, tmp_path) -> None:
+        """ISE downloadable_acl_names pack is not applied by default."""
+        data = {
+            "downloadable_acl": [
+                {
+                    "data": {
+                        "id": "9825aa40-8c01-11e6-996c-525400b48521",
+                        "name": "DENY_ALL_IPV4",
+                        "description": "Deny all ipv4 traffic",
+                        "dacl": "deny ip any any",
+                        "daclType": "IPV4",
+                    },
+                    "endpoint": "/ers/config/downloadableacl/9825aa40-8c01-11e6-996c-525400b48521",
+                },
+                {
+                    "data": {
+                        "id": "d51e3b40-f945-11eb-953e-0050568fa723",
+                        "name": "QUARANTINE_ACL",
+                        "description": "Deny all ipv6 traffic",
+                        "dacl": "deny ipv6 any any",
+                        "daclType": "IPV6",
+                    },
+                    "endpoint": "/ers/config/downloadableacl/d51e3b40-f945-11eb-953e-0050568fa723",
+                },
+            ]
+        }
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["ise"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        # Names should NOT be redacted by default (optional tier)
+        assert sanitized["downloadable_acl"][0]["data"]["name"] == "DENY_ALL_IPV4"
+        assert sanitized["downloadable_acl"][1]["data"]["name"] == "QUARANTINE_ACL"
+        # Other fields should be preserved
+        assert (
+            sanitized["downloadable_acl"][0]["data"]["id"]
+            == "9825aa40-8c01-11e6-996c-525400b48521"
+        )
+        assert (
+            sanitized["downloadable_acl"][0]["data"]["description"]
+            == "Deny all ipv4 traffic"
+        )
+        assert sanitized["downloadable_acl"][0]["data"]["dacl"] == "deny ip any any"
+        assert sanitized["downloadable_acl"][0]["data"]["daclType"] == "IPV4"
+
+    def test_ise_downloadable_acl_names_redacts_when_enabled(self, tmp_path) -> None:
+        """ISE downloadable_acl_names pack redacts ACL names when explicitly enabled."""
+        data = {
+            "downloadable_acl": [
+                {
+                    "data": {
+                        "id": "9825aa40-8c01-11e6-996c-525400b48521",
+                        "name": "DENY_ALL_IPV4",
+                        "description": "Deny all ipv4 traffic",
+                        "dacl": "deny ip any any",
+                        "daclType": "IPV4",
+                    },
+                    "endpoint": "/ers/config/downloadableacl/9825aa40-8c01-11e6-996c-525400b48521",
+                },
+                {
+                    "data": {
+                        "id": "d51e3b40-f945-11eb-953e-0050568fa723",
+                        "name": "QUARANTINE_ACL",
+                        "description": "Deny all ipv6 traffic",
+                        "dacl": "deny ipv6 any any",
+                        "daclType": "IPV6",
+                    },
+                    "endpoint": "/ers/config/downloadableacl/d51e3b40-f945-11eb-953e-0050568fa723",
+                },
+            ]
+        }
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["ise"],
+            packs=PackConfig(enable=["downloadable_acl_names"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        # Names should be redacted when enabled
+        assert sanitized["downloadable_acl"][0]["data"]["name"] != "DENY_ALL_IPV4"
+        assert sanitized["downloadable_acl"][1]["data"]["name"] != "QUARANTINE_ACL"
+        # Other sensitive fields should NOT be redacted (id, description, dacl, daclType)
+        assert (
+            sanitized["downloadable_acl"][0]["data"]["id"]
+            == "9825aa40-8c01-11e6-996c-525400b48521"
+        )
+        assert (
+            sanitized["downloadable_acl"][0]["data"]["description"]
+            == "Deny all ipv4 traffic"
+        )
+        assert sanitized["downloadable_acl"][0]["data"]["dacl"] == "deny ip any any"
+        assert sanitized["downloadable_acl"][0]["data"]["daclType"] == "IPV4"
+        assert (
+            sanitized["downloadable_acl"][1]["data"]["id"]
+            == "d51e3b40-f945-11eb-953e-0050568fa723"
+        )
+        assert (
+            sanitized["downloadable_acl"][1]["data"]["description"]
+            == "Deny all ipv6 traffic"
+        )
+        assert sanitized["downloadable_acl"][1]["data"]["dacl"] == "deny ipv6 any any"
+        assert sanitized["downloadable_acl"][1]["data"]["daclType"] == "IPV6"
 
 
 @pytest.mark.unit
