@@ -1011,19 +1011,16 @@ class TestCatalystCenterProfileIntegration:
         sanitizer.run(input_file, output_dir)
 
         sanitized = json.loads((output_dir / "cc.json").read_text())
-        raw = json.dumps(sanitized)
-        assert "sw-floor3-01.corp.example.com" not in raw
-        assert "sw-discovered-01.corp.local" not in raw
 
         replacement = sanitized["device_replacement"][0]["data"][0]
-        assert replacement["faultyDeviceName"].startswith("DEVICE-")
+        assert replacement["faultyDeviceName"] == "DEVICE-001"
         assert replacement["replacementStatus"] == "READY-FOR-REPLACEMENT"
         assert replacement["faultyDeviceSerialNumber"] == "FDO98765432"
 
         discovered = sanitized["lan_automation"][0]["data"][0]["discoveredDeviceList"][
             0
         ]
-        assert discovered["name"].startswith("DEVICE-")
+        assert discovered["name"] == "DEVICE-002"
         assert discovered["serialNumber"] == "FCW1234ABCD"
 
     def test_cc_device_descriptions_excluded_by_default(self, tmp_path) -> None:
@@ -1058,15 +1055,14 @@ class TestCatalystCenterProfileIntegration:
         sanitizer.run(input_file, output_dir)
 
         sanitized = json.loads((output_dir / "cc.json").read_text())
-        raw = json.dumps(sanitized)
-        assert "IDF-3A Floor 3 Wing A Router" not in raw
-        assert "DC1-Core-Switch primary management" not in raw
 
         device = sanitized["network_devices"][0]["data"][0]
+        assert device["description"] == "DEVICE_DESCRIPTIONS-001"
         assert device["family"] == "Routers"
         assert device["type"] == "Cisco Catalyst 8300"
         assert device["softwareVersion"] == "17.15.4c"
         assert device["managementState"] == "Managed"
 
         mgmt = sanitized["update_device_management_address"][0]["data"][0]
+        assert mgmt["description"] == "DEVICE_DESCRIPTIONS-002"
         assert mgmt["deviceId"] == "abc-123"
