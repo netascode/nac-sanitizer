@@ -109,3 +109,10 @@ packs:
     paths:
       - "$..templateConfiguration"
       - "$..templateConfigurationEdited"
+
+  policy_profile_descriptions:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.policy_object_feature_profile[*].data.description"
+      - "$.policy_object_feature_profile_parcels[*].data.description"
