@@ -38,3 +38,9 @@ packs:
     strategy: token
     paths:
       - "$..domain"
+
+  license_tier_names:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.license_tier_state[*].data[*].name"
