@@ -119,6 +119,12 @@ class TestISEProfileRegistry:
         assert len(user_rules) > 0
         assert all(r.tier == "optional" for r in user_rules)
 
+    def test_ise_repository_config_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("ise")
+        repo_rules = [r for r in rules if r.category == "REPOSITORY_CONFIG"]
+        assert len(repo_rules) > 0
+        assert all(r.tier == "optional" for r in repo_rules)
+
 
 @pytest.mark.unit
 class TestProfileIntegration:
@@ -458,6 +464,103 @@ class TestProfileIntegration:
         user = sanitized["internal_user"][0]["data"]["InternalUser"]
         assert user["userName"] != "jsmith"
         assert user["domain"] != "corp.example.com"
+
+    def test_ise_repository_config_excluded_by_default(self, tmp_path) -> None:
+        """ISE repository_config pack (name, path) NOT redacted by default."""
+        data = {
+            "repository": [
+                {
+                    "data": {
+                        "name": "ISE-Backup-SFTP",
+                        "protocol": "SFTP",
+                        "serverName": "10.0.0.206",
+                        "path": "/backups/ise/nightly",
+                        "enablePki": False,
+                        "userName": "backup-svc",
+                        "password": "",
+                    },
+                    "endpoint": "/api/v1/repository/ISE-Backup",
+                },
+                {
+                    "data": {
+                        "name": "Config-Archive-FTP",
+                        "protocol": "FTP",
+                        "serverName": "10.0.0.171",
+                        "path": "/archive/configs",
+                        "userName": "ftpuser",
+                        "password": "",
+                    },
+                    "endpoint": "/api/v1/repository/WIN-19",
+                },
+            ]
+        }
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["ise"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        # name and path should NOT be redacted (optional pack, not enabled)
+        assert sanitized["repository"][0]["data"]["name"] == "ISE-Backup-SFTP"
+        assert sanitized["repository"][0]["data"]["path"] == "/backups/ise/nightly"
+        assert sanitized["repository"][1]["data"]["name"] == "Config-Archive-FTP"
+        assert sanitized["repository"][1]["data"]["path"] == "/archive/configs"
+
+    def test_ise_repository_config_redacts_when_enabled(self, tmp_path) -> None:
+        """ISE repository_config pack redacts name/path when enabled; other fields preserved."""
+        data = {
+            "repository": [
+                {
+                    "data": {
+                        "name": "ISE-Backup-SFTP",
+                        "protocol": "SFTP",
+                        "serverName": "10.0.0.206",
+                        "path": "/backups/ise/nightly",
+                        "enablePki": False,
+                        "userName": "backup-svc",
+                        "password": "",
+                    },
+                    "endpoint": "/api/v1/repository/ISE-Backup",
+                },
+                {
+                    "data": {
+                        "name": "Config-Archive-FTP",
+                        "protocol": "FTP",
+                        "serverName": "10.0.0.171",
+                        "path": "/archive/configs",
+                        "userName": "ftpuser",
+                        "password": "",
+                    },
+                    "endpoint": "/api/v1/repository/WIN-19",
+                },
+            ]
+        }
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["ise"],
+            packs=PackConfig(enable=["repository_config"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        # name and path should be redacted
+        assert sanitized["repository"][0]["data"]["name"] != "ISE-Backup-SFTP"
+        assert sanitized["repository"][0]["data"]["path"] != "/backups/ise/nightly"
+        assert sanitized["repository"][1]["data"]["name"] != "Config-Archive-FTP"
+        assert sanitized["repository"][1]["data"]["path"] != "/archive/configs"
+        # protocol, serverName, enablePki should be preserved (not in repository_config pack)
+        assert sanitized["repository"][0]["data"]["protocol"] == "SFTP"
+        assert sanitized["repository"][0]["data"]["serverName"] == "10.0.0.206"
+        assert sanitized["repository"][0]["data"]["enablePki"] is False
+        assert sanitized["repository"][1]["data"]["protocol"] == "FTP"
+        assert sanitized["repository"][1]["data"]["serverName"] == "10.0.0.171"
 
 
 @pytest.mark.unit

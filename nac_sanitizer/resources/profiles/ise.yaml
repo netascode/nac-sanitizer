@@ -38,3 +38,10 @@ packs:
     strategy: token
     paths:
       - "$..domain"
+
+  repository_config:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.repository[*].data.name"
+      - "$.repository[*].data.path"
