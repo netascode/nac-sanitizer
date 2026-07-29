@@ -35,6 +35,70 @@ packs:
       - "$..siteNameHierarchy"
       - "$..groupNameHierarchy"
 
+  credential_descriptions:
+    tier: default
+    strategy: token
+    paths:
+      - "$..cliCredential[*].description"
+      - "$..snmpV3[*].description"
+      - "$..netconfCredential[*].description"
+
+  transit_network_names:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.transit_network[*].data[*].name"
+
+  authentication_descriptions:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.authentication_policy_server[*].data[*].ciscoIseDtos[*].description"
+      - "$.authentication_policy_server[*].data[*].ciscoIseDtos[*].fqdn"
+      - "$.update_authentication_profile[*].data[*].preAuthAcl.description"
+
+  image_names:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.image[*].data[*].name"
+
+  user_pii:
+    tier: default
+    strategy: token
+    paths:
+      - "$..users[*].email"
+      - "$..users[*].firstName"
+      - "$..users[*].lastName"
+
+  device_names:
+    tier: optional
+    strategy: hostname_map
+    paths:
+      - "$..faultyDeviceName"
+      - "$.lan_automation[*].data[*].discoveredDeviceList[*].name"
+
+  device_descriptions:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.network_devices[*].data[*].description"
+      - "$.update_device_management_address[*].data[*].description"
+
+  interface_descriptions:
+    tier: optional
+    strategy: token
+    paths:
+      - "$..interfaceDescription"
+
+  fabric_descriptions:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.fabric_authentication_profile[*].data[*].data[*].description"
+      - "$.fabric_virtual_network[*].data[*].data[*].description"
+      - "$.fabric_virtual_network[*].data[*].data[*].scalableGroupNames[*]"
+
   virtual_network_names:
     tier: optional
     strategy: token
