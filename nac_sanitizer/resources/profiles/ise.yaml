@@ -38,3 +38,10 @@ packs:
     strategy: token
     paths:
       - "$..domain"
+
+  policy_names:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.allowed_protocols[*].data.name"
+      - "$.allowed_protocols_tacacs[*].data.name"
