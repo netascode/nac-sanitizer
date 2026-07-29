@@ -550,11 +550,11 @@ class TestProfileIntegration:
         sanitizer.run(input_file, output_dir)
 
         sanitized = json.loads((output_dir / "ise.json").read_text())
-        # name and path should be redacted
-        assert sanitized["repository"][0]["data"]["name"] != "ISE-Backup-SFTP"
-        assert sanitized["repository"][0]["data"]["path"] != "/backups/ise/nightly"
-        assert sanitized["repository"][1]["data"]["name"] != "Config-Archive-FTP"
-        assert sanitized["repository"][1]["data"]["path"] != "/archive/configs"
+        # name and path should be redacted to specific token values
+        assert sanitized["repository"][0]["data"]["name"] == "REPOSITORY_CONFIG-001"
+        assert sanitized["repository"][1]["data"]["name"] == "REPOSITORY_CONFIG-002"
+        assert sanitized["repository"][0]["data"]["path"] == "REPOSITORY_CONFIG-003"
+        assert sanitized["repository"][1]["data"]["path"] == "REPOSITORY_CONFIG-004"
         # protocol, serverName, enablePki should be preserved (not in repository_config pack)
         assert sanitized["repository"][0]["data"]["protocol"] == "SFTP"
         assert sanitized["repository"][0]["data"]["serverName"] == "10.0.0.206"
