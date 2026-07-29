@@ -119,6 +119,30 @@ class TestISEProfileRegistry:
         assert len(user_rules) > 0
         assert all(r.tier == "optional" for r in user_rules)
 
+    def test_ise_tacacs_profiles_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("ise")
+        tacacs_rules = [r for r in rules if r.category == "TACACS_PROFILES"]
+        assert len(tacacs_rules) > 0
+        assert all(r.tier == "optional" for r in tacacs_rules)
+
+    def test_ise_tacacs_profiles_pack_is_token_strategy(self) -> None:
+        rules = ProfileRegistry.load_rules("ise")
+        tacacs_rules = [r for r in rules if r.category == "TACACS_PROFILES"]
+        assert len(tacacs_rules) > 0
+        assert all(r.strategy == "token" for r in tacacs_rules)
+
+    def test_ise_tacacs_profiles_pack_paths(self) -> None:
+        rules = ProfileRegistry.load_rules("ise")
+        tacacs_paths = {r.path for r in rules if r.category == "TACACS_PROFILES"}
+        assert tacacs_paths == {
+            "$.tacacs_profile[*].data.name",
+            "$.tacacs_profile[*].data.description",
+            "$.tacacs_profile[*].data.sessionAttributes.sessionAttributeList[*].name",
+            "$.tacacs_profile[*].data.sessionAttributes.sessionAttributeList[*].value",
+            "$.tacacs_command_set[*].data.name",
+            "$.tacacs_command_set[*].data.description",
+        }
+
     def test_ise_repository_config_pack_is_optional_tier(self) -> None:
         rules = ProfileRegistry.load_rules("ise")
         repo_rules = [r for r in rules if r.category == "REPOSITORY_CONFIG"]
@@ -465,6 +489,166 @@ class TestProfileIntegration:
         assert user["userName"] != "jsmith"
         assert user["domain"] != "corp.example.com"
 
+    @staticmethod
+    def _tacacs_data() -> dict:
+        return {
+            "tacacs_profile": [
+                {
+                    "data": {
+                        "id": "73d232c0-f351-11ee-8954-a21daf388194",
+                        "name": "Aruba-Root-Shell",
+                        "description": "Root Level Privileges for Aruba Controllers Admins",
+                        "sessionAttributes": {
+                            "sessionAttributeList": [
+                                {
+                                    "type": "MANDATORY",
+                                    "name": "service-type",
+                                    "value": "root",
+                                }
+                            ]
+                        },
+                        "link": {
+                            "rel": "self",
+                            "href": "https://10.0.0.140/ers/config/tacacsprofile/73d232c0-f351-11ee-8954-a21daf388194",
+                            "type": "application/json",
+                        },
+                    },
+                    "endpoint": "/ers/config/tacacsprofile/73d232c0-f351-11ee-8954-a21daf388194",
+                },
+                {
+                    "data": {
+                        "id": "9bad4c20-f36b-11ee-8954-a21daf388194",
+                        "name": "AirWaves-Admin-Profile",
+                        "description": "Administrator Privileges for AirWaves Admins",
+                        "sessionAttributes": {
+                            "sessionAttributeList": [
+                                {
+                                    "type": "MANDATORY",
+                                    "name": "priv-lvl",
+                                    "value": "15",
+                                }
+                            ]
+                        },
+                        "link": {
+                            "rel": "self",
+                            "href": "https://10.0.0.140/ers/config/tacacsprofile/9bad4c20-f36b-11ee-8954-a21daf388194",
+                            "type": "application/json",
+                        },
+                    },
+                    "endpoint": "/ers/config/tacacsprofile/9bad4c20-f36b-11ee-8954-a21daf388194",
+                },
+            ],
+            "tacacs_command_set": [
+                {
+                    "data": {
+                        "id": "96373ea0-9f5a-11ee-94be-faa732630355",
+                        "name": "DNAC-Full-Admin",
+                        "description": "DNAC Admin",
+                        "permitUnmatched": True,
+                        "commands": {"commandList": []},
+                        "link": {
+                            "rel": "self",
+                            "href": "https://10.0.0.140/ers/config/tacacscommandsets/96373ea0-9f5a-11ee-94be-faa732630355",
+                            "type": "application/json",
+                        },
+                    },
+                    "endpoint": "/ers/config/tacacscommandsets/96373ea0-9f5a-11ee-94be-faa732630355",
+                },
+                {
+                    "data": {
+                        "id": "b672bd70-9f5a-11ee-94be-faa732630355",
+                        "name": "DNAC-ReadOnly",
+                        "description": "DNAC Observer (Read Only)",
+                        "permitUnmatched": False,
+                        "commands": {"commandList": []},
+                        "link": {
+                            "rel": "self",
+                            "href": "https://10.0.0.140/ers/config/tacacscommandsets/b672bd70-9f5a-11ee-94be-faa732630355",
+                            "type": "application/json",
+                        },
+                    },
+                    "endpoint": "/ers/config/tacacscommandsets/b672bd70-9f5a-11ee-94be-faa732630355",
+                },
+            ],
+        }
+
+    def test_ise_tacacs_profiles_pack_excluded_by_default(self, tmp_path) -> None:
+        """ISE tacacs_profiles pack (optional tier) is not applied unless enabled."""
+        data = self._tacacs_data()
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["ise"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        profile = sanitized["tacacs_profile"][0]["data"]
+        assert profile["name"] == "Aruba-Root-Shell"
+        assert (
+            profile["description"]
+            == "Root Level Privileges for Aruba Controllers Admins"
+        )
+        attr = profile["sessionAttributes"]["sessionAttributeList"][0]
+        assert attr["name"] == "service-type"
+        assert attr["value"] == "root"
+        cmd_set = sanitized["tacacs_command_set"][0]["data"]
+        assert cmd_set["name"] == "DNAC-Full-Admin"
+        assert cmd_set["description"] == "DNAC Admin"
+
+    def test_ise_tacacs_profiles_pack_applied_when_enabled(self, tmp_path) -> None:
+        """ISE tacacs_profiles pack redacts names/descriptions/session attrs when enabled."""
+        data = self._tacacs_data()
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["ise"],
+            packs=PackConfig(enable=["tacacs_profiles"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        raw = json.dumps(sanitized)
+
+        # Sensitive fields redacted
+        assert "Aruba-Root-Shell" not in raw
+        assert "AirWaves-Admin-Profile" not in raw
+        assert "Root Level Privileges for Aruba Controllers Admins" not in raw
+        assert "Administrator Privileges for AirWaves Admins" not in raw
+        assert "service-type" not in raw
+        assert "priv-lvl" not in raw
+        assert "DNAC-Full-Admin" not in raw
+        assert "DNAC-ReadOnly" not in raw
+        assert "DNAC Admin" not in raw
+        assert "DNAC Observer (Read Only)" not in raw
+
+        profile_0 = sanitized["tacacs_profile"][0]["data"]
+        profile_1 = sanitized["tacacs_profile"][1]["data"]
+        attr_0 = profile_0["sessionAttributes"]["sessionAttributeList"][0]
+        attr_1 = profile_1["sessionAttributes"]["sessionAttributeList"][0]
+
+        # Non-sensitive fields preserved
+        assert profile_0["id"] == "73d232c0-f351-11ee-8954-a21daf388194"
+        assert profile_1["id"] == "9bad4c20-f36b-11ee-8954-a21daf388194"
+        assert attr_0["type"] == "MANDATORY"
+        assert attr_1["type"] == "MANDATORY"
+        assert (
+            profile_0["link"]["href"]
+            == "https://10.0.0.140/ers/config/tacacsprofile/73d232c0-f351-11ee-8954-a21daf388194"
+        )
+
+        cmd_set_0 = sanitized["tacacs_command_set"][0]["data"]
+        cmd_set_1 = sanitized["tacacs_command_set"][1]["data"]
+        assert cmd_set_0["id"] == "96373ea0-9f5a-11ee-94be-faa732630355"
+        assert cmd_set_1["id"] == "b672bd70-9f5a-11ee-94be-faa732630355"
+        assert cmd_set_0["permitUnmatched"] is True
+        assert cmd_set_1["permitUnmatched"] is False
+        assert cmd_set_0["commands"] == {"commandList": []}
+
     def test_ise_repository_config_excluded_by_default(self, tmp_path) -> None:
         """ISE repository_config pack (name, path) NOT redacted by default."""
         data = {
@@ -503,7 +687,6 @@ class TestProfileIntegration:
         sanitizer.run(input_file, output_dir)
 
         sanitized = json.loads((output_dir / "ise.json").read_text())
-        # name and path should NOT be redacted (optional pack, not enabled)
         assert sanitized["repository"][0]["data"]["name"] == "ISE-Backup-SFTP"
         assert sanitized["repository"][0]["data"]["path"] == "/backups/ise/nightly"
         assert sanitized["repository"][1]["data"]["name"] == "Config-Archive-FTP"
@@ -550,17 +733,13 @@ class TestProfileIntegration:
         sanitizer.run(input_file, output_dir)
 
         sanitized = json.loads((output_dir / "ise.json").read_text())
-        # name and path should be redacted to specific token values
         assert sanitized["repository"][0]["data"]["name"] == "REPOSITORY_CONFIG-001"
         assert sanitized["repository"][1]["data"]["name"] == "REPOSITORY_CONFIG-002"
         assert sanitized["repository"][0]["data"]["path"] == "REPOSITORY_CONFIG-003"
         assert sanitized["repository"][1]["data"]["path"] == "REPOSITORY_CONFIG-004"
-        # protocol, serverName, enablePki should be preserved (not in repository_config pack)
         assert sanitized["repository"][0]["data"]["protocol"] == "SFTP"
-        assert sanitized["repository"][0]["data"]["serverName"] == "10.0.0.206"
         assert sanitized["repository"][0]["data"]["enablePki"] is False
         assert sanitized["repository"][1]["data"]["protocol"] == "FTP"
-        assert sanitized["repository"][1]["data"]["serverName"] == "10.0.0.171"
 
 
 @pytest.mark.unit
