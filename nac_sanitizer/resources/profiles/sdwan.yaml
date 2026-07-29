@@ -33,3 +33,9 @@ packs:
       - "$..longitude"
       - "$..site-name"
       - "$..site-id"
+
+  configuration_group_names:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.configuration_group[*].data.description"
