@@ -56,3 +56,9 @@ packs:
       - "$.authentication_policy_server[*].data[*].ciscoIseDtos[*].description"
       - "$.authentication_policy_server[*].data[*].ciscoIseDtos[*].fqdn"
       - "$.update_authentication_profile[*].data[*].preAuthAcl.description"
+
+  image_names:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.image[*].data[*].name"
