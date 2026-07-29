@@ -4797,3 +4797,214 @@ class TestCatalystCenterProfileRegistry:
         # Non-sensitive fields preserved
         assert gw[0]["virtualNetworkName"] == "CORP_VN_1200"
         assert gw[0]["vlanId"] == 1110
+
+
+def _cc_site_hierarchy_data() -> dict:
+    """Fixture data covering Catalyst Center site hierarchy endpoints."""
+    return {
+        "area": [
+            {
+                "data": [
+                    {
+                        "id": "a5e44366-e8ef-4a76-80a3-b5aa1f558bf3",
+                        "name": "US-East-Region",
+                        "groupNameHierarchy": "Global/US/East",
+                        "instanceTenantId": "645beb4a0308c414a4f1d65d",
+                        "additionalInfo": [
+                            {
+                                "nameSpace": "Location",
+                                "attributes": {
+                                    "country": "United States",
+                                    "address": "123 Main St, New York, NY",
+                                    "type": "building",
+                                    "latitude": "40.7128",
+                                },
+                            }
+                        ],
+                    }
+                ],
+                "endpoint": "/dna/intent/api/v1/topology/site-topology",
+            }
+        ],
+        "building": [
+            {
+                "data": [
+                    {
+                        "id": "b1234567-abcd-ef01-2345-67890abcdef0",
+                        "name": "NYC-HQ-Building",
+                        "groupNameHierarchy": "Global/US/East/NYC-HQ",
+                        "instanceTenantId": "645beb4a0308c414a4f1d65d",
+                        "additionalInfo": [
+                            {
+                                "nameSpace": "Location",
+                                "attributes": {
+                                    "country": "United States",
+                                    "address": "456 Corporate Blvd, New York, NY",
+                                    "type": "building",
+                                    "latitude": "40.7306",
+                                },
+                            }
+                        ],
+                    }
+                ],
+                "endpoint": "/dna/intent/api/v1/topology/site-topology",
+            }
+        ],
+        "site": [
+            {
+                "data": [
+                    {
+                        "id": "fa33d01b-074d-42c7-be90-ddbae3b6f624",
+                        "name": "Global",
+                        "nameHierarchy": "Global/US/East/NYC-HQ/Floor-3",
+                        "type": "global",
+                    }
+                ],
+                "endpoint": "/dna/intent/api/v2/sites",
+            }
+        ],
+        "ip_pool_reservation": [
+            {
+                "data": [
+                    {
+                        "id": "80d933af-be42-461d-bfdc-f29ffe33c0f9",
+                        "groupName": "NYC-HQ-Floor3",
+                        "siteHierarchy": "Global/US/East/NYC-HQ/Floor-3",
+                        "ipPools": [
+                            {
+                                "ipPoolName": "MGMT-Pool-Floor3",
+                                "totalIpAddressCount": 32,
+                            }
+                        ],
+                    }
+                ],
+                "endpoint": "/dna/intent/api/v2/reserve-ip-subpool",
+            }
+        ],
+        "site_settings": [
+            {
+                "data": [{"data": [{"value": [{"domainName": "corp.example.com"}]}]}],
+                "endpoint": "/dna/intent/api/v1/site-settings",
+            }
+        ],
+    }
+
+
+@pytest.mark.unit
+class TestCatalystCenterSiteHierarchyProfileRegistry:
+    def test_cc_site_names_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("catalyst_center")
+        site_rules = [r for r in rules if r.category == "SITE_NAMES"]
+        assert len(site_rules) > 0
+        assert all(r.tier == "optional" for r in site_rules)
+
+    def test_cc_physical_addresses_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("catalyst_center")
+        addr_rules = [r for r in rules if r.category == "PHYSICAL_ADDRESSES"]
+        assert len(addr_rules) > 0
+        assert all(r.tier == "optional" for r in addr_rules)
+
+    def test_cc_domain_names_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("catalyst_center")
+        domain_rules = [r for r in rules if r.category == "DOMAIN_NAMES"]
+        assert len(domain_rules) > 0
+        assert all(r.tier == "optional" for r in domain_rules)
+
+
+@pytest.mark.unit
+class TestCatalystCenterSiteHierarchyIntegration:
+    def test_cc_site_names_excluded_by_default(self, tmp_path) -> None:
+        """Site hierarchy names are not redacted unless the site_names pack is enabled."""
+        data = _cc_site_hierarchy_data()
+        input_file = tmp_path / "cc.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["catalyst_center"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "cc.json").read_text())
+        assert sanitized["area"][0]["data"][0]["name"] == "US-East-Region"
+        assert sanitized["building"][0]["data"][0]["name"] == "NYC-HQ-Building"
+        assert sanitized["site"][0]["data"][0]["name"] == "Global"
+        assert (
+            sanitized["site"][0]["data"][0]["nameHierarchy"]
+            == "Global/US/East/NYC-HQ/Floor-3"
+        )
+        assert (
+            sanitized["ip_pool_reservation"][0]["data"][0]["siteHierarchy"]
+            == "Global/US/East/NYC-HQ/Floor-3"
+        )
+        assert (
+            sanitized["ip_pool_reservation"][0]["data"][0]["groupName"]
+            == "NYC-HQ-Floor3"
+        )
+
+    def test_cc_site_names_redacts_when_enabled(self, tmp_path) -> None:
+        """Enabling the site_names pack redacts names and hierarchy fields."""
+        data = _cc_site_hierarchy_data()
+        input_file = tmp_path / "cc.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["catalyst_center"],
+            packs=PackConfig(enable=["site_names"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "cc.json").read_text())
+        area = sanitized["area"][0]["data"][0]
+        building = sanitized["building"][0]["data"][0]
+        site = sanitized["site"][0]["data"][0]
+        pool = sanitized["ip_pool_reservation"][0]["data"][0]
+
+        assert area["name"] == "SITE_NAMES-002"
+        assert building["name"] == "SITE_NAMES-003"
+        assert site["name"] == "SITE_NAMES-004"
+        assert site["nameHierarchy"] == "SITE_NAMES-001"
+        assert pool["siteHierarchy"] == "SITE_NAMES-001"
+        assert pool["groupName"] == "SITE_NAMES-005"
+
+        # Non-sensitive fields preserved
+        assert area["id"] == "a5e44366-e8ef-4a76-80a3-b5aa1f558bf3"
+        assert area["instanceTenantId"] == "645beb4a0308c414a4f1d65d"
+        assert site["type"] == "global"
+        assert pool["ipPools"][0]["totalIpAddressCount"] == 32
+
+    def test_cc_physical_addresses_redacts_when_enabled(self, tmp_path) -> None:
+        """Enabling the physical_addresses pack redacts street addresses and countries."""
+        data = _cc_site_hierarchy_data()
+        input_file = tmp_path / "cc.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["catalyst_center"],
+            packs=PackConfig(enable=["physical_addresses"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "cc.json").read_text())
+        area_attrs = sanitized["area"][0]["data"][0]["additionalInfo"][0]["attributes"]
+        building_attrs = sanitized["building"][0]["data"][0]["additionalInfo"][0][
+            "attributes"
+        ]
+
+        assert area_attrs["address"] == "PHYSICAL_ADDRESSES-001"
+        assert area_attrs["country"] == "PHYSICAL_ADDRESSES-002"
+        assert building_attrs["address"] == "PHYSICAL_ADDRESSES-003"
+        assert building_attrs["country"] == "PHYSICAL_ADDRESSES-002"
+
+        # Non-sensitive fields preserved
+        assert (
+            sanitized["area"][0]["data"][0]["additionalInfo"][0]["nameSpace"]
+            == "Location"
+        )
+        assert area_attrs["type"] == "building"
+        assert area_attrs["latitude"] == "40.7128"
+        assert building_attrs["type"] == "building"
+        assert building_attrs["latitude"] == "40.7306"

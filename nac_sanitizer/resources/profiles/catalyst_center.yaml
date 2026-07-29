@@ -126,3 +126,32 @@ packs:
     paths:
       - "$..securityGroupName"
       - "$..scalableGroupNames[*]"
+
+  site_names:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.area[*].data[*].name"
+      - "$.building[*].data[*].name"
+      - "$.site[*].data[*].name"
+      - "$..nameHierarchy"
+      - "$..siteHierarchy"
+      - "$..siteNames[*]"
+      - "$.ip_pool_reservation[*].data[*].groupName"
+
+  physical_addresses:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.area[*].data[*].additionalInfo[*].attributes.address"
+      - "$.area[*].data[*].additionalInfo[*].attributes.country"
+      - "$.building[*].data[*].additionalInfo[*].attributes.address"
+      - "$.building[*].data[*].additionalInfo[*].attributes.country"
+      - "$.site[*].data[*].address"
+      - "$.site[*].data[*].country"
+
+  domain_names:
+    tier: optional
+    strategy: preserve_format
+    paths:
+      - "$..domainName"
