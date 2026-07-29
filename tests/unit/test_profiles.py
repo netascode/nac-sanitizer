@@ -778,19 +778,20 @@ class TestProfileIntegration:
         sanitizer.run(input_file, output_dir)
 
         sanitized = json.loads((output_dir / "ise.json").read_text())
-        raw = json.dumps(sanitized)
-
-        # Sensitive fields redacted
-        assert "VLAN1210-Employee-Access" not in raw
-        assert "VPN-IPSec-Pool-Profile" not in raw
-        assert "Standard employee network access with VLAN 1210" not in raw
-        assert "Remote access VPN authorization" not in raw
-        assert "EMPLOYEE_VLAN_1210" not in raw
-        assert "ipsec:addr-pool=CORP_VPN_POOL" not in raw
 
         profile = sanitized["authorization_profile"][0]["data"]
         profile2 = sanitized["authorization_profile"][1]["data"]
         attr = profile2["advancedAttributes"][0]
+
+        # Sensitive fields redacted
+        assert profile["name"] == "AUTHORIZATION_PROFILES-001"
+        assert profile["description"] == "AUTHORIZATION_PROFILES-003"
+        assert profile["vlan"]["nameID"] == "AUTHORIZATION_PROFILES-005"
+        assert profile2["name"] == "AUTHORIZATION_PROFILES-002"
+        assert profile2["description"] == "AUTHORIZATION_PROFILES-004"
+        assert (
+            attr["rightHandSideAttribueValue"]["value"] == "AUTHORIZATION_PROFILES-006"
+        )
 
         # Non-sensitive fields preserved
         assert profile["id"] == "a1b2c3d4-1234-5678-abcd-111111111111"
