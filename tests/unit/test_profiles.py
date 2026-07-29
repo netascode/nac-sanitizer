@@ -170,14 +170,14 @@ class TestProfileRegistry:
         sanitizer.run(input_file, output_dir)
 
         sanitized = json.loads((output_dir / "sdwan.json").read_text())
-        # Description should be redacted
+        # Description should be redacted to a deterministic token
         assert (
             sanitized["configuration_group"][0]["data"]["description"]
-            != "Gold tier branch type 2 configuration for ACME Corp"
+            == "CONFIGURATION_GROUP_NAMES-001"
         )
         assert (
             sanitized["configuration_group"][1]["data"]["description"]
-            != "Silver tier remote office configuration"
+            == "CONFIGURATION_GROUP_NAMES-002"
         )
         # Other fields should be preserved
         assert (
