@@ -705,13 +705,12 @@ class TestProfileIntegration:
         sanitizer.run(input_file, output_dir)
 
         sanitized = json.loads((output_dir / "ise.json").read_text())
-        raw = json.dumps(sanitized)
-        assert "givenName" not in raw
-        assert '"sn"' not in raw
 
         settings = sanitized["active_directory_join_point"][0]["data"][
             "advancedSettings"
         ]
+        assert settings["firstName"] == "PERSONAL_INFO-001"
+        assert settings["lastName"] == "PERSONAL_INFO-002"
         assert settings["enablePassChange"] is True
         assert settings["enableMachineAuth"] is True
         assert settings["department"] == "department"
@@ -754,18 +753,18 @@ class TestProfileIntegration:
         sanitizer.run(input_file, output_dir)
 
         sanitized = json.loads((output_dir / "ise.json").read_text())
-        raw = json.dumps(sanitized)
-        assert "CORP_AD_wan.example.com" not in raw
-        assert "IT-Admins-NYC" not in raw
-        assert "VPN-Users-Remote" not in raw
-        assert "Finance-Dept-All" not in raw
 
         join_point = sanitized["active_directory_join_point"][0]["data"]
+        assert join_point["name"] == "ACTIVE_DIRECTORY_GROUPS-001"
+        groups = join_point["adgroups"]["groups"]
+        assert groups[0]["name"] == "ACTIVE_DIRECTORY_GROUPS-002"
+        assert groups[1]["name"] == "ACTIVE_DIRECTORY_GROUPS-003"
+        assert groups[2]["name"] == "ACTIVE_DIRECTORY_GROUPS-004"
+
         assert join_point["id"] == "ae1e4320-8d6b-11ee-8e9d-c6c118414b7e"
         assert join_point["domain"] == "wan.example.com"
         assert join_point["enableDomainAllowedList"] is True
         assert join_point["description"] == ""
-        groups = join_point["adgroups"]["groups"]
         assert {g["sid"] for g in groups} == {
             "S-1-5-32-555",
             "S-1-5-21-309816-515",
