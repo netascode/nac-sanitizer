@@ -167,6 +167,12 @@ class TestISEProfileRegistry:
         assert len(src_rules) > 0
         assert all(r.tier == "optional" for r in src_rules)
 
+    def test_ise_license_tier_names_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("ise")
+        lic_rules = [r for r in rules if r.category == "LICENSE_TIER_NAMES"]
+        assert len(lic_rules) > 0
+        assert all(r.tier == "optional" for r in lic_rules)
+
 
 @pytest.mark.unit
 class TestProfileIntegration:
@@ -1132,6 +1138,129 @@ class TestProfileIntegration:
         assert cert2["id"] == "d59cd630-985d-11ee-94be-faa732630355"
         assert cert2["description"] == ""
         assert cert2["certificateAttributeName"] == "SUBJECT_ALTERNATIVE_NAME"
+
+    def test_ise_license_tier_names_excluded_by_default(self, tmp_path) -> None:
+        """ISE optional-tier license_tier_names pack is not applied by default."""
+        data = {
+            "license_tier_state": [
+                {
+                    "data": [
+                        {
+                            "name": "ESSENTIAL",
+                            "status": "ENABLED",
+                            "compliance": "COMPLIANT",
+                            "consumptionCounter": 25664,
+                            "daysOutOfCompliance": "-",
+                            "lastAuthorization": "May 27,2026 19:38:38 PM",
+                        },
+                        {
+                            "name": "ADVANTAGE",
+                            "status": "ENABLED",
+                            "compliance": "COMPLIANT",
+                            "consumptionCounter": 9243,
+                            "daysOutOfCompliance": "-",
+                            "lastAuthorization": "May 27,2026 19:38:38 PM",
+                        },
+                        {
+                            "name": "PREMIER",
+                            "status": "ENABLED",
+                            "compliance": "COMPLIANT",
+                            "consumptionCounter": 2856,
+                            "daysOutOfCompliance": "-",
+                            "lastAuthorization": "May 27,2026 19:38:38 PM",
+                        },
+                    ]
+                }
+            ]
+        }
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["ise"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        # Optional pack should NOT be redacted by default
+        assert sanitized["license_tier_state"][0]["data"][0]["name"] == "ESSENTIAL"
+        assert sanitized["license_tier_state"][0]["data"][1]["name"] == "ADVANTAGE"
+        assert sanitized["license_tier_state"][0]["data"][2]["name"] == "PREMIER"
+
+    def test_ise_license_tier_names_redacts_when_enabled(self, tmp_path) -> None:
+        """ISE license_tier_names pack redacts names when explicitly enabled."""
+        data = {
+            "license_tier_state": [
+                {
+                    "data": [
+                        {
+                            "name": "ESSENTIAL",
+                            "status": "ENABLED",
+                            "compliance": "COMPLIANT",
+                            "consumptionCounter": 25664,
+                            "daysOutOfCompliance": "-",
+                            "lastAuthorization": "May 27,2026 19:38:38 PM",
+                        },
+                        {
+                            "name": "ADVANTAGE",
+                            "status": "ENABLED",
+                            "compliance": "COMPLIANT",
+                            "consumptionCounter": 9243,
+                            "daysOutOfCompliance": "-",
+                            "lastAuthorization": "May 27,2026 19:38:38 PM",
+                        },
+                        {
+                            "name": "PREMIER",
+                            "status": "ENABLED",
+                            "compliance": "COMPLIANT",
+                            "consumptionCounter": 2856,
+                            "daysOutOfCompliance": "-",
+                            "lastAuthorization": "May 27,2026 19:38:38 PM",
+                        },
+                    ]
+                }
+            ]
+        }
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["ise"],
+            packs=PackConfig(enable=["license_tier_names"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        # All tier names should be redacted
+        assert (
+            sanitized["license_tier_state"][0]["data"][0]["name"]
+            == "LICENSE_TIER_NAMES-001"
+        )
+        assert (
+            sanitized["license_tier_state"][0]["data"][1]["name"]
+            == "LICENSE_TIER_NAMES-002"
+        )
+        assert (
+            sanitized["license_tier_state"][0]["data"][2]["name"]
+            == "LICENSE_TIER_NAMES-003"
+        )
+        # But other fields should be preserved
+        assert sanitized["license_tier_state"][0]["data"][0]["status"] == "ENABLED"
+        assert (
+            sanitized["license_tier_state"][0]["data"][0]["compliance"] == "COMPLIANT"
+        )
+        assert (
+            sanitized["license_tier_state"][0]["data"][0]["consumptionCounter"] == 25664
+        )
+        assert (
+            sanitized["license_tier_state"][0]["data"][0]["daysOutOfCompliance"] == "-"
+        )
+        assert (
+            sanitized["license_tier_state"][0]["data"][0]["lastAuthorization"]
+            == "May 27,2026 19:38:38 PM"
+        )
 
 
 @pytest.mark.unit

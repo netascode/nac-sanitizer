@@ -76,3 +76,9 @@ packs:
     paths:
       - "$.certificate_authentication_profile[*].data.name"
       - "$..externalIdentityStoreName"
+
+  license_tier_names:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.license_tier_state[*].data[*].name"
