@@ -98,3 +98,31 @@ packs:
       - "$.fabric_authentication_profile[*].data[*].data[*].description"
       - "$.fabric_virtual_network[*].data[*].data[*].description"
       - "$.fabric_virtual_network[*].data[*].data[*].scalableGroupNames[*]"
+
+  virtual_network_names:
+    tier: optional
+    strategy: token
+    paths:
+      - "$..virtualNetworkName"
+      - "$..associatedLayer3VirtualNetworkName"
+
+  vlan_names:
+    tier: optional
+    strategy: token
+    paths:
+      - "$..vlanName"
+      - "$..dataVlanName"
+
+  ip_pool_names:
+    tier: optional
+    strategy: token
+    paths:
+      - "$..ipPoolName"
+      - "$.ip_pools[*].data[*].name"
+
+  security_group_names:
+    tier: optional
+    strategy: token
+    paths:
+      - "$..securityGroupName"
+      - "$..scalableGroupNames[*]"
