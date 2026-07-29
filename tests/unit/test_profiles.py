@@ -588,16 +588,11 @@ class TestProfileIntegration:
 
         sanitized = json.loads((output_dir / "ise.json").read_text())
         # Policy names should be redacted
-        assert (
-            sanitized["allowed_protocols"][0]["data"]["name"]
-            != "Default-Device-Admin-Protocols"
-        )
-        assert (
-            sanitized["allowed_protocols"][1]["data"]["name"] != "EAP-TLS-Corp-Wireless"
-        )
+        assert sanitized["allowed_protocols"][0]["data"]["name"] == "POLICY_NAMES-001"
+        assert sanitized["allowed_protocols"][1]["data"]["name"] == "POLICY_NAMES-002"
         assert (
             sanitized["allowed_protocols_tacacs"][0]["data"]["name"]
-            != "TACACS-Default-Protocols"
+            == "POLICY_NAMES-003"
         )
         # But other fields should be preserved
         assert (
