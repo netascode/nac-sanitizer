@@ -35,6 +35,14 @@ packs:
       - "$..siteNameHierarchy"
       - "$..groupNameHierarchy"
 
+  credential_descriptions:
+    tier: default
+    strategy: token
+    paths:
+      - "$..cliCredential[*].description"
+      - "$..snmpV3[*].description"
+      - "$..netconfCredential[*].description"
+
   transit_network_names:
     tier: optional
     strategy: token
