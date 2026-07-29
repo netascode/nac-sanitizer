@@ -119,11 +119,59 @@ class TestISEProfileRegistry:
         assert len(user_rules) > 0
         assert all(r.tier == "optional" for r in user_rules)
 
+    def test_ise_tacacs_profiles_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("ise")
+        tacacs_rules = [r for r in rules if r.category == "TACACS_PROFILES"]
+        assert len(tacacs_rules) > 0
+        assert all(r.tier == "optional" for r in tacacs_rules)
+
+    def test_ise_tacacs_profiles_pack_is_token_strategy(self) -> None:
+        rules = ProfileRegistry.load_rules("ise")
+        tacacs_rules = [r for r in rules if r.category == "TACACS_PROFILES"]
+        assert len(tacacs_rules) > 0
+        assert all(r.strategy == "token" for r in tacacs_rules)
+
+    def test_ise_tacacs_profiles_pack_paths(self) -> None:
+        rules = ProfileRegistry.load_rules("ise")
+        tacacs_paths = {r.path for r in rules if r.category == "TACACS_PROFILES"}
+        assert tacacs_paths == {
+            "$.tacacs_profile[*].data.name",
+            "$.tacacs_profile[*].data.description",
+            "$.tacacs_profile[*].data.sessionAttributes.sessionAttributeList[*].name",
+            "$.tacacs_profile[*].data.sessionAttributes.sessionAttributeList[*].value",
+            "$.tacacs_command_set[*].data.name",
+            "$.tacacs_command_set[*].data.description",
+        }
+
+    def test_ise_repository_config_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("ise")
+        repo_rules = [r for r in rules if r.category == "REPOSITORY_CONFIG"]
+        assert len(repo_rules) > 0
+        assert all(r.tier == "optional" for r in repo_rules)
+
+    def test_ise_policy_names_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("ise")
+        policy_rules = [r for r in rules if r.category == "POLICY_NAMES"]
+        assert len(policy_rules) > 0
+        assert all(r.tier == "optional" for r in policy_rules)
+
+    def test_ise_downloadable_acl_names_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("ise")
+        acl_rules = [r for r in rules if r.category == "DOWNLOADABLE_ACL_NAMES"]
+        assert len(acl_rules) > 0
+        assert all(r.tier == "optional" for r in acl_rules)
+
+    def test_ise_identity_sources_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("ise")
+        src_rules = [r for r in rules if r.category == "IDENTITY_SOURCES"]
+        assert len(src_rules) > 0
+        assert all(r.tier == "optional" for r in src_rules)
+
     def test_ise_license_tier_names_pack_is_optional_tier(self) -> None:
         rules = ProfileRegistry.load_rules("ise")
-        tier_rules = [r for r in rules if r.category == "LICENSE_TIER_NAMES"]
-        assert len(tier_rules) > 0
-        assert all(r.tier == "optional" for r in tier_rules)
+        lic_rules = [r for r in rules if r.category == "LICENSE_TIER_NAMES"]
+        assert len(lic_rules) > 0
+        assert all(r.tier == "optional" for r in lic_rules)
 
 
 @pytest.mark.unit
@@ -464,6 +512,632 @@ class TestProfileIntegration:
         user = sanitized["internal_user"][0]["data"]["InternalUser"]
         assert user["userName"] != "jsmith"
         assert user["domain"] != "corp.example.com"
+
+    @staticmethod
+    def _tacacs_data() -> dict:
+        return {
+            "tacacs_profile": [
+                {
+                    "data": {
+                        "id": "73d232c0-f351-11ee-8954-a21daf388194",
+                        "name": "Aruba-Root-Shell",
+                        "description": "Root Level Privileges for Aruba Controllers Admins",
+                        "sessionAttributes": {
+                            "sessionAttributeList": [
+                                {
+                                    "type": "MANDATORY",
+                                    "name": "service-type",
+                                    "value": "root",
+                                }
+                            ]
+                        },
+                        "link": {
+                            "rel": "self",
+                            "href": "https://10.0.0.140/ers/config/tacacsprofile/73d232c0-f351-11ee-8954-a21daf388194",
+                            "type": "application/json",
+                        },
+                    },
+                    "endpoint": "/ers/config/tacacsprofile/73d232c0-f351-11ee-8954-a21daf388194",
+                },
+                {
+                    "data": {
+                        "id": "9bad4c20-f36b-11ee-8954-a21daf388194",
+                        "name": "AirWaves-Admin-Profile",
+                        "description": "Administrator Privileges for AirWaves Admins",
+                        "sessionAttributes": {
+                            "sessionAttributeList": [
+                                {
+                                    "type": "MANDATORY",
+                                    "name": "priv-lvl",
+                                    "value": "15",
+                                }
+                            ]
+                        },
+                        "link": {
+                            "rel": "self",
+                            "href": "https://10.0.0.140/ers/config/tacacsprofile/9bad4c20-f36b-11ee-8954-a21daf388194",
+                            "type": "application/json",
+                        },
+                    },
+                    "endpoint": "/ers/config/tacacsprofile/9bad4c20-f36b-11ee-8954-a21daf388194",
+                },
+            ],
+            "tacacs_command_set": [
+                {
+                    "data": {
+                        "id": "96373ea0-9f5a-11ee-94be-faa732630355",
+                        "name": "DNAC-Full-Admin",
+                        "description": "DNAC Admin",
+                        "permitUnmatched": True,
+                        "commands": {"commandList": []},
+                        "link": {
+                            "rel": "self",
+                            "href": "https://10.0.0.140/ers/config/tacacscommandsets/96373ea0-9f5a-11ee-94be-faa732630355",
+                            "type": "application/json",
+                        },
+                    },
+                    "endpoint": "/ers/config/tacacscommandsets/96373ea0-9f5a-11ee-94be-faa732630355",
+                },
+                {
+                    "data": {
+                        "id": "b672bd70-9f5a-11ee-94be-faa732630355",
+                        "name": "DNAC-ReadOnly",
+                        "description": "DNAC Observer (Read Only)",
+                        "permitUnmatched": False,
+                        "commands": {"commandList": []},
+                        "link": {
+                            "rel": "self",
+                            "href": "https://10.0.0.140/ers/config/tacacscommandsets/b672bd70-9f5a-11ee-94be-faa732630355",
+                            "type": "application/json",
+                        },
+                    },
+                    "endpoint": "/ers/config/tacacscommandsets/b672bd70-9f5a-11ee-94be-faa732630355",
+                },
+            ],
+        }
+
+    def test_ise_tacacs_profiles_pack_excluded_by_default(self, tmp_path) -> None:
+        """ISE tacacs_profiles pack (optional tier) is not applied unless enabled."""
+        data = self._tacacs_data()
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["ise"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        profile = sanitized["tacacs_profile"][0]["data"]
+        assert profile["name"] == "Aruba-Root-Shell"
+        assert (
+            profile["description"]
+            == "Root Level Privileges for Aruba Controllers Admins"
+        )
+        attr = profile["sessionAttributes"]["sessionAttributeList"][0]
+        assert attr["name"] == "service-type"
+        assert attr["value"] == "root"
+        cmd_set = sanitized["tacacs_command_set"][0]["data"]
+        assert cmd_set["name"] == "DNAC-Full-Admin"
+        assert cmd_set["description"] == "DNAC Admin"
+
+    def test_ise_tacacs_profiles_pack_applied_when_enabled(self, tmp_path) -> None:
+        """ISE tacacs_profiles pack redacts names/descriptions/session attrs when enabled."""
+        data = self._tacacs_data()
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["ise"],
+            packs=PackConfig(enable=["tacacs_profiles"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        raw = json.dumps(sanitized)
+
+        # Sensitive fields redacted
+        assert "Aruba-Root-Shell" not in raw
+        assert "AirWaves-Admin-Profile" not in raw
+        assert "Root Level Privileges for Aruba Controllers Admins" not in raw
+        assert "Administrator Privileges for AirWaves Admins" not in raw
+        assert "service-type" not in raw
+        assert "priv-lvl" not in raw
+        assert "DNAC-Full-Admin" not in raw
+        assert "DNAC-ReadOnly" not in raw
+        assert "DNAC Admin" not in raw
+        assert "DNAC Observer (Read Only)" not in raw
+
+        profile_0 = sanitized["tacacs_profile"][0]["data"]
+        profile_1 = sanitized["tacacs_profile"][1]["data"]
+        attr_0 = profile_0["sessionAttributes"]["sessionAttributeList"][0]
+        attr_1 = profile_1["sessionAttributes"]["sessionAttributeList"][0]
+
+        # Non-sensitive fields preserved
+        assert profile_0["id"] == "73d232c0-f351-11ee-8954-a21daf388194"
+        assert profile_1["id"] == "9bad4c20-f36b-11ee-8954-a21daf388194"
+        assert attr_0["type"] == "MANDATORY"
+        assert attr_1["type"] == "MANDATORY"
+        assert (
+            profile_0["link"]["href"]
+            == "https://10.0.0.140/ers/config/tacacsprofile/73d232c0-f351-11ee-8954-a21daf388194"
+        )
+
+        cmd_set_0 = sanitized["tacacs_command_set"][0]["data"]
+        cmd_set_1 = sanitized["tacacs_command_set"][1]["data"]
+        assert cmd_set_0["id"] == "96373ea0-9f5a-11ee-94be-faa732630355"
+        assert cmd_set_1["id"] == "b672bd70-9f5a-11ee-94be-faa732630355"
+        assert cmd_set_0["permitUnmatched"] is True
+        assert cmd_set_1["permitUnmatched"] is False
+        assert cmd_set_0["commands"] == {"commandList": []}
+
+    def test_ise_repository_config_excluded_by_default(self, tmp_path) -> None:
+        """ISE repository_config pack (name, path) NOT redacted by default."""
+        data = {
+            "repository": [
+                {
+                    "data": {
+                        "name": "ISE-Backup-SFTP",
+                        "protocol": "SFTP",
+                        "serverName": "10.0.0.206",
+                        "path": "/backups/ise/nightly",
+                        "enablePki": False,
+                        "userName": "backup-svc",
+                        "password": "",
+                    },
+                    "endpoint": "/api/v1/repository/ISE-Backup",
+                },
+                {
+                    "data": {
+                        "name": "Config-Archive-FTP",
+                        "protocol": "FTP",
+                        "serverName": "10.0.0.171",
+                        "path": "/archive/configs",
+                        "userName": "ftpuser",
+                        "password": "",
+                    },
+                    "endpoint": "/api/v1/repository/WIN-19",
+                },
+            ]
+        }
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["ise"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        assert sanitized["repository"][0]["data"]["name"] == "ISE-Backup-SFTP"
+        assert sanitized["repository"][0]["data"]["path"] == "/backups/ise/nightly"
+        assert sanitized["repository"][1]["data"]["name"] == "Config-Archive-FTP"
+        assert sanitized["repository"][1]["data"]["path"] == "/archive/configs"
+
+    def test_ise_repository_config_redacts_when_enabled(self, tmp_path) -> None:
+        """ISE repository_config pack redacts name/path when enabled; other fields preserved."""
+        data = {
+            "repository": [
+                {
+                    "data": {
+                        "name": "ISE-Backup-SFTP",
+                        "protocol": "SFTP",
+                        "serverName": "10.0.0.206",
+                        "path": "/backups/ise/nightly",
+                        "enablePki": False,
+                        "userName": "backup-svc",
+                        "password": "",
+                    },
+                    "endpoint": "/api/v1/repository/ISE-Backup",
+                },
+                {
+                    "data": {
+                        "name": "Config-Archive-FTP",
+                        "protocol": "FTP",
+                        "serverName": "10.0.0.171",
+                        "path": "/archive/configs",
+                        "userName": "ftpuser",
+                        "password": "",
+                    },
+                    "endpoint": "/api/v1/repository/WIN-19",
+                },
+            ]
+        }
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["ise"],
+            packs=PackConfig(enable=["repository_config"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        assert sanitized["repository"][0]["data"]["name"] == "REPOSITORY_CONFIG-001"
+        assert sanitized["repository"][1]["data"]["name"] == "REPOSITORY_CONFIG-002"
+        assert sanitized["repository"][0]["data"]["path"] == "REPOSITORY_CONFIG-003"
+        assert sanitized["repository"][1]["data"]["path"] == "REPOSITORY_CONFIG-004"
+        assert sanitized["repository"][0]["data"]["protocol"] == "SFTP"
+        assert sanitized["repository"][0]["data"]["enablePki"] is False
+        assert sanitized["repository"][1]["data"]["protocol"] == "FTP"
+
+    def test_ise_policy_names_excluded_by_default(self, tmp_path) -> None:
+        """ISE policy_names pack (optional tier) is not redacted by default."""
+        data = {
+            "allowed_protocols": [
+                {
+                    "data": {
+                        "id": "926901b0-8c01-11e6-996c-525400b48521",
+                        "name": "Default-Device-Admin-Protocols",
+                        "description": "Default Allowed Protocol Service Device Admin",
+                        "allowPapAscii": True,
+                        "allowChap": True,
+                        "allowMsChapV1": True,
+                    },
+                    "endpoint": "/ers/config/allowedprotocols/926901b0-8c01-11e6-996c-525400b48521",
+                },
+                {
+                    "data": {
+                        "id": "92613980-8c01-11e6-996c-525400b48521",
+                        "name": "EAP-TLS-Corp-Wireless",
+                        "description": "Default Allowed Protocol Service",
+                        "allowPapAscii": False,
+                        "allowEapTls": True,
+                    },
+                    "endpoint": "/ers/config/allowedprotocols/92613980-8c01-11e6-996c-525400b48521",
+                },
+            ],
+            "allowed_protocols_tacacs": [
+                {
+                    "data": {
+                        "id": "a1b2c3d4-1234-5678-9abc-def012345678",
+                        "name": "TACACS-Default-Protocols",
+                        "description": "Default TACACS Protocol Service",
+                        "allowPapAscii": True,
+                        "allowChap": True,
+                    },
+                    "endpoint": "/ers/config/allowedprotocolstacacs/a1b2c3d4-1234-5678-9abc-def012345678",
+                }
+            ],
+        }
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["ise"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        # Policy names should NOT be redacted by default (optional tier)
+        assert (
+            sanitized["allowed_protocols"][0]["data"]["name"]
+            == "Default-Device-Admin-Protocols"
+        )
+        assert (
+            sanitized["allowed_protocols"][1]["data"]["name"] == "EAP-TLS-Corp-Wireless"
+        )
+        assert (
+            sanitized["allowed_protocols_tacacs"][0]["data"]["name"]
+            == "TACACS-Default-Protocols"
+        )
+        # But other fields should remain
+        assert (
+            sanitized["allowed_protocols"][0]["data"]["id"]
+            == "926901b0-8c01-11e6-996c-525400b48521"
+        )
+        assert (
+            sanitized["allowed_protocols"][0]["data"]["description"]
+            == "Default Allowed Protocol Service Device Admin"
+        )
+        assert sanitized["allowed_protocols"][0]["data"]["allowPapAscii"] is True
+
+    def test_ise_policy_names_redacts_when_enabled(self, tmp_path) -> None:
+        """ISE policy_names pack redacts policy names when explicitly enabled."""
+        data = {
+            "allowed_protocols": [
+                {
+                    "data": {
+                        "id": "926901b0-8c01-11e6-996c-525400b48521",
+                        "name": "Default-Device-Admin-Protocols",
+                        "description": "Default Allowed Protocol Service Device Admin",
+                        "allowPapAscii": True,
+                        "allowChap": True,
+                        "allowMsChapV1": True,
+                    },
+                    "endpoint": "/ers/config/allowedprotocols/926901b0-8c01-11e6-996c-525400b48521",
+                },
+                {
+                    "data": {
+                        "id": "92613980-8c01-11e6-996c-525400b48521",
+                        "name": "EAP-TLS-Corp-Wireless",
+                        "description": "Default Allowed Protocol Service",
+                        "allowPapAscii": False,
+                        "allowEapTls": True,
+                    },
+                    "endpoint": "/ers/config/allowedprotocols/92613980-8c01-11e6-996c-525400b48521",
+                },
+            ],
+            "allowed_protocols_tacacs": [
+                {
+                    "data": {
+                        "id": "a1b2c3d4-1234-5678-9abc-def012345678",
+                        "name": "TACACS-Default-Protocols",
+                        "description": "Default TACACS Protocol Service",
+                        "allowPapAscii": True,
+                        "allowChap": True,
+                    },
+                    "endpoint": "/ers/config/allowedprotocolstacacs/a1b2c3d4-1234-5678-9abc-def012345678",
+                }
+            ],
+        }
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["ise"],
+            packs=PackConfig(enable=["policy_names"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        # Policy names should be redacted
+        assert sanitized["allowed_protocols"][0]["data"]["name"] == "POLICY_NAMES-001"
+        assert sanitized["allowed_protocols"][1]["data"]["name"] == "POLICY_NAMES-002"
+        assert (
+            sanitized["allowed_protocols_tacacs"][0]["data"]["name"]
+            == "POLICY_NAMES-003"
+        )
+        # But other fields should be preserved
+        assert (
+            sanitized["allowed_protocols"][0]["data"]["id"]
+            == "926901b0-8c01-11e6-996c-525400b48521"
+        )
+        assert (
+            sanitized["allowed_protocols"][0]["data"]["description"]
+            == "Default Allowed Protocol Service Device Admin"
+        )
+        assert sanitized["allowed_protocols"][0]["data"]["allowPapAscii"] is True
+        assert sanitized["allowed_protocols"][1]["data"]["allowEapTls"] is True
+        assert sanitized["allowed_protocols_tacacs"][0]["data"]["allowChap"] is True
+
+    def test_ise_downloadable_acl_names_excluded_by_default(self, tmp_path) -> None:
+        """ISE downloadable_acl_names pack is not applied by default."""
+        data = {
+            "downloadable_acl": [
+                {
+                    "data": {
+                        "id": "9825aa40-8c01-11e6-996c-525400b48521",
+                        "name": "DENY_ALL_IPV4",
+                        "description": "Deny all ipv4 traffic",
+                        "dacl": "deny ip any any",
+                        "daclType": "IPV4",
+                    },
+                    "endpoint": "/ers/config/downloadableacl/9825aa40-8c01-11e6-996c-525400b48521",
+                },
+                {
+                    "data": {
+                        "id": "d51e3b40-f945-11eb-953e-0050568fa723",
+                        "name": "QUARANTINE_ACL",
+                        "description": "Deny all ipv6 traffic",
+                        "dacl": "deny ipv6 any any",
+                        "daclType": "IPV6",
+                    },
+                    "endpoint": "/ers/config/downloadableacl/d51e3b40-f945-11eb-953e-0050568fa723",
+                },
+            ]
+        }
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["ise"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        # Names should NOT be redacted by default (optional tier)
+        assert sanitized["downloadable_acl"][0]["data"]["name"] == "DENY_ALL_IPV4"
+        assert sanitized["downloadable_acl"][1]["data"]["name"] == "QUARANTINE_ACL"
+        # Other fields should be preserved
+        assert (
+            sanitized["downloadable_acl"][0]["data"]["id"]
+            == "9825aa40-8c01-11e6-996c-525400b48521"
+        )
+        assert (
+            sanitized["downloadable_acl"][0]["data"]["description"]
+            == "Deny all ipv4 traffic"
+        )
+        assert sanitized["downloadable_acl"][0]["data"]["dacl"] == "deny ip any any"
+        assert sanitized["downloadable_acl"][0]["data"]["daclType"] == "IPV4"
+
+    def test_ise_downloadable_acl_names_redacts_when_enabled(self, tmp_path) -> None:
+        """ISE downloadable_acl_names pack redacts ACL names when explicitly enabled."""
+        data = {
+            "downloadable_acl": [
+                {
+                    "data": {
+                        "id": "9825aa40-8c01-11e6-996c-525400b48521",
+                        "name": "DENY_ALL_IPV4",
+                        "description": "Deny all ipv4 traffic",
+                        "dacl": "deny ip any any",
+                        "daclType": "IPV4",
+                    },
+                    "endpoint": "/ers/config/downloadableacl/9825aa40-8c01-11e6-996c-525400b48521",
+                },
+                {
+                    "data": {
+                        "id": "d51e3b40-f945-11eb-953e-0050568fa723",
+                        "name": "QUARANTINE_ACL",
+                        "description": "Deny all ipv6 traffic",
+                        "dacl": "deny ipv6 any any",
+                        "daclType": "IPV6",
+                    },
+                    "endpoint": "/ers/config/downloadableacl/d51e3b40-f945-11eb-953e-0050568fa723",
+                },
+            ]
+        }
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["ise"],
+            packs=PackConfig(enable=["downloadable_acl_names"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        # Names should be redacted when enabled
+        assert (
+            sanitized["downloadable_acl"][0]["data"]["name"]
+            == "DOWNLOADABLE_ACL_NAMES-001"
+        )
+        assert (
+            sanitized["downloadable_acl"][1]["data"]["name"]
+            == "DOWNLOADABLE_ACL_NAMES-002"
+        )
+        # Other sensitive fields should NOT be redacted (id, description, dacl, daclType)
+        assert (
+            sanitized["downloadable_acl"][0]["data"]["id"]
+            == "9825aa40-8c01-11e6-996c-525400b48521"
+        )
+        assert (
+            sanitized["downloadable_acl"][0]["data"]["description"]
+            == "Deny all ipv4 traffic"
+        )
+        assert sanitized["downloadable_acl"][0]["data"]["dacl"] == "deny ip any any"
+        assert sanitized["downloadable_acl"][0]["data"]["daclType"] == "IPV4"
+        assert (
+            sanitized["downloadable_acl"][1]["data"]["id"]
+            == "d51e3b40-f945-11eb-953e-0050568fa723"
+        )
+        assert (
+            sanitized["downloadable_acl"][1]["data"]["description"]
+            == "Deny all ipv6 traffic"
+        )
+        assert sanitized["downloadable_acl"][1]["data"]["dacl"] == "deny ipv6 any any"
+        assert sanitized["downloadable_acl"][1]["data"]["daclType"] == "IPV6"
+
+    def test_ise_identity_sources_excluded_by_default(self, tmp_path) -> None:
+        """ISE identity_sources optional pack is not applied by default."""
+        data = {
+            "certificate_authentication_profile": [
+                {
+                    "data": {
+                        "id": "167942e0-dbea-11ee-94be-faa732630355",
+                        "name": "Azure-TLS-Cert-Profile",
+                        "description": "Azure_TLS_Certificate_Profile",
+                        "externalIdentityStoreName": "[not applicable]",
+                        "certificateAttributeName": "SUBJECT_COMMON_NAME",
+                        "allowedAsUserName": False,
+                        "matchMode": "NEVER",
+                        "usernameFrom": "CERTIFICATE",
+                    },
+                    "endpoint": "/ers/config/certificateprofile/167942e0-dbea-11ee-94be-faa732630355",
+                },
+                {
+                    "data": {
+                        "id": "d59cd630-985d-11ee-94be-faa732630355",
+                        "name": "Corp-Machine-Cert-Profile",
+                        "description": "",
+                        "externalIdentityStoreName": "CORP_AD_wan.example.com",
+                        "certificateAttributeName": "SUBJECT_ALTERNATIVE_NAME",
+                        "allowedAsUserName": False,
+                        "matchMode": "RESOLVE_IDENTITY_AMBIGUITY",
+                        "usernameFrom": "CERTIFICATE",
+                    },
+                    "endpoint": "/ers/config/certificateprofile/d59cd630-985d-11ee-94be-faa732630355",
+                },
+            ]
+        }
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["ise"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        # Optional pack NOT enabled - names and externalIdentityStoreName should NOT be redacted
+        cert1 = sanitized["certificate_authentication_profile"][0]["data"]
+        assert cert1["name"] == "Azure-TLS-Cert-Profile"
+        assert cert1["externalIdentityStoreName"] == "[not applicable]"
+        cert2 = sanitized["certificate_authentication_profile"][1]["data"]
+        assert cert2["name"] == "Corp-Machine-Cert-Profile"
+        assert cert2["externalIdentityStoreName"] == "CORP_AD_wan.example.com"
+        # Other fields should still be preserved
+        assert cert1["id"] == "167942e0-dbea-11ee-94be-faa732630355"
+        assert cert1["certificateAttributeName"] == "SUBJECT_COMMON_NAME"
+
+    def test_ise_identity_sources_redacts_when_enabled(self, tmp_path) -> None:
+        """ISE identity_sources pack redacts name and externalIdentityStoreName when enabled."""
+        data = {
+            "certificate_authentication_profile": [
+                {
+                    "data": {
+                        "id": "167942e0-dbea-11ee-94be-faa732630355",
+                        "name": "Azure-TLS-Cert-Profile",
+                        "description": "Azure_TLS_Certificate_Profile",
+                        "externalIdentityStoreName": "[not applicable]",
+                        "certificateAttributeName": "SUBJECT_COMMON_NAME",
+                        "allowedAsUserName": False,
+                        "matchMode": "NEVER",
+                        "usernameFrom": "CERTIFICATE",
+                    },
+                    "endpoint": "/ers/config/certificateprofile/167942e0-dbea-11ee-94be-faa732630355",
+                },
+                {
+                    "data": {
+                        "id": "d59cd630-985d-11ee-94be-faa732630355",
+                        "name": "Corp-Machine-Cert-Profile",
+                        "description": "",
+                        "externalIdentityStoreName": "CORP_AD_wan.example.com",
+                        "certificateAttributeName": "SUBJECT_ALTERNATIVE_NAME",
+                        "allowedAsUserName": False,
+                        "matchMode": "RESOLVE_IDENTITY_AMBIGUITY",
+                        "usernameFrom": "CERTIFICATE",
+                    },
+                    "endpoint": "/ers/config/certificateprofile/d59cd630-985d-11ee-94be-faa732630355",
+                },
+            ]
+        }
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["ise"],
+            packs=PackConfig(enable=["identity_sources"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        # identity_sources enabled - names and externalIdentityStoreName should be redacted
+        cert1 = sanitized["certificate_authentication_profile"][0]["data"]
+        assert cert1["name"] == "IDENTITY_SOURCES-003"
+        assert cert1["externalIdentityStoreName"] == "IDENTITY_SOURCES-001"
+        cert2 = sanitized["certificate_authentication_profile"][1]["data"]
+        assert cert2["name"] == "IDENTITY_SOURCES-004"
+        assert cert2["externalIdentityStoreName"] == "IDENTITY_SOURCES-002"
+        # Non-identity_sources fields should be preserved
+        assert cert1["id"] == "167942e0-dbea-11ee-94be-faa732630355"
+        assert cert1["description"] == "Azure_TLS_Certificate_Profile"
+        assert cert1["certificateAttributeName"] == "SUBJECT_COMMON_NAME"
+        assert cert1["allowedAsUserName"] is False
+        assert cert1["matchMode"] == "NEVER"
+        assert cert2["id"] == "d59cd630-985d-11ee-94be-faa732630355"
+        assert cert2["description"] == ""
+        assert cert2["certificateAttributeName"] == "SUBJECT_ALTERNATIVE_NAME"
 
     def test_ise_license_tier_names_excluded_by_default(self, tmp_path) -> None:
         """ISE optional-tier license_tier_names pack is not applied by default."""
