@@ -48,3 +48,11 @@ packs:
     strategy: token
     paths:
       - "$.transit_network[*].data[*].name"
+
+  authentication_descriptions:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.authentication_policy_server[*].data[*].ciscoIseDtos[*].description"
+      - "$.authentication_policy_server[*].data[*].ciscoIseDtos[*].fqdn"
+      - "$.update_authentication_profile[*].data[*].preAuthAcl.description"
