@@ -620,27 +620,27 @@ class TestProfileIntegration:
         sanitized = json.loads((output_dir / "ise.json").read_text())
 
         sg = sanitized["trustsec_security_group"][0]["data"]
-        assert sg["name"] != "Aruba_Wireless_APs"
-        assert sg["description"] != "Aruba Wireless Access Points"
+        assert sg["name"] == "SECURITY_GROUPS-001"
+        assert sg["description"] == "SECURITY_GROUPS-002"
         assert sg["id"] == "fba9f273-839e-4b95-9764-61b24315132e"
         assert sg["value"] == 902
         assert sg["generationId"] == "10"
 
         acl = sanitized["trustsec_security_group_acl"][0]["data"]
-        assert acl["name"] != "Allow_DHCP_DNS"
+        assert acl["name"] == "SECURITY_GROUPS-003"
         assert (
             acl["aclcontent"]
             == "permit udp dst eq 67\npermit udp dst eq 68\npermit tcp dst eq 53\ndeny ip"
         )
 
         cell = sanitized["trustsec_egress_matrix_cell"][0]["data"]
-        assert cell["name"] != "Auditors-to-Servers"
+        assert cell["name"] == "SECURITY_GROUPS-004"
         assert cell["sgacls"] == ["92951ac0-8c01-11e6-996c-525400b48521"]
         assert cell["matrixCellStatus"] == "ENABLED"
         assert cell["defaultRule"] == "PERMIT_IP"
 
         default_cell = sanitized["trustsec_egress_matrix_cell_default"][0]["data"]
-        assert default_cell["name"] != "Default-Cell-Deny"
+        assert default_cell["name"] == "SECURITY_GROUPS-005"
         assert default_cell["sgacls"] == ["92919850-8c01-11e6-996c-525400b48521"]
         assert default_cell["matrixCellStatus"] == "ENABLED"
         assert default_cell["defaultRule"] == "DENY_IP"
@@ -703,8 +703,8 @@ class TestProfileIntegration:
 
         sanitized = json.loads((output_dir / "ise.json").read_text())
         filt = sanitized["sxp_domain_filter"][0]["data"]
-        assert filt["vn"] != "INFRA_VN"
-        assert filt["domains"] != "sda-infra-vn"
+        assert filt["vn"] == "SXP_CONFIG-001"
+        assert filt["domains"] == "SXP_CONFIG-002"
         assert filt["id"] == "25cae136-f670-46bc-8e6f-14badb95b94b"
         assert filt["subnet"] == ""
         assert filt["sgt"] == ""
