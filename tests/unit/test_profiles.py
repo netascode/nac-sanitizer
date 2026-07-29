@@ -864,3 +864,161 @@ class TestFMCProfileIntegration:
         result = runner.invoke(app, ["profiles", "list"])
         assert result.exit_code == 0
         assert "fmc" in result.output
+
+
+@pytest.mark.unit
+class TestCatalystCenterProfileRegistry:
+    def test_catalyst_center_profile_available(self) -> None:
+        available = ProfileRegistry.available()
+        assert "catalyst_center" in available
+
+    def test_load_catalyst_center_profile(self) -> None:
+        profile = ProfileRegistry.load("catalyst_center")
+        assert profile["name"] == "catalyst_center"
+        assert "packs" in profile
+
+    def test_catalyst_center_rules_have_valid_paths(self) -> None:
+        rules = ProfileRegistry.load_rules("catalyst_center")
+        resolver = PathResolver()
+        for rule in rules:
+            resolver.parse(rule.path)
+
+    def test_catalyst_center_rules_have_valid_strategies(self) -> None:
+        valid_strategies = {
+            "token",
+            "ip_map",
+            "hostname_map",
+            "constant",
+            "hash",
+            "preserve_format",
+        }
+        rules = ProfileRegistry.load_rules("catalyst_center")
+        for rule in rules:
+            assert rule.strategy in valid_strategies, (
+                f"Unknown strategy '{rule.strategy}' in path {rule.path}"
+            )
+
+    def test_cc_transit_network_names_pack_is_optional_tier(self) -> None:
+        """Catalyst Center transit_network_names pack should be optional tier."""
+        rules = ProfileRegistry.load_rules("catalyst_center")
+        transit_rules = [r for r in rules if r.category == "TRANSIT_NETWORK_NAMES"]
+        assert len(transit_rules) > 0
+        assert all(r.tier == "optional" for r in transit_rules)
+
+
+@pytest.mark.unit
+class TestCatalystCenterProfileIntegration:
+    def test_cc_transit_network_names_excluded_by_default(self, tmp_path) -> None:
+        """Transit network names should NOT be redacted by default (optional tier)."""
+        data = {
+            "transit_network": [
+                {
+                    "data": [
+                        {
+                            "id": "02db99e6-e565-4419-b9fe-8dd7f2bbe244",
+                            "name": "DC-Core-Transit",
+                            "type": "IP_BASED_TRANSIT",
+                            "ipTransitSettings": {
+                                "routingProtocolName": "BGP",
+                                "autonomousSystemNumber": "1000",
+                            },
+                        },
+                        {
+                            "id": "04f1a0f9-98c3-469e-8c34-1b8d10c48910",
+                            "name": "Campus-Edge-Transit",
+                            "type": "IP_BASED_TRANSIT",
+                            "ipTransitSettings": {
+                                "routingProtocolName": "BGP",
+                                "autonomousSystemNumber": "5009",
+                            },
+                        },
+                    ],
+                    "endpoint": "/dna/intent/api/v1/business/sda/transit-networks",
+                }
+            ]
+        }
+        input_file = tmp_path / "catalyst_center.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["catalyst_center"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "catalyst_center.json").read_text())
+        # Transit network names should NOT be redacted by default (optional tier)
+        assert sanitized["transit_network"][0]["data"][0]["name"] == "DC-Core-Transit"
+        assert (
+            sanitized["transit_network"][0]["data"][1]["name"] == "Campus-Edge-Transit"
+        )
+
+    def test_cc_transit_network_names_redacts_when_enabled(self, tmp_path) -> None:
+        """Transit network names should be redacted when explicitly enabled."""
+        data = {
+            "transit_network": [
+                {
+                    "data": [
+                        {
+                            "id": "02db99e6-e565-4419-b9fe-8dd7f2bbe244",
+                            "name": "DC-Core-Transit",
+                            "type": "IP_BASED_TRANSIT",
+                            "ipTransitSettings": {
+                                "routingProtocolName": "BGP",
+                                "autonomousSystemNumber": "1000",
+                            },
+                        },
+                        {
+                            "id": "04f1a0f9-98c3-469e-8c34-1b8d10c48910",
+                            "name": "Campus-Edge-Transit",
+                            "type": "IP_BASED_TRANSIT",
+                            "ipTransitSettings": {
+                                "routingProtocolName": "BGP",
+                                "autonomousSystemNumber": "5009",
+                            },
+                        },
+                    ],
+                    "endpoint": "/dna/intent/api/v1/business/sda/transit-networks",
+                }
+            ]
+        }
+        input_file = tmp_path / "catalyst_center.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["catalyst_center"],
+            packs=PackConfig(enable=["transit_network_names"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "catalyst_center.json").read_text())
+        # Transit network names should be redacted
+        assert sanitized["transit_network"][0]["data"][0]["name"] != "DC-Core-Transit"
+        assert (
+            sanitized["transit_network"][0]["data"][1]["name"] != "Campus-Edge-Transit"
+        )
+        # But other fields should be preserved
+        assert (
+            sanitized["transit_network"][0]["data"][0]["id"]
+            == "02db99e6-e565-4419-b9fe-8dd7f2bbe244"
+        )
+        assert sanitized["transit_network"][0]["data"][0]["type"] == "IP_BASED_TRANSIT"
+        assert (
+            sanitized["transit_network"][0]["data"][0]["ipTransitSettings"][
+                "routingProtocolName"
+            ]
+            == "BGP"
+        )
+        assert (
+            sanitized["transit_network"][0]["data"][0]["ipTransitSettings"][
+                "autonomousSystemNumber"
+            ]
+            == "1000"
+        )
+        assert (
+            sanitized["transit_network"][0]["data"][1]["ipTransitSettings"][
+                "autonomousSystemNumber"
+            ]
+            == "5009"
+        )

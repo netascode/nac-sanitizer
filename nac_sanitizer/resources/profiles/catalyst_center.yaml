@@ -34,3 +34,9 @@ packs:
     paths:
       - "$..siteNameHierarchy"
       - "$..groupNameHierarchy"
+
+  transit_network_names:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.transit_network[*].data[*].name"
