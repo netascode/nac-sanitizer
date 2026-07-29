@@ -34,6 +34,67 @@ packs:
       - "$..site-name"
       - "$..site-id"
 
+  url_filter_patterns:
+    tier: default
+    strategy: token
+    paths:
+      - "$.allow_url_list_policy_object[*].data.entries[*].pattern"
+      - "$.block_url_list_policy_object[*].data.entries[*].pattern"
+
+  configuration_group_names:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.configuration_group[*].data.description"
+
+  user_identity:
+    tier: default
+    strategy: token
+    paths:
+      - "$..owner"
+      - "$..createdBy"
+      - "$..lastUpdatedBy"
+
+  organization_names:
+    tier: default
+    strategy: token
+    paths:
+      - "$..sp-org-name"
+      - "$..tenant-org-name"
+
+  vpn_service_names:
+    tier: optional
+    strategy: token
+    paths:
+      - "$..payload.name"
+      - "$..payload.description"
+      - "$..payload.data.name.value"
+      - "$..payload.data.description.value"
+      - "$..payload.data.entries[*].vpn.value"
+
+  template_definition_values:
+    tier: optional
+    strategy: token
+    paths:
+      - "$..templateDefinition.name.vipValue"
+      - "$..editedTemplateDefinition.name.vipValue"
+      - "$..templateDefinition.description.vipValue"
+      - "$..editedTemplateDefinition.description.vipValue"
+      - "$..templateDefinition.pim.rp-addr.vipValue[*].access-list.vipValue"
+      - "$..editedTemplateDefinition.pim.rp-addr.vipValue[*].access-list.vipValue"
+
+  policy_definition_names:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.custom_control_topology_policy_definition[*].data.name"
+      - "$.traffic_data_policy_definition[*].data.name"
+      - "$.traffic_data_policy_definition[*].data.description"
+      - "$.zone_based_firewall_policy_definition[*].data.name"
+      - "$.zone_based_firewall_policy_definition[*].data.description"
+      - "$.zone_list_policy_object[*].data.name"
+      - "$..sequences[*].sequenceName"
+
   template_names:
     tier: optional
     strategy: token
