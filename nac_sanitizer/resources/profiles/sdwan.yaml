@@ -33,3 +33,18 @@ packs:
       - "$..longitude"
       - "$..site-name"
       - "$..site-id"
+
+  template_names:
+    tier: optional
+    strategy: token
+    paths:
+      - "$..templateName"
+      - "$..templateDescription"
+      - "$..profileName"
+
+  cli_template_configs:
+    tier: optional
+    strategy: token
+    paths:
+      - "$..templateConfiguration"
+      - "$..templateConfigurationEdited"

@@ -68,6 +68,18 @@ class TestProfileRegistry:
         assert len(host_rules) > 0
         assert all(r.tier == "optional" for r in host_rules)
 
+    def test_sdwan_template_names_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("sdwan")
+        template_rules = [r for r in rules if r.category == "TEMPLATE_NAMES"]
+        assert len(template_rules) > 0
+        assert all(r.tier == "optional" for r in template_rules)
+
+    def test_sdwan_cli_template_configs_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("sdwan")
+        cli_rules = [r for r in rules if r.category == "CLI_TEMPLATE_CONFIGS"]
+        assert len(cli_rules) > 0
+        assert all(r.tier == "optional" for r in cli_rules)
+
 
 @pytest.mark.unit
 class TestISEProfileRegistry:
@@ -226,6 +238,159 @@ class TestProfileIntegration:
         assert sanitized["device"]["vipPasskey"] == "admin"
         # IP addresses still default - should be redacted
         assert sanitized["device"]["system-ip"] != "10.1.1.1"
+
+    @staticmethod
+    def _sdwan_template_data() -> dict:
+        return {
+            "feature_device_template": [
+                {
+                    "data": {
+                        "templateId": "fdt-001",
+                        "templateName": "GOLD-BRANCH-WAN-ROUTER",
+                        "templateDescription": "Gold tier branch WAN router template for ACME",
+                        "deviceType": "vedge-cloud",
+                        "deviceRole": "sdwan-edge",
+                        "lastUpdatedBy": "admin@cisco.com",
+                        "lastUpdatedOn": 1779119653498,
+                    },
+                    "endpoint": "/dataservice/template/device/fdt-001",
+                }
+            ],
+            "device": [
+                {
+                    "data": {
+                        "uuid": "dev-001",
+                        "deviceId": "10.255.0.1",
+                        "templateName": "GOLD-BRANCH-WAN-ROUTER",
+                        "host-name": "branch-01",
+                        "system-ip": "10.255.0.1",
+                        "site-id": "100",
+                    },
+                    "endpoint": "/dataservice/device",
+                }
+            ],
+            "feature_templates": [
+                {
+                    "data": {
+                        "templateId": "ft-001",
+                        "templateName": "GOLD-SYSTEM-TEMPLATE",
+                        "templateDescription": "Gold tier system feature template",
+                        "templateType": "cisco_system",
+                        "lastUpdatedBy": "admin",
+                        "templateConfiguration": (
+                            "system\n host-name branch-01\n "
+                            "system-ip 10.255.0.1\n site-id 100\n!"
+                        ),
+                        "templateConfigurationEdited": (
+                            "system\n host-name branch-02\n system-ip 10.255.0.2\n!"
+                        ),
+                    },
+                    "endpoint": "/dataservice/template/feature/ft-001",
+                }
+            ],
+        }
+
+    def test_sdwan_template_names_excluded_by_default(self, tmp_path) -> None:
+        """SD-WAN template_names pack is optional-tier - not applied by default."""
+        data = self._sdwan_template_data()
+        input_file = tmp_path / "sdwan.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["sdwan"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "sdwan.json").read_text())
+        fdt = sanitized["feature_device_template"][0]["data"]
+        assert fdt["templateName"] == "GOLD-BRANCH-WAN-ROUTER"
+        assert (
+            fdt["templateDescription"]
+            == "Gold tier branch WAN router template for ACME"
+        )
+        assert sanitized["device"][0]["data"]["templateName"] == (
+            "GOLD-BRANCH-WAN-ROUTER"
+        )
+        ft = sanitized["feature_templates"][0]["data"]
+        assert ft["templateName"] == "GOLD-SYSTEM-TEMPLATE"
+        assert ft["templateDescription"] == "Gold tier system feature template"
+
+    def test_sdwan_template_names_redacts_when_enabled(self, tmp_path) -> None:
+        """SD-WAN template_names pack redacts templateName/templateDescription/profileName when enabled."""
+        data = self._sdwan_template_data()
+        input_file = tmp_path / "sdwan.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["sdwan"],
+            packs=PackConfig(enable=["template_names"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "sdwan.json").read_text())
+        raw = json.dumps(sanitized)
+        assert "GOLD-BRANCH-WAN-ROUTER" not in raw
+        assert "Gold tier branch WAN router template for ACME" not in raw
+        assert "GOLD-SYSTEM-TEMPLATE" not in raw
+        assert "Gold tier system feature template" not in raw
+
+        fdt = sanitized["feature_device_template"][0]["data"]
+        assert fdt["templateId"] == "fdt-001"
+        assert fdt["deviceType"] == "vedge-cloud"
+        assert fdt["deviceRole"] == "sdwan-edge"
+
+        ft = sanitized["feature_templates"][0]["data"]
+        assert ft["templateId"] == "ft-001"
+        assert ft["templateType"] == "cisco_system"
+
+    def test_sdwan_cli_template_configs_excluded_by_default(self, tmp_path) -> None:
+        """SD-WAN cli_template_configs pack is optional-tier - not applied by default."""
+        data = self._sdwan_template_data()
+        input_file = tmp_path / "sdwan.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["sdwan"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "sdwan.json").read_text())
+        ft = sanitized["feature_templates"][0]["data"]
+        # cli_template_configs pack disabled - the CLI blob is not wholesale
+        # tokenized (embedded IPs are still redacted by the always-on IP
+        # scanner, which is independent of this pack).
+        assert ft["templateConfiguration"].startswith("system\n host-name branch-01\n")
+        assert "site-id 100" in ft["templateConfiguration"]
+        assert ft["templateConfigurationEdited"].startswith(
+            "system\n host-name branch-02\n"
+        )
+
+    def test_sdwan_cli_template_configs_redacts_when_enabled(self, tmp_path) -> None:
+        """SD-WAN cli_template_configs pack redacts CLI blobs when enabled."""
+        data = self._sdwan_template_data()
+        input_file = tmp_path / "sdwan.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["sdwan"],
+            packs=PackConfig(enable=["cli_template_configs"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "sdwan.json").read_text())
+        ft = sanitized["feature_templates"][0]["data"]
+        assert ft["templateConfiguration"] != (
+            "system\n host-name branch-01\n system-ip 10.255.0.1\n site-id 100\n!"
+        )
+        assert ft["templateConfigurationEdited"] != (
+            "system\n host-name branch-02\n system-ip 10.255.0.2\n!"
+        )
+        assert ft["templateId"] == "ft-001"
+        assert ft["templateType"] == "cisco_system"
 
     def test_profiles_list_shows_sdwan(self) -> None:
         """CLI profiles list should show sdwan."""
