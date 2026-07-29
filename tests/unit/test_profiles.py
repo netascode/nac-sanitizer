@@ -803,18 +803,18 @@ class TestProfileIntegration:
         sanitizer.run(input_file, output_dir)
 
         sanitized = json.loads((output_dir / "ise.json").read_text())
-        raw = json.dumps(sanitized)
-
-        # Sensitive names redacted
-        assert "WLC-Admin-Access" not in raw
-        assert "AD-Auth-Rule" not in raw
-        assert "Admin-Priv15-Rule" not in raw
-        assert "Is-Wireless-Controller" not in raw
 
         policy_set = sanitized["device_admin_policy_set"][0]["data"]
         children = sanitized["device_admin_policy_set"][0]["children"]
         authn_rule = children["device_admin_authentication_rule"][0]["data"]["rule"]
         authz_rule = children["device_admin_authorization_rule"][0]["data"]["rule"]
+        condition_entry = sanitized["device_admin_condition"][0]["data"]
+
+        # Sensitive names redacted to deterministic tokens
+        assert policy_set["name"] == "DEVICE_ADMIN_POLICY_NAMES-001"
+        assert condition_entry["name"] == "DEVICE_ADMIN_POLICY_NAMES-002"
+        assert authn_rule["name"] == "DEVICE_ADMIN_POLICY_NAMES-003"
+        assert authz_rule["name"] == "DEVICE_ADMIN_POLICY_NAMES-004"
 
         # Non-sensitive fields preserved
         assert policy_set["id"] == "8d4c8d67-53c2-477a-bd8d-4803f3604529"
@@ -847,30 +847,48 @@ class TestProfileIntegration:
         sanitizer.run(input_file, output_dir)
 
         sanitized = json.loads((output_dir / "ise.json").read_text())
-        raw = json.dumps(sanitized)
-
-        # Values that occur only within a "condition" wrapper are redacted.
-        # (Device Type / DEVICE also appear unwrapped in device_admin_condition,
-        # which this pack intentionally does not target, so they are checked
-        # per-field below rather than via a blanket substring search.)
-        assert "WLC-Controllers" not in raw
-        assert "Building-A" not in raw
-        assert "Network-Admins" not in raw
-        assert "IdentityGroup" not in raw
 
         policy_set = sanitized["device_admin_policy_set"][0]["data"]
         children = sanitized["device_admin_policy_set"][0]["children"]
         authn_rule = children["device_admin_authentication_rule"][0]["data"]["rule"]
         authz_rule = children["device_admin_authorization_rule"][0]["data"]["rule"]
 
-        assert policy_set["condition"]["attributeValue"] != "WLC-Controllers"
-        assert policy_set["condition"]["attributeName"] != "Device Type"
-        assert policy_set["condition"]["dictionaryName"] != "DEVICE"
-        assert authn_rule["condition"]["attributeValue"] != "Building-A"
-        assert authn_rule["condition"]["attributeName"] != "Location"
-        assert authn_rule["condition"]["dictionaryName"] != "DEVICE"
-        assert authz_rule["condition"]["attributeValue"] != "Network-Admins"
-        assert authz_rule["condition"]["dictionaryName"] != "IdentityGroup"
+        # Values that occur only within a "condition" wrapper are redacted to
+        # deterministic tokens. (Device Type / DEVICE also appear unwrapped in
+        # device_admin_condition, which this pack intentionally does not
+        # target, so they are checked per-field below.)
+        assert (
+            policy_set["condition"]["attributeValue"]
+            == "DEVICE_ADMIN_CONDITION_VALUES-001"
+        )
+        assert (
+            policy_set["condition"]["attributeName"]
+            == "DEVICE_ADMIN_CONDITION_VALUES-004"
+        )
+        assert (
+            policy_set["condition"]["dictionaryName"]
+            == "DEVICE_ADMIN_CONDITION_VALUES-007"
+        )
+        assert (
+            authn_rule["condition"]["attributeValue"]
+            == "DEVICE_ADMIN_CONDITION_VALUES-002"
+        )
+        assert (
+            authn_rule["condition"]["attributeName"]
+            == "DEVICE_ADMIN_CONDITION_VALUES-005"
+        )
+        assert (
+            authn_rule["condition"]["dictionaryName"]
+            == "DEVICE_ADMIN_CONDITION_VALUES-007"
+        )
+        assert (
+            authz_rule["condition"]["attributeValue"]
+            == "DEVICE_ADMIN_CONDITION_VALUES-003"
+        )
+        assert (
+            authz_rule["condition"]["dictionaryName"]
+            == "DEVICE_ADMIN_CONDITION_VALUES-008"
+        )
 
         # Non-sensitive fields preserved
         assert policy_set["condition"]["conditionType"] == "ConditionAttributes"
@@ -902,15 +920,14 @@ class TestProfileIntegration:
         sanitizer.run(input_file, output_dir)
 
         sanitized = json.loads((output_dir / "ise.json").read_text())
-        raw = json.dumps(sanitized)
-
-        # Sensitive authorization references redacted
-        assert "Priv15-Shell-Profile" not in raw
-        assert "PermitAll-Commands" not in raw
 
         children = sanitized["device_admin_policy_set"][0]["children"]
         authz_data = children["device_admin_authorization_rule"][0]["data"]
         authz_rule = authz_data["rule"]
+
+        # Sensitive authorization references redacted to deterministic tokens
+        assert authz_data["profile"] == "DEVICE_ADMIN_AUTHZ_REFS-001"
+        assert authz_data["commands"][0] == "DEVICE_ADMIN_AUTHZ_REFS-002"
 
         # Non-sensitive fields preserved
         assert authz_rule["id"] == "f123g456-78hi-90jk-lmno-pqrstuvwxyz"
