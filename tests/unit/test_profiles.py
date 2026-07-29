@@ -272,12 +272,13 @@ class TestProfileIntegration:
         sanitizer.run(input_file, output_dir)
 
         sanitized = json.loads((output_dir / "sdwan.json").read_text())
-        raw = json.dumps(sanitized)
-        # URL patterns should be redacted
-        assert "*.internal.corp.example.com" not in raw
-        assert "sharepoint.example.com" not in raw
-        assert "*.malware-domain.com" not in raw
-        assert "phishing-site.net" not in raw
+        # URL patterns should be redacted to deterministic tokens
+        allow_entries = sanitized["allow_url_list_policy_object"][0]["data"]["entries"]
+        block_entries = sanitized["block_url_list_policy_object"][0]["data"]["entries"]
+        assert allow_entries[0]["pattern"] == "URL_FILTER_PATTERNS-001"
+        assert allow_entries[1]["pattern"] == "URL_FILTER_PATTERNS-002"
+        assert block_entries[0]["pattern"] == "URL_FILTER_PATTERNS-003"
+        assert block_entries[1]["pattern"] == "URL_FILTER_PATTERNS-004"
         # But names, types, and endpoints should be preserved
         assert (
             sanitized["allow_url_list_policy_object"][0]["data"]["name"]
