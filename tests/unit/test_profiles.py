@@ -3688,6 +3688,18 @@ class TestCatalystCenterProfileRegistry:
         assert len(device_desc_rules) > 0
         assert all(r.tier == "optional" for r in device_desc_rules)
 
+    def test_cc_interface_descriptions_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("catalyst_center")
+        desc_rules = [r for r in rules if r.category == "INTERFACE_DESCRIPTIONS"]
+        assert len(desc_rules) > 0
+        assert all(r.tier == "optional" for r in desc_rules)
+
+    def test_cc_fabric_descriptions_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("catalyst_center")
+        fabric_rules = [r for r in rules if r.category == "FABRIC_DESCRIPTIONS"]
+        assert len(fabric_rules) > 0
+        assert all(r.tier == "optional" for r in fabric_rules)
+
     def test_cc_user_pii_pack_is_default_tier(self) -> None:
         rules = ProfileRegistry.load_rules("catalyst_center")
         user_pii_rules = [r for r in rules if r.category == "USER_PII"]
@@ -4441,3 +4453,149 @@ class TestCatalystCenterProfileRegistry:
         mgmt = sanitized["update_device_management_address"][0]["data"][0]
         assert mgmt["description"] == "DEVICE_DESCRIPTIONS-002"
         assert mgmt["deviceId"] == "abc-123"
+
+    @staticmethod
+    def _fabric_data() -> dict:
+        return {
+            "fabric_port_assignments": [
+                {
+                    "data": [
+                        {
+                            "id": "d91d56d8-7c56-435c-b299-ffb00781245f",
+                            "fabricId": "04adc497-1f43-40a1-b7f9-8975d15bcc56",
+                            "networkDeviceId": "b72b53a7-8c0e-45a7-b6f7-c8d011c79edb",
+                            "interfaceName": "GigabitEthernet1/1/2",
+                            "connectedDeviceType": "TRUNKING_DEVICE",
+                            "authenticateTemplateName": "No Authentication",
+                            "interfaceDescription": "JP3-2A-045 / John Smith Desk",
+                        }
+                    ],
+                    "endpoint": "/dna/intent/api/v1/business/sda/port-assignments",
+                }
+            ],
+            "fabric_authentication_profile": [
+                {
+                    "data": [
+                        {
+                            "data": [
+                                {
+                                    "siteNameHierarchy": "Global/US/NYC-HQ",
+                                    "description": "Closed auth profile for employee ports",
+                                    "authenticationOrder": "dot1x",
+                                }
+                            ]
+                        }
+                    ],
+                    "endpoint": "/dna/intent/api/v1/business/sda/authentication-profile",
+                }
+            ],
+            "fabric_virtual_network": [
+                {
+                    "data": [
+                        {
+                            "data": [
+                                {
+                                    "virtualNetworkName": "CORP_VN",
+                                    "description": "Corporate overlay network for employees",
+                                    "scalableGroupNames": [
+                                        "Employees",
+                                        "Contractors",
+                                        "IoT_Devices",
+                                    ],
+                                }
+                            ]
+                        }
+                    ],
+                    "endpoint": "/dna/intent/api/v1/business/sda/virtual-network",
+                }
+            ],
+        }
+
+    def test_cc_interface_descriptions_excluded_by_default(self, tmp_path) -> None:
+        """CC interface_descriptions pack (optional tier) is not applied unless enabled."""
+        data = self._fabric_data()
+        input_file = tmp_path / "cc.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["catalyst_center"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "cc.json").read_text())
+        port = sanitized["fabric_port_assignments"][0]["data"][0]
+        assert port["interfaceDescription"] == "JP3-2A-045 / John Smith Desk"
+
+    def test_cc_interface_descriptions_redacts_when_enabled(self, tmp_path) -> None:
+        """CC interface_descriptions pack redacts interfaceDescription when enabled."""
+        data = self._fabric_data()
+        input_file = tmp_path / "cc.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["catalyst_center"],
+            packs=PackConfig(enable=["interface_descriptions"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "cc.json").read_text())
+        port = sanitized["fabric_port_assignments"][0]["data"][0]
+        assert port["interfaceDescription"] == "INTERFACE_DESCRIPTIONS-001"
+        # Non-sensitive fields preserved
+        assert port["interfaceName"] == "GigabitEthernet1/1/2"
+        assert port["connectedDeviceType"] == "TRUNKING_DEVICE"
+        assert port["authenticateTemplateName"] == "No Authentication"
+
+    def test_cc_fabric_descriptions_excluded_by_default(self, tmp_path) -> None:
+        """CC fabric_descriptions pack (optional tier) is not applied unless enabled."""
+        data = self._fabric_data()
+        input_file = tmp_path / "cc.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["catalyst_center"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "cc.json").read_text())
+        auth_profile = sanitized["fabric_authentication_profile"][0]["data"][0]["data"][
+            0
+        ]
+        assert auth_profile["description"] == "Closed auth profile for employee ports"
+        vn = sanitized["fabric_virtual_network"][0]["data"][0]["data"][0]
+        assert vn["description"] == "Corporate overlay network for employees"
+        assert vn["scalableGroupNames"] == ["Employees", "Contractors", "IoT_Devices"]
+
+    def test_cc_fabric_descriptions_redacts_when_enabled(self, tmp_path) -> None:
+        """CC fabric_descriptions pack redacts fabric auth profile/VN descriptions and scalableGroupNames."""
+        data = self._fabric_data()
+        input_file = tmp_path / "cc.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["catalyst_center"],
+            packs=PackConfig(enable=["fabric_descriptions"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "cc.json").read_text())
+
+        auth_profile = sanitized["fabric_authentication_profile"][0]["data"][0]["data"][
+            0
+        ]
+        assert auth_profile["description"] == "FABRIC_DESCRIPTIONS-001"
+        assert auth_profile["authenticationOrder"] == "dot1x"
+        assert auth_profile["siteNameHierarchy"] == "Global/US/NYC-HQ"
+
+        vn = sanitized["fabric_virtual_network"][0]["data"][0]["data"][0]
+        assert vn["description"] == "FABRIC_DESCRIPTIONS-002"
+        assert vn["scalableGroupNames"] == [
+            "FABRIC_DESCRIPTIONS-003",
+            "FABRIC_DESCRIPTIONS-004",
+            "FABRIC_DESCRIPTIONS-005",
+        ]
+        assert vn["virtualNetworkName"] == "CORP_VN"
