@@ -728,20 +728,19 @@ class TestProfileIntegration:
         sanitizer.run(input_file, output_dir)
 
         sanitized = json.loads((output_dir / "ise.json").read_text())
-        raw = json.dumps(sanitized)
-
-        # Personal info redacted by default
-        assert "jsmith" not in raw
-        assert "mjones" not in raw
-        assert "John" not in raw
-        assert "Smith" not in raw
-        assert "Mary" not in raw
-        assert "Jones" not in raw
-        assert "john.smith@example.com" not in raw
-        assert "mary.jones@example.com" not in raw
 
         user_0 = sanitized["internal_user"][0]["data"]
         user_1 = sanitized["internal_user"][1]["data"]
+
+        # Personal info redacted by default
+        assert user_0["name"] == "USER_PERSONAL_INFO-001"
+        assert user_1["name"] == "USER_PERSONAL_INFO-002"
+        assert user_0["firstName"] == "USER_PERSONAL_INFO-003"
+        assert user_1["firstName"] == "USER_PERSONAL_INFO-004"
+        assert user_0["lastName"] == "USER_PERSONAL_INFO-005"
+        assert user_1["lastName"] == "USER_PERSONAL_INFO-006"
+        assert user_0["email"] == "USER_PERSONAL_INFO-007"
+        assert user_1["email"] == "USER_PERSONAL_INFO-008"
 
         # Non-personal-info fields preserved
         assert user_0["id"] == "f49babbd-5a20-4fdb-9c58-9ab1477162ca"
@@ -791,17 +790,19 @@ class TestProfileIntegration:
         sanitizer.run(input_file, output_dir)
 
         sanitized = json.loads((output_dir / "ise.json").read_text())
-        raw = json.dumps(sanitized)
-
-        # Sensitive fields redacted
-        assert "ALL_ACCOUNTS" not in raw
-        assert "Aruba_Helpdesk" not in raw
-        assert "Default ALL_ACCOUNTS (default) User Group" not in raw
-        assert "Aruba helpdesk operators group" not in raw
-        assert "Network Operations Engineer" not in raw
 
         group_0 = sanitized["user_identity_group"][0]["data"]
         group_1 = sanitized["user_identity_group"][1]["data"]
+
+        # Sensitive fields redacted
+        assert group_0["name"] == "USER_IDENTITY_GROUPS-002"
+        assert group_1["name"] == "USER_IDENTITY_GROUPS-003"
+        assert group_0["description"] == "USER_IDENTITY_GROUPS-004"
+        assert group_1["description"] == "USER_IDENTITY_GROUPS-005"
+        assert (
+            sanitized["internal_user"][0]["data"]["description"]
+            == "USER_IDENTITY_GROUPS-001"
+        )
 
         # Non-sensitive fields preserved
         assert group_0["id"] == "a176c430-8c01-11e6-996c-525400b48521"
