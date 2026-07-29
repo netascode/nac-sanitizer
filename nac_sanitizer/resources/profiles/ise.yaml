@@ -131,3 +131,11 @@ packs:
       - "$.authorization_profile[*].data.description"
       - "$.authorization_profile[*].data.vlan.nameID"
       - "$.authorization_profile[*].data.advancedAttributes[*].rightHandSideAttribueValue.value"
+
+  identity_source_sequences:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.identity_source_sequence[*].data.name"
+      - "$.identity_source_sequence[*].data.description"
+      - "$.identity_source_sequence[*].data.idSeqItem[*].idstore"
