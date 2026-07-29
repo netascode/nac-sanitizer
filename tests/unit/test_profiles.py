@@ -563,11 +563,11 @@ class TestProfileIntegration:
         sanitized = json.loads((output_dir / "ise.json").read_text())
         # identity_sources enabled - names and externalIdentityStoreName should be redacted
         cert1 = sanitized["certificate_authentication_profile"][0]["data"]
-        assert cert1["name"] != "Azure-TLS-Cert-Profile"
-        assert cert1["externalIdentityStoreName"] != "[not applicable]"
+        assert cert1["name"] == "IDENTITY_SOURCES-003"
+        assert cert1["externalIdentityStoreName"] == "IDENTITY_SOURCES-001"
         cert2 = sanitized["certificate_authentication_profile"][1]["data"]
-        assert cert2["name"] != "Corp-Machine-Cert-Profile"
-        assert cert2["externalIdentityStoreName"] != "CORP_AD_wan.example.com"
+        assert cert2["name"] == "IDENTITY_SOURCES-004"
+        assert cert2["externalIdentityStoreName"] == "IDENTITY_SOURCES-002"
         # Non-identity_sources fields should be preserved
         assert cert1["id"] == "167942e0-dbea-11ee-94be-faa732630355"
         assert cert1["description"] == "Azure_TLS_Certificate_Profile"
