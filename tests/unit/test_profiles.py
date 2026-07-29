@@ -4,6 +4,7 @@
 """Tests for product profile loading and integration."""
 
 import json
+import re
 
 import pytest
 
@@ -142,6 +143,18 @@ class TestISEProfileRegistry:
             "$.tacacs_command_set[*].data.name",
             "$.tacacs_command_set[*].data.description",
         }
+
+    def test_ise_endpoint_identities_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("ise")
+        identity_rules = [r for r in rules if r.category == "ENDPOINT_IDENTITIES"]
+        assert len(identity_rules) > 0
+        assert all(r.tier == "optional" for r in identity_rules)
+
+    def test_ise_endpoint_custom_pii_pack_is_default_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("ise")
+        pii_rules = [r for r in rules if r.category == "ENDPOINT_CUSTOM_PII"]
+        assert len(pii_rules) > 0
+        assert all(r.tier == "default" for r in pii_rules)
 
 
 @pytest.mark.unit
@@ -642,6 +655,177 @@ class TestProfileIntegration:
         assert cmd_set_0["permitUnmatched"] is True
         assert cmd_set_1["permitUnmatched"] is False
         assert cmd_set_0["commands"] == {"commandList": []}
+
+    @staticmethod
+    def _endpoint_identity_data() -> dict:
+        return {
+            "endpoint": [
+                {
+                    "data": {
+                        "id": "aabb-ccdd-eeff-0011",
+                        "name": "AA:BB:CC:DD:EE:FF",
+                        "description": "",
+                        "mac": "AA:BB:CC:DD:EE:FF",
+                        "staticProfileAssignment": False,
+                        "identityStore": "Internal Users",
+                        "customAttributes": {
+                            "customAttributes": {
+                                "UserEmail": "jsmith@example.com",
+                                "MDAVCompliant": "Yes",
+                            }
+                        },
+                    },
+                    "endpoint": "/ers/config/endpoint/aabb-ccdd-eeff-0011",
+                },
+                {
+                    "data": {
+                        "id": "1122-3344-5566-7788",
+                        "name": "11:22:33:44:55:66",
+                        "description": "",
+                        "mac": "11:22:33:44:55:66",
+                        "staticProfileAssignment": True,
+                        "identityStore": "",
+                    },
+                    "endpoint": "/ers/config/endpoint/1122-3344-5566-7788",
+                },
+            ],
+            "endpoint_identity_group": [
+                {
+                    "data": {
+                        "id": "a176c430-8c01-11e6-996c-525400b48521",
+                        "name": "Profiled",
+                        "description": "Endpoint Identity Group for profiled endpoints",
+                        "systemDefined": True,
+                        "parent": "NAC Group:NAC:IdentityGroups:Endpoint Identity Groups",
+                    },
+                    "endpoint": "/ers/config/endpointgroup/a176c430-8c01-11e6-996c-525400b48521",
+                },
+                {
+                    "data": {
+                        "id": "b287d541-9d02-22f7-aa7d-636622c49622",
+                        "name": "BYOD-Registered",
+                        "description": "Endpoints registered through BYOD portal",
+                        "systemDefined": False,
+                        "parent": "NAC Group:NAC:IdentityGroups:Endpoint Identity Groups",
+                    },
+                    "endpoint": "/ers/config/endpointgroup/b287d541-9d02-22f7-aa7d-636622c49622",
+                },
+            ],
+        }
+
+    def test_ise_endpoint_custom_pii_redacted_by_default(self, tmp_path) -> None:
+        """ISE endpoint_custom_pii pack (default tier) redacts UserEmail custom attribute."""
+        data = self._endpoint_identity_data()
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["ise"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        raw = json.dumps(sanitized)
+        assert "jsmith@example.com" not in raw
+
+        custom_attrs = sanitized["endpoint"][0]["data"]["customAttributes"][
+            "customAttributes"
+        ]
+        assert custom_attrs["UserEmail"] != "jsmith@example.com"
+        # Non-PII custom attributes preserved
+        assert custom_attrs["MDAVCompliant"] == "Yes"
+
+    def test_ise_endpoint_identities_excluded_by_default(self, tmp_path) -> None:
+        """ISE endpoint_identities pack (optional tier) is not applied unless enabled."""
+        data = self._endpoint_identity_data()
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["ise"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        endpoints = sanitized["endpoint"]
+        assert endpoints[0]["data"]["name"] == "AA:BB:CC:DD:EE:FF"
+        assert endpoints[1]["data"]["name"] == "11:22:33:44:55:66"
+
+        groups = sanitized["endpoint_identity_group"]
+        assert groups[0]["data"]["name"] == "Profiled"
+        assert (
+            groups[0]["data"]["description"]
+            == "Endpoint Identity Group for profiled endpoints"
+        )
+        assert groups[1]["data"]["name"] == "BYOD-Registered"
+        assert (
+            groups[1]["data"]["description"]
+            == "Endpoints registered through BYOD portal"
+        )
+
+    def test_ise_endpoint_identities_redacts_when_enabled(self, tmp_path) -> None:
+        """ISE endpoint_identities pack redacts endpoint/group names when enabled."""
+        data = self._endpoint_identity_data()
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["ise"],
+            packs=PackConfig(enable=["endpoint_identities"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+
+        endpoint_0 = sanitized["endpoint"][0]["data"]
+        endpoint_1 = sanitized["endpoint"][1]["data"]
+        group_0 = sanitized["endpoint_identity_group"][0]["data"]
+        group_1 = sanitized["endpoint_identity_group"][1]["data"]
+
+        # Sensitive fields redacted (name is targeted by the pack; mac is not)
+        assert endpoint_0["name"] != "AA:BB:CC:DD:EE:FF"
+        assert endpoint_1["name"] != "11:22:33:44:55:66"
+        assert group_0["name"] != "Profiled"
+        assert group_1["name"] != "BYOD-Registered"
+        assert (
+            group_0["description"] != "Endpoint Identity Group for profiled endpoints"
+        )
+        assert group_1["description"] != "Endpoints registered through BYOD portal"
+
+        # preserve_format strategy: MAC-formatted names keep their delimiter pattern
+        assert re.fullmatch(
+            r"[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:"
+            r"[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}",
+            endpoint_0["name"],
+        )
+        assert re.fullmatch(
+            r"[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:"
+            r"[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}",
+            endpoint_1["name"],
+        )
+
+        # Non-sensitive fields preserved
+        assert endpoint_0["id"] == "aabb-ccdd-eeff-0011"
+        assert endpoint_0["mac"] == "AA:BB:CC:DD:EE:FF"
+        assert endpoint_0["staticProfileAssignment"] is False
+        assert endpoint_0["identityStore"] == "Internal Users"
+        assert endpoint_1["id"] == "1122-3344-5566-7788"
+        assert endpoint_1["mac"] == "11:22:33:44:55:66"
+        assert endpoint_1["staticProfileAssignment"] is True
+        assert endpoint_1["identityStore"] == ""
+
+        assert group_0["id"] == "a176c430-8c01-11e6-996c-525400b48521"
+        assert group_0["systemDefined"] is True
+        assert (
+            group_0["parent"] == "NAC Group:NAC:IdentityGroups:Endpoint Identity Groups"
+        )
+        assert group_1["id"] == "b287d541-9d02-22f7-aa7d-636622c49622"
+        assert group_1["systemDefined"] is False
+        assert (
+            group_1["parent"] == "NAC Group:NAC:IdentityGroups:Endpoint Identity Groups"
+        )
 
 
 @pytest.mark.unit
