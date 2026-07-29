@@ -143,6 +143,12 @@ class TestISEProfileRegistry:
             "$.tacacs_command_set[*].data.description",
         }
 
+    def test_ise_authorization_profiles_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("ise")
+        authz_rules = [r for r in rules if r.category == "AUTHORIZATION_PROFILES"]
+        assert len(authz_rules) > 0
+        assert all(r.tier == "optional" for r in authz_rules)
+
 
 @pytest.mark.unit
 class TestProfileIntegration:
@@ -642,6 +648,165 @@ class TestProfileIntegration:
         assert cmd_set_0["permitUnmatched"] is True
         assert cmd_set_1["permitUnmatched"] is False
         assert cmd_set_0["commands"] == {"commandList": []}
+
+    def test_ise_authorization_profiles_excluded_by_default(self, tmp_path) -> None:
+        """ISE authorization_profiles pack (optional tier) is not applied unless enabled."""
+        data = {
+            "authorization_profile": [
+                {
+                    "data": {
+                        "id": "a1b2c3d4-1234-5678-abcd-111111111111",
+                        "name": "VLAN1210-Employee-Access",
+                        "description": "Standard employee network access with VLAN 1210",
+                        "accessType": "ACCESS_ACCEPT",
+                        "authzProfileType": "SWITCH",
+                        "vlan": {
+                            "nameID": "EMPLOYEE_VLAN_1210",
+                            "tagID": 1,
+                        },
+                        "trackMovement": False,
+                        "agentlessPosture": False,
+                    },
+                    "endpoint": "/ers/config/authorizationprofile/a1b2c3d4-1234-5678-abcd-111111111111",
+                },
+                {
+                    "data": {
+                        "id": "e5f6g7h8-9012-3456-efgh-222222222222",
+                        "name": "VPN-IPSec-Pool-Profile",
+                        "description": "Remote access VPN authorization",
+                        "accessType": "ACCESS_ACCEPT",
+                        "authzProfileType": "SWITCH",
+                        "advancedAttributes": [
+                            {
+                                "leftHandSideDictionaryAttribue": {
+                                    "AdvancedAttributeValueType": "AdvancedDictionaryAttribute",
+                                    "dictionaryName": "Cisco",
+                                    "attributeName": "cisco-av-pair",
+                                },
+                                "rightHandSideAttribueValue": {
+                                    "AdvancedAttributeValueType": "AttributeValue",
+                                    "value": "ipsec:addr-pool=CORP_VPN_POOL",
+                                },
+                            }
+                        ],
+                        "trackMovement": False,
+                    },
+                    "endpoint": "/ers/config/authorizationprofile/e5f6g7h8-9012-3456-efgh-222222222222",
+                },
+            ]
+        }
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["ise"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        # Optional pack NOT applied by default - sensitive fields preserved
+        profile = sanitized["authorization_profile"][0]["data"]
+        assert profile["name"] == "VLAN1210-Employee-Access"
+        assert (
+            profile["description"] == "Standard employee network access with VLAN 1210"
+        )
+        assert profile["vlan"]["nameID"] == "EMPLOYEE_VLAN_1210"
+
+        profile2 = sanitized["authorization_profile"][1]["data"]
+        assert profile2["name"] == "VPN-IPSec-Pool-Profile"
+        attr = profile2["advancedAttributes"][0]
+        assert (
+            attr["rightHandSideAttribueValue"]["value"]
+            == "ipsec:addr-pool=CORP_VPN_POOL"
+        )
+
+    def test_ise_authorization_profiles_redacts_when_enabled(self, tmp_path) -> None:
+        """ISE authorization_profiles pack redacts names, descriptions, vlan names, and attributes when enabled."""
+        data = {
+            "authorization_profile": [
+                {
+                    "data": {
+                        "id": "a1b2c3d4-1234-5678-abcd-111111111111",
+                        "name": "VLAN1210-Employee-Access",
+                        "description": "Standard employee network access with VLAN 1210",
+                        "accessType": "ACCESS_ACCEPT",
+                        "authzProfileType": "SWITCH",
+                        "vlan": {
+                            "nameID": "EMPLOYEE_VLAN_1210",
+                            "tagID": 1,
+                        },
+                        "trackMovement": False,
+                        "agentlessPosture": False,
+                    },
+                    "endpoint": "/ers/config/authorizationprofile/a1b2c3d4-1234-5678-abcd-111111111111",
+                },
+                {
+                    "data": {
+                        "id": "e5f6g7h8-9012-3456-efgh-222222222222",
+                        "name": "VPN-IPSec-Pool-Profile",
+                        "description": "Remote access VPN authorization",
+                        "accessType": "ACCESS_ACCEPT",
+                        "authzProfileType": "SWITCH",
+                        "advancedAttributes": [
+                            {
+                                "leftHandSideDictionaryAttribue": {
+                                    "AdvancedAttributeValueType": "AdvancedDictionaryAttribute",
+                                    "dictionaryName": "Cisco",
+                                    "attributeName": "cisco-av-pair",
+                                },
+                                "rightHandSideAttribueValue": {
+                                    "AdvancedAttributeValueType": "AttributeValue",
+                                    "value": "ipsec:addr-pool=CORP_VPN_POOL",
+                                },
+                            }
+                        ],
+                        "trackMovement": False,
+                    },
+                    "endpoint": "/ers/config/authorizationprofile/e5f6g7h8-9012-3456-efgh-222222222222",
+                },
+            ]
+        }
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["ise"],
+            packs=PackConfig(enable=["authorization_profiles"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        raw = json.dumps(sanitized)
+
+        # Sensitive fields redacted
+        assert "VLAN1210-Employee-Access" not in raw
+        assert "VPN-IPSec-Pool-Profile" not in raw
+        assert "Standard employee network access with VLAN 1210" not in raw
+        assert "Remote access VPN authorization" not in raw
+        assert "EMPLOYEE_VLAN_1210" not in raw
+        assert "ipsec:addr-pool=CORP_VPN_POOL" not in raw
+
+        profile = sanitized["authorization_profile"][0]["data"]
+        profile2 = sanitized["authorization_profile"][1]["data"]
+        attr = profile2["advancedAttributes"][0]
+
+        # Non-sensitive fields preserved
+        assert profile["id"] == "a1b2c3d4-1234-5678-abcd-111111111111"
+        assert profile["accessType"] == "ACCESS_ACCEPT"
+        assert profile["authzProfileType"] == "SWITCH"
+        assert profile["vlan"]["tagID"] == 1
+        assert profile["trackMovement"] is False
+        assert profile["agentlessPosture"] is False
+
+        assert profile2["id"] == "e5f6g7h8-9012-3456-efgh-222222222222"
+        assert profile2["accessType"] == "ACCESS_ACCEPT"
+        assert profile2["trackMovement"] is False
+        assert (
+            attr["leftHandSideDictionaryAttribue"]["AdvancedAttributeValueType"]
+            == "AdvancedDictionaryAttribute"
+        )
 
 
 @pytest.mark.unit

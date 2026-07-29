@@ -49,3 +49,12 @@ packs:
       - "$.tacacs_profile[*].data.sessionAttributes.sessionAttributeList[*].value"
       - "$.tacacs_command_set[*].data.name"
       - "$.tacacs_command_set[*].data.description"
+
+  authorization_profiles:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.authorization_profile[*].data.name"
+      - "$.authorization_profile[*].data.description"
+      - "$.authorization_profile[*].data.vlan.nameID"
+      - "$.authorization_profile[*].data.advancedAttributes[*].rightHandSideAttribueValue.value"
