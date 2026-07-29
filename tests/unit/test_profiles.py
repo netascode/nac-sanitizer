@@ -789,12 +789,32 @@ class TestProfileIntegration:
         assert "PREFER-MPLS-BKUP-INET" not in raw
         assert "BACKBONE-COMMUNITIES" not in raw
 
-        for key, expected in data.items():
-            for expected_item, actual_item in zip(
-                expected, sanitized[key], strict=True
-            ):
-                assert actual_item["data"]["name"] != expected_item["data"]["name"]
-                assert actual_item["endpoint"] != expected_item["endpoint"]
+        expected_names = {
+            "vpn_list_policy_object": [
+                "POLICY_OBJECT_NAMES-001",
+                "POLICY_OBJECT_NAMES-002",
+            ],
+            "site_list_policy_object": ["POLICY_OBJECT_NAMES-003"],
+            "ipv4_prefix_list_policy_object": ["POLICY_OBJECT_NAMES-004"],
+            "data_ipv4_prefix_list_policy_object": ["POLICY_OBJECT_NAMES-005"],
+            "preferred_color_group_policy_object": ["POLICY_OBJECT_NAMES-006"],
+            "standard_community_list_policy_object": ["POLICY_OBJECT_NAMES-007"],
+        }
+        expected_endpoints = {
+            "vpn_list_policy_object": [
+                "POLICY_OBJECT_NAMES-008",
+                "POLICY_OBJECT_NAMES-009",
+            ],
+            "site_list_policy_object": ["POLICY_OBJECT_NAMES-010"],
+            "ipv4_prefix_list_policy_object": ["POLICY_OBJECT_NAMES-011"],
+            "data_ipv4_prefix_list_policy_object": ["POLICY_OBJECT_NAMES-012"],
+            "preferred_color_group_policy_object": ["POLICY_OBJECT_NAMES-013"],
+            "standard_community_list_policy_object": ["POLICY_OBJECT_NAMES-014"],
+        }
+        for key in data:
+            for i, actual_item in enumerate(sanitized[key]):
+                assert actual_item["data"]["name"] == expected_names[key][i]
+                assert actual_item["endpoint"] == expected_endpoints[key][i]
 
         # Non-sensitive fields preserved
         vpn_0 = sanitized["vpn_list_policy_object"][0]["data"]
