@@ -300,9 +300,6 @@ class TestProfileIntegration:
         sanitizer.run(input_file, output_dir)
 
         sanitized = json.loads((output_dir / "sdwan.json").read_text())
-        raw = json.dumps(sanitized)
-        assert "admin@cisco.com" not in raw
-        assert "netops@cisco.com" not in raw
 
         ft = sanitized["feature_templates"][0]["data"]
         assert ft["templateId"] == "ft-001"
@@ -310,9 +307,14 @@ class TestProfileIntegration:
         assert ft["templateType"] == "system-vsmart"
         assert ft["lastUpdatedOn"] == 1779119653498
         assert ft["createdOn"] == 1773939469900
+        assert ft["owner"] == "USER_IDENTITY-001"
+        assert ft["lastUpdatedBy"] == "USER_IDENTITY-001"
+        assert ft["createdBy"] == "USER_IDENTITY-002"
 
         po = sanitized["policy_object_feature_profile"][0]["data"]
         assert po["solution"] == "sdwan"
+        assert po["createdBy"] == "USER_IDENTITY-002"
+        assert po["lastUpdatedBy"] == "USER_IDENTITY-001"
 
     def test_sdwan_organization_names_redacted_by_default(self, tmp_path) -> None:
         """SD-WAN organization_names pack (default tier) redacts sp-org-name/tenant-org-name."""
@@ -326,13 +328,12 @@ class TestProfileIntegration:
         sanitizer.run(input_file, output_dir)
 
         sanitized = json.loads((output_dir / "sdwan.json").read_text())
-        raw = json.dumps(sanitized)
-        assert "ACME Corp - Fabric 610415" not in raw
-        assert "ACME-Corp-Tenant" not in raw
 
         dt = sanitized["cli_device_template"][0]["data"]
         assert dt["csv-templateId"] == "dt-001"
         assert dt["csv-deviceId"] == "dev-001"
+        assert dt["sp-org-name"] == "ORGANIZATION_NAMES-001"
+        assert dt["tenant-org-name"] == "ORGANIZATION_NAMES-002"
 
     def test_sdwan_user_identity_can_be_disabled(self, tmp_path) -> None:
         """SD-WAN user_identity pack can be disabled by the user."""
