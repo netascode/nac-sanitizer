@@ -68,6 +68,12 @@ class TestProfileRegistry:
         assert len(host_rules) > 0
         assert all(r.tier == "optional" for r in host_rules)
 
+    def test_sdwan_policy_profile_descriptions_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("sdwan")
+        desc_rules = [r for r in rules if r.category == "POLICY_PROFILE_DESCRIPTIONS"]
+        assert len(desc_rules) > 0
+        assert all(r.tier == "optional" for r in desc_rules)
+
 
 @pytest.mark.unit
 class TestISEProfileRegistry:
@@ -226,6 +232,157 @@ class TestProfileIntegration:
         assert sanitized["device"]["vipPasskey"] == "admin"
         # IP addresses still default - should be redacted
         assert sanitized["device"]["system-ip"] != "10.1.1.1"
+
+    def test_sdwan_policy_profile_descriptions_excluded_by_default(
+        self, tmp_path
+    ) -> None:
+        """Profile-level description fields are not redacted unless enabled."""
+        data = {
+            "policy_object_feature_profile": [
+                {
+                    "data": {
+                        "profileId": "po-001",
+                        "profileName": "GLOBAL-POLICY-OBJECTS",
+                        "description": "Global policy objects profile for ACME network",
+                        "profileType": "policy-object",
+                        "solution": "sdwan",
+                        "profileParcelCount": 35,
+                        "createdBy": "admin",
+                        "lastUpdatedBy": "admin",
+                    },
+                    "endpoint": "/dataservice/v1/feature-profile/sdwan/policy-object/po-001",
+                }
+            ],
+            "policy_object_feature_profile_parcels": [
+                {
+                    "data": {
+                        "profileId": "po-001",
+                        "profileName": "GLOBAL-POLICY-OBJECTS",
+                        "description": "Global policy objects for branch security zones",
+                        "profileType": "policy-object",
+                        "solution": "sdwan",
+                        "profileParcelCount": 35,
+                        "associatedProfileParcels": [
+                            {
+                                "parcelId": "parcel-001",
+                                "parcelType": "app-list",
+                                "payload": {
+                                    "name": "box_net_apps",
+                                    "description": "",
+                                },
+                                "referenceCount": 0,
+                            }
+                        ],
+                    },
+                    "endpoint": "/dataservice/v1/feature-profile/sdwan/policy-object/po-001/parcels",
+                }
+            ],
+        }
+        input_file = tmp_path / "sdwan.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["sdwan"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "sdwan.json").read_text())
+        profile = sanitized["policy_object_feature_profile"][0]["data"]
+        parcels = sanitized["policy_object_feature_profile_parcels"][0]["data"]
+        assert (
+            profile["description"] == "Global policy objects profile for ACME network"
+        )
+        assert (
+            parcels["description"] == "Global policy objects for branch security zones"
+        )
+
+    def test_sdwan_policy_profile_descriptions_redacts_when_enabled(
+        self, tmp_path
+    ) -> None:
+        """When enabled, profile-level description fields are redacted."""
+        data = {
+            "policy_object_feature_profile": [
+                {
+                    "data": {
+                        "profileId": "po-001",
+                        "profileName": "GLOBAL-POLICY-OBJECTS",
+                        "description": "Global policy objects profile for ACME network",
+                        "profileType": "policy-object",
+                        "solution": "sdwan",
+                        "profileParcelCount": 35,
+                        "createdBy": "admin",
+                        "lastUpdatedBy": "admin",
+                    },
+                    "endpoint": "/dataservice/v1/feature-profile/sdwan/policy-object/po-001",
+                }
+            ],
+            "policy_object_feature_profile_parcels": [
+                {
+                    "data": {
+                        "profileId": "po-001",
+                        "profileName": "GLOBAL-POLICY-OBJECTS",
+                        "description": "Global policy objects for branch security zones",
+                        "profileType": "policy-object",
+                        "solution": "sdwan",
+                        "profileParcelCount": 35,
+                        "associatedProfileParcels": [
+                            {
+                                "parcelId": "parcel-001",
+                                "parcelType": "app-list",
+                                "payload": {
+                                    "name": "box_net_apps",
+                                    "description": "",
+                                },
+                                "referenceCount": 0,
+                            }
+                        ],
+                    },
+                    "endpoint": "/dataservice/v1/feature-profile/sdwan/policy-object/po-001/parcels",
+                }
+            ],
+        }
+        input_file = tmp_path / "sdwan.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["sdwan"],
+            packs=PackConfig(enable=["policy_profile_descriptions"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "sdwan.json").read_text())
+        profile = sanitized["policy_object_feature_profile"][0]["data"]
+        parcels = sanitized["policy_object_feature_profile_parcels"][0]["data"]
+
+        # description fields redacted
+        assert (
+            profile["description"] != "Global policy objects profile for ACME network"
+        )
+        assert (
+            parcels["description"] != "Global policy objects for branch security zones"
+        )
+
+        # unrelated fields preserved
+        assert profile["profileId"] == "po-001"
+        assert profile["profileName"] == "GLOBAL-POLICY-OBJECTS"
+        assert profile["profileType"] == "policy-object"
+        assert profile["solution"] == "sdwan"
+        assert profile["profileParcelCount"] == 35
+        assert parcels["profileId"] == "po-001"
+        assert parcels["profileName"] == "GLOBAL-POLICY-OBJECTS"
+        assert parcels["profileType"] == "policy-object"
+        assert parcels["solution"] == "sdwan"
+        assert parcels["profileParcelCount"] == 35
+        assert parcels["associatedProfileParcels"] == [
+            {
+                "parcelId": "parcel-001",
+                "parcelType": "app-list",
+                "payload": {"name": "box_net_apps", "description": ""},
+                "referenceCount": 0,
+            }
+        ]
 
     def test_profiles_list_shows_sdwan(self) -> None:
         """CLI profiles list should show sdwan."""
