@@ -994,9 +994,13 @@ class TestCatalystCenterProfileIntegration:
 
         sanitized = json.loads((output_dir / "catalyst_center.json").read_text())
         # Transit network names should be redacted
-        assert sanitized["transit_network"][0]["data"][0]["name"] != "DC-Core-Transit"
         assert (
-            sanitized["transit_network"][0]["data"][1]["name"] != "Campus-Edge-Transit"
+            sanitized["transit_network"][0]["data"][0]["name"]
+            == "TRANSIT_NETWORK_NAMES-001"
+        )
+        assert (
+            sanitized["transit_network"][0]["data"][1]["name"]
+            == "TRANSIT_NETWORK_NAMES-002"
         )
         # But other fields should be preserved
         assert (
