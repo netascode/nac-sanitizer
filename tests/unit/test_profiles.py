@@ -143,6 +143,36 @@ class TestISEProfileRegistry:
             "$.tacacs_command_set[*].data.description",
         }
 
+    def test_ise_network_access_policy_names_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("ise")
+        name_rules = [r for r in rules if r.category == "NETWORK_ACCESS_POLICY_NAMES"]
+        assert len(name_rules) > 0
+        assert all(r.tier == "optional" for r in name_rules)
+        assert all(r.strategy == "token" for r in name_rules)
+
+    def test_ise_network_access_condition_values_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("ise")
+        cond_rules = [
+            r for r in rules if r.category == "NETWORK_ACCESS_CONDITION_VALUES"
+        ]
+        assert len(cond_rules) > 0
+        assert all(r.tier == "optional" for r in cond_rules)
+        assert all(r.strategy == "token" for r in cond_rules)
+
+    def test_ise_network_access_authz_refs_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("ise")
+        authz_rules = [r for r in rules if r.category == "NETWORK_ACCESS_AUTHZ_REFS"]
+        assert len(authz_rules) > 0
+        assert all(r.tier == "optional" for r in authz_rules)
+        assert all(r.strategy == "token" for r in authz_rules)
+
+    def test_ise_network_access_api_links_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("ise")
+        link_rules = [r for r in rules if r.category == "NETWORK_ACCESS_API_LINKS"]
+        assert len(link_rules) > 0
+        assert all(r.tier == "optional" for r in link_rules)
+        assert all(r.strategy == "token" for r in link_rules)
+
 
 @pytest.mark.unit
 class TestProfileIntegration:
@@ -642,6 +672,268 @@ class TestProfileIntegration:
         assert cmd_set_0["permitUnmatched"] is True
         assert cmd_set_1["permitUnmatched"] is False
         assert cmd_set_0["commands"] == {"commandList": []}
+
+    @staticmethod
+    def _network_access_data() -> dict:
+        return {
+            "network_access_policy_set": [
+                {
+                    "data": {
+                        "default": False,
+                        "id": "fe420cc0-d304-4d5f-8b90-b8b68b787821",
+                        "name": "Wired-802.1X-Policy",
+                        "hitCounts": 20185603,
+                        "rank": 0,
+                        "state": "enabled",
+                        "condition": {
+                            "conditionType": "ConditionReference",
+                            "isNegate": False,
+                            "name": "Wired_802.1X",
+                            "id": "9ba56b5f-a361-4b6d-bebc-36f55b0c9942",
+                        },
+                        "serviceName": "Default Network Access",
+                    },
+                    "endpoint": "/api/v1/policy/network-access/policy-set/fe420cc0",
+                    "children": {
+                        "network_access_authentication_rule": [
+                            {
+                                "data": {
+                                    "rule": {
+                                        "default": False,
+                                        "id": "0b4ca6b2-850f-4547-afa2-acb84e0ccfc4",
+                                        "name": "Cert-Based-Auth",
+                                        "hitCounts": 1327805,
+                                        "rank": 0,
+                                        "state": "enabled",
+                                        "condition": {
+                                            "conditionType": "ConditionOrBlock",
+                                            "isNegate": False,
+                                            "children": [
+                                                {
+                                                    "conditionType": "ConditionAttributes",
+                                                    "isNegate": False,
+                                                    "dictionaryName": "CERTIFICATE",
+                                                    "attributeName": "Subject Alternative Name",
+                                                    "operator": "contains",
+                                                    "attributeValue": "ID:Intune:GUID",
+                                                },
+                                                {
+                                                    "conditionType": "ConditionAttributes",
+                                                    "isNegate": False,
+                                                    "dictionaryName": "CERTIFICATE",
+                                                    "attributeName": "Issuer Common Name",
+                                                    "operator": "equals",
+                                                    "attributeValue": "Corp-Internal-CA",
+                                                },
+                                            ],
+                                        },
+                                    },
+                                    "identitySourceName": "Corp-AD-Store",
+                                    "ifAuthFail": "CONTINUE",
+                                    "ifUserNotFound": "CONTINUE",
+                                    "ifProcessFail": "CONTINUE",
+                                },
+                                "endpoint": "/authentication/0b4ca6b2",
+                            }
+                        ],
+                        "network_access_authorization_rule": [
+                            {
+                                "data": {
+                                    "rule": {
+                                        "default": False,
+                                        "id": "auth-rule-001",
+                                        "name": "Employee-Full-Access",
+                                        "hitCounts": 500000,
+                                        "rank": 0,
+                                        "state": "enabled",
+                                        "condition": {
+                                            "conditionType": "ConditionAttributes",
+                                            "isNegate": False,
+                                            "dictionaryName": "IdentityGroup",
+                                            "attributeName": "Name",
+                                            "operator": "equals",
+                                            "attributeValue": "Employee",
+                                        },
+                                    },
+                                    "profile": ["PermitAccess", "VLAN1210-Profile"],
+                                    "securityGroup": "Employees_SGT",
+                                },
+                                "endpoint": "/authorization/auth-rule-001",
+                            }
+                        ],
+                    },
+                }
+            ],
+            "network_access_condition": [
+                {
+                    "data": {
+                        "id": "cond-nac-001",
+                        "name": "Wired_802.1X",
+                        "conditionType": "LibraryConditionAttributes",
+                        "dictionaryName": "Radius",
+                        "attributeName": "Service-Type",
+                        "operator": "equals",
+                        "attributeValue": "Framed",
+                    },
+                    "endpoint": "/api/v1/policy/network-access/condition/cond-nac-001",
+                }
+            ],
+            "network_access_dictionary": [
+                {
+                    "data": {
+                        "id": "dict-001",
+                        "name": "CERTIFICATE",
+                        "description": "Certificate-based authentication attributes",
+                        "version": "1.0",
+                        "dictionaryAttrType": "ENTITY_ATTR",
+                        "link": {
+                            "rel": "self",
+                            "href": "https://10.0.0.140/ers/config/allowedprotocols/dict-001",
+                        },
+                    },
+                    "endpoint": "/api/v1/policy/network-access/dictionaries",
+                }
+            ],
+        }
+
+    def test_ise_network_access_policy_names_excluded_by_default(
+        self, tmp_path
+    ) -> None:
+        """ISE network_access_policy_names pack (optional tier) is not applied by default."""
+        data = self._network_access_data()
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["ise"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        policy_set = sanitized["network_access_policy_set"][0]["data"]
+        assert policy_set["name"] == "Wired-802.1X-Policy"
+        condition = sanitized["network_access_condition"][0]["data"]
+        assert condition["name"] == "Wired_802.1X"
+        dictionary = sanitized["network_access_dictionary"][0]["data"]
+        assert dictionary["name"] == "CERTIFICATE"
+        assert dictionary["description"] == (
+            "Certificate-based authentication attributes"
+        )
+
+    def test_ise_network_access_policy_names_redacts_when_enabled(
+        self, tmp_path
+    ) -> None:
+        """ISE network_access_policy_names pack redacts names when enabled."""
+        data = self._network_access_data()
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["ise"],
+            packs=PackConfig(enable=["network_access_policy_names"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+
+        policy_set = sanitized["network_access_policy_set"][0]["data"]
+        assert policy_set["name"] != "Wired-802.1X-Policy"
+
+        condition = sanitized["network_access_condition"][0]["data"]
+        assert condition["name"] != "Wired_802.1X"
+
+        dictionary = sanitized["network_access_dictionary"][0]["data"]
+        assert dictionary["name"] != "CERTIFICATE"
+        assert dictionary["description"] != (
+            "Certificate-based authentication attributes"
+        )
+
+        # Fields outside the network_access_policy_names pack are untouched,
+        # e.g. the nested policy-set condition's own "name" field (that
+        # belongs to the network_access_condition_values pack instead).
+        assert policy_set["condition"]["name"] == "Wired_802.1X"
+
+        assert policy_set["id"] == "fe420cc0-d304-4d5f-8b90-b8b68b787821"
+        assert policy_set["hitCounts"] == 20185603
+        assert policy_set["state"] == "enabled"
+
+        assert dictionary["id"] == "dict-001"
+        assert dictionary["version"] == "1.0"
+        assert dictionary["dictionaryAttrType"] == "ENTITY_ATTR"
+
+    def test_ise_network_access_condition_values_redacts_when_enabled(
+        self, tmp_path
+    ) -> None:
+        """ISE network_access_condition_values pack redacts condition attribute data."""
+        data = self._network_access_data()
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["ise"],
+            packs=PackConfig(enable=["network_access_condition_values"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        policy_set = sanitized["network_access_policy_set"][0]
+        children = policy_set["children"]
+
+        authz_rule = children["network_access_authorization_rule"][0]["data"]
+        authz_condition = authz_rule["rule"]["condition"]
+        assert authz_condition["attributeValue"] != "Employee"
+        assert authz_condition["attributeName"] != "Name"
+        assert authz_condition["dictionaryName"] != "IdentityGroup"
+        assert authz_condition["conditionType"] == "ConditionAttributes"
+        assert authz_condition["isNegate"] is False
+        assert authz_condition["operator"] == "equals"
+
+        authn_rule = children["network_access_authentication_rule"][0]["data"]
+        cond_children = authn_rule["rule"]["condition"]["children"]
+        assert cond_children[0]["attributeValue"] != "ID:Intune:GUID"
+        assert cond_children[0]["attributeName"] != "Subject Alternative Name"
+        assert cond_children[0]["dictionaryName"] != "CERTIFICATE"
+        assert cond_children[0]["conditionType"] == "ConditionAttributes"
+        assert cond_children[0]["operator"] == "contains"
+        assert cond_children[1]["attributeValue"] != "Corp-Internal-CA"
+        assert cond_children[1]["operator"] == "equals"
+
+    def test_ise_network_access_authz_refs_redacts_when_enabled(self, tmp_path) -> None:
+        """ISE network_access_authz_refs pack redacts profile/SGT/identity source refs."""
+        data = self._network_access_data()
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["ise"],
+            packs=PackConfig(enable=["network_access_authz_refs"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        raw = json.dumps(sanitized)
+
+        assert "PermitAccess" not in raw
+        assert "VLAN1210-Profile" not in raw
+        assert "Employees_SGT" not in raw
+        assert "Corp-AD-Store" not in raw
+
+        children = sanitized["network_access_policy_set"][0]["children"]
+        authz_data = children["network_access_authorization_rule"][0]["data"]
+        rule = authz_data["rule"]
+        assert rule["id"] == "auth-rule-001"
+        assert rule["hitCounts"] == 500000
+
+        authn_data = children["network_access_authentication_rule"][0]["data"]
+        assert authn_data["ifAuthFail"] == "CONTINUE"
+        assert authn_data["ifUserNotFound"] == "CONTINUE"
+        assert authn_data["ifProcessFail"] == "CONTINUE"
 
 
 @pytest.mark.unit

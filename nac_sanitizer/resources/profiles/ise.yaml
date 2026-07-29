@@ -49,3 +49,42 @@ packs:
       - "$.tacacs_profile[*].data.sessionAttributes.sessionAttributeList[*].value"
       - "$.tacacs_command_set[*].data.name"
       - "$.tacacs_command_set[*].data.description"
+
+  network_access_policy_names:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.network_access_policy_set[*].data.name"
+      - "$.network_access_policy_set_update_ranks[*].data.name"
+      - "$.network_access_condition[*].data.name"
+      - "$.network_access_dictionary[*].data.name"
+      - "$.network_access_dictionary[*].data.description"
+
+  network_access_condition_values:
+    tier: optional
+    strategy: token
+    paths:
+      - "$..condition.attributeValue"
+      - "$..condition.attributeName"
+      - "$..condition.dictionaryName"
+      - "$..condition.name"
+      - "$..condition.children[*].attributeValue"
+      - "$..condition.children[*].attributeName"
+      - "$..condition.children[*].dictionaryName"
+      - "$..condition.children[*].name"
+
+  network_access_authz_refs:
+    tier: optional
+    strategy: token
+    paths:
+      - "$..network_access_authorization_rule[*].data.profile[*]"
+      - "$..network_access_authorization_rule_update_ranks[*].data.profile[*]"
+      - "$..network_access_authorization_rule[*].data.securityGroup"
+      - "$..network_access_authorization_rule_update_ranks[*].data.securityGroup"
+      - "$..identitySourceName"
+
+  network_access_api_links:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.network_access_dictionary[*].data.link.href"
