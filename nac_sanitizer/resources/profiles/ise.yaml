@@ -39,6 +39,17 @@ packs:
     paths:
       - "$..domain"
 
+  tacacs_profiles:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.tacacs_profile[*].data.name"
+      - "$.tacacs_profile[*].data.description"
+      - "$.tacacs_profile[*].data.sessionAttributes.sessionAttributeList[*].name"
+      - "$.tacacs_profile[*].data.sessionAttributes.sessionAttributeList[*].value"
+      - "$.tacacs_command_set[*].data.name"
+      - "$.tacacs_command_set[*].data.description"
+
   policy_names:
     tier: optional
     strategy: token
