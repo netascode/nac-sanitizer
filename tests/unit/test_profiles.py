@@ -779,7 +779,7 @@ class TestCatalystCenterProfileIntegration:
 
         sanitized = json.loads((output_dir / "cc.json").read_text())
         port = sanitized["fabric_port_assignments"][0]["data"][0]
-        assert port["interfaceDescription"] != "JP3-2A-045 / John Smith Desk"
+        assert port["interfaceDescription"] == "INTERFACE_DESCRIPTIONS-001"
         # Non-sensitive fields preserved
         assert port["interfaceName"] == "GigabitEthernet1/1/2"
         assert port["connectedDeviceType"] == "TRUNKING_DEVICE"
@@ -820,21 +820,21 @@ class TestCatalystCenterProfileIntegration:
         sanitizer.run(input_file, output_dir)
 
         sanitized = json.loads((output_dir / "cc.json").read_text())
-        raw = json.dumps(sanitized)
-
-        assert "Closed auth profile for employee ports" not in raw
-        assert "Corporate overlay network for employees" not in raw
-        assert "Employees" not in raw
-        assert "Contractors" not in raw
-        assert "IoT_Devices" not in raw
 
         auth_profile = sanitized["fabric_authentication_profile"][0]["data"][0]["data"][
             0
         ]
+        assert auth_profile["description"] == "FABRIC_DESCRIPTIONS-001"
         assert auth_profile["authenticationOrder"] == "dot1x"
         assert auth_profile["siteNameHierarchy"] == "Global/US/NYC-HQ"
 
         vn = sanitized["fabric_virtual_network"][0]["data"][0]["data"][0]
+        assert vn["description"] == "FABRIC_DESCRIPTIONS-002"
+        assert vn["scalableGroupNames"] == [
+            "FABRIC_DESCRIPTIONS-003",
+            "FABRIC_DESCRIPTIONS-004",
+            "FABRIC_DESCRIPTIONS-005",
+        ]
         assert vn["virtualNetworkName"] == "CORP_VN"
 
 
