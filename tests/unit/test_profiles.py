@@ -68,6 +68,12 @@ class TestProfileRegistry:
         assert len(host_rules) > 0
         assert all(r.tier == "optional" for r in host_rules)
 
+    def test_sdwan_policy_definition_names_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("sdwan")
+        policy_rules = [r for r in rules if r.category == "POLICY_DEFINITION_NAMES"]
+        assert len(policy_rules) > 0
+        assert all(r.tier == "optional" for r in policy_rules)
+
 
 @pytest.mark.unit
 class TestISEProfileRegistry:
@@ -237,6 +243,158 @@ class TestProfileIntegration:
         result = runner.invoke(app, ["profiles", "list"])
         assert result.exit_code == 0
         assert "sdwan" in result.output
+
+    @staticmethod
+    def _sdwan_policy_definition_data() -> dict:
+        return {
+            "custom_control_topology_policy_definition": [
+                {
+                    "data": {
+                        "definitionId": "ctrl-001",
+                        "name": "Hub-Spoke-Control",
+                        "type": "control",
+                        "mode": "global",
+                        "optimized": "false",
+                    },
+                    "endpoint": "/template/policy/definition/control/ctrl-001",
+                }
+            ],
+            "traffic_data_policy_definition": [
+                {
+                    "data": {
+                        "definitionId": "td-001",
+                        "name": "CLASSIFIED-TRAFFIC-POLICY",
+                        "type": "data",
+                        "description": "Classified traffic steering policy",
+                        "sequences": [
+                            {
+                                "sequenceId": 1,
+                                "sequenceName": "CLASSIFIED-Traffic",
+                                "baseAction": "accept",
+                                "sequenceType": "data",
+                                "sequenceIpType": "ipv4",
+                                "match": {"entries": []},
+                                "actions": [],
+                            }
+                        ],
+                        "defaultAction": {"type": "accept"},
+                        "lastUpdated": 1774294354326,
+                        "optimized": "false",
+                        "referenceCount": 1,
+                    },
+                    "endpoint": "/template/policy/definition/data/td-001",
+                }
+            ],
+            "zone_based_firewall_policy_definition": [
+                {
+                    "data": {
+                        "definitionId": "fw-001",
+                        "name": "ACME-DIA-FIREWALL",
+                        "type": "zoneBasedFW",
+                        "description": "Direct Internet Access firewall policy for ACME",
+                        "mode": "security",
+                        "optimized": "false",
+                    },
+                    "endpoint": "/template/policy/definition/zonebasedfw/fw-001",
+                }
+            ],
+            "zone_list_policy_object": [
+                {
+                    "data": {
+                        "listId": "zone-001",
+                        "name": "CORP-LAN-ZONE",
+                        "type": "zone",
+                        "entries": [{"vpn": "1100"}],
+                        "lastUpdated": 1774294354326,
+                        "readOnly": False,
+                    },
+                    "endpoint": "/template/policy/list/zone/zone-001",
+                }
+            ],
+        }
+
+    def test_sdwan_policy_definition_names_excluded_by_default(self, tmp_path) -> None:
+        """SD-WAN policy_definition_names pack (optional tier) is not applied unless enabled."""
+        data = self._sdwan_policy_definition_data()
+        input_file = tmp_path / "sdwan.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["sdwan"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "sdwan.json").read_text())
+
+        ctrl = sanitized["custom_control_topology_policy_definition"][0]["data"]
+        assert ctrl["name"] == "Hub-Spoke-Control"
+
+        td = sanitized["traffic_data_policy_definition"][0]["data"]
+        assert td["name"] == "CLASSIFIED-TRAFFIC-POLICY"
+        assert td["description"] == "Classified traffic steering policy"
+        assert td["sequences"][0]["sequenceName"] == "CLASSIFIED-Traffic"
+
+        fw = sanitized["zone_based_firewall_policy_definition"][0]["data"]
+        assert fw["name"] == "ACME-DIA-FIREWALL"
+        assert fw["description"] == "Direct Internet Access firewall policy for ACME"
+
+        zone = sanitized["zone_list_policy_object"][0]["data"]
+        assert zone["name"] == "CORP-LAN-ZONE"
+
+    def test_sdwan_policy_definition_names_redacts_when_enabled(self, tmp_path) -> None:
+        """SD-WAN policy_definition_names pack redacts names/descriptions/sequenceNames when enabled."""
+        data = self._sdwan_policy_definition_data()
+        input_file = tmp_path / "sdwan.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["sdwan"],
+            packs=PackConfig(enable=["policy_definition_names"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "sdwan.json").read_text())
+        raw = json.dumps(sanitized)
+
+        # Sensitive fields redacted
+        assert "Hub-Spoke-Control" not in raw
+        assert "CLASSIFIED-TRAFFIC-POLICY" not in raw
+        assert "Classified traffic steering policy" not in raw
+        assert "CLASSIFIED-Traffic" not in raw
+        assert "ACME-DIA-FIREWALL" not in raw
+        assert "Direct Internet Access firewall policy for ACME" not in raw
+        assert "CORP-LAN-ZONE" not in raw
+
+        ctrl = sanitized["custom_control_topology_policy_definition"][0]["data"]
+        assert ctrl["name"] != "Hub-Spoke-Control"
+        assert ctrl["definitionId"] == "ctrl-001"
+        assert ctrl["type"] == "control"
+        assert ctrl["mode"] == "global"
+        assert ctrl["optimized"] == "false"
+
+        td = sanitized["traffic_data_policy_definition"][0]["data"]
+        assert td["name"] != "CLASSIFIED-TRAFFIC-POLICY"
+        assert td["description"] != "Classified traffic steering policy"
+        seq = td["sequences"][0]
+        assert seq["sequenceName"] != "CLASSIFIED-Traffic"
+        assert seq["sequenceId"] == 1
+        assert seq["baseAction"] == "accept"
+        assert seq["sequenceType"] == "data"
+        assert seq["sequenceIpType"] == "ipv4"
+        assert td["defaultAction"] == {"type": "accept"}
+        assert td["referenceCount"] == 1
+
+        fw = sanitized["zone_based_firewall_policy_definition"][0]["data"]
+        assert fw["name"] != "ACME-DIA-FIREWALL"
+        assert fw["description"] != "Direct Internet Access firewall policy for ACME"
+
+        zone = sanitized["zone_list_policy_object"][0]["data"]
+        assert zone["name"] != "CORP-LAN-ZONE"
+        assert zone["listId"] == "zone-001"
+        assert zone["readOnly"] is False
+        assert zone["entries"] == [{"vpn": "1100"}]
 
     def test_sanitize_with_ise_profile_redacts_credentials(self, tmp_path) -> None:
         """ISE profile default-tier credentials pack redacts RADIUS shared secrets."""

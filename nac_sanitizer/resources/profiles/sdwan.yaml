@@ -33,3 +33,15 @@ packs:
       - "$..longitude"
       - "$..site-name"
       - "$..site-id"
+
+  policy_definition_names:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.custom_control_topology_policy_definition[*].data.name"
+      - "$.traffic_data_policy_definition[*].data.name"
+      - "$.traffic_data_policy_definition[*].data.description"
+      - "$.zone_based_firewall_policy_definition[*].data.name"
+      - "$.zone_based_firewall_policy_definition[*].data.description"
+      - "$.zone_list_policy_object[*].data.name"
+      - "$..sequences[*].sequenceName"
