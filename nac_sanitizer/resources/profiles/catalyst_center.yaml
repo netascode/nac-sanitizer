@@ -34,3 +34,11 @@ packs:
     paths:
       - "$..siteNameHierarchy"
       - "$..groupNameHierarchy"
+
+  authentication_descriptions:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.authentication_policy_server[*].data[*].ciscoIseDtos[*].description"
+      - "$.authentication_policy_server[*].data[*].ciscoIseDtos[*].fqdn"
+      - "$.update_authentication_profile[*].data[*].preAuthAcl.description"

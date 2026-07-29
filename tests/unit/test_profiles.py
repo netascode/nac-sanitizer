@@ -864,3 +864,196 @@ class TestFMCProfileIntegration:
         result = runner.invoke(app, ["profiles", "list"])
         assert result.exit_code == 0
         assert "fmc" in result.output
+
+
+@pytest.mark.unit
+class TestCatalystCenterProfileRegistry:
+    def test_cc_profile_available(self) -> None:
+        available = ProfileRegistry.available()
+        assert "catalyst_center" in available
+
+    def test_load_cc_profile(self) -> None:
+        profile = ProfileRegistry.load("catalyst_center")
+        assert profile["name"] == "catalyst_center"
+        assert "packs" in profile
+
+    def test_cc_rules_have_valid_paths(self) -> None:
+        rules = ProfileRegistry.load_rules("catalyst_center")
+        resolver = PathResolver()
+        for rule in rules:
+            resolver.parse(rule.path)
+
+    def test_cc_rules_have_valid_strategies(self) -> None:
+        valid_strategies = {
+            "token",
+            "ip_map",
+            "hostname_map",
+            "constant",
+            "hash",
+            "preserve_format",
+        }
+        rules = ProfileRegistry.load_rules("catalyst_center")
+        for rule in rules:
+            assert rule.strategy in valid_strategies, (
+                f"Unknown strategy '{rule.strategy}' in path {rule.path}"
+            )
+
+    def test_cc_authentication_descriptions_pack_is_optional_tier(self) -> None:
+        """Load catalyst_center profile, filter by AUTHENTICATION_DESCRIPTIONS category, verify tier is optional."""
+        rules = ProfileRegistry.load_rules("catalyst_center")
+        auth_rules = [r for r in rules if r.category == "AUTHENTICATION_DESCRIPTIONS"]
+        assert len(auth_rules) > 0
+        assert all(r.tier == "optional" for r in auth_rules)
+
+
+@pytest.mark.unit
+class TestCatalystCenterProfileIntegration:
+    def test_cc_authentication_descriptions_excluded_by_default(self, tmp_path) -> None:
+        """With profiles=['catalyst_center'], verify authentication descriptions NOT redacted by default."""
+        data = {
+            "authentication_policy_server": [
+                {
+                    "data": [
+                        {
+                            "ipAddress": "10.0.0.140",
+                            "protocol": "RADI_TACACS",
+                            "role": "primary",
+                            "port": 49,
+                            "isIseEnabled": True,
+                            "ciscoIseDtos": [
+                                {
+                                    "description": "Primary ISE PAN node",
+                                    "fqdn": "ise-pan-01.corp.example.com",
+                                    "ipAddress": "10.0.0.140",
+                                    "subscriberName": "ise-pan-01",
+                                    "userName": "admin",
+                                }
+                            ],
+                            "state": "ACTIVE",
+                        }
+                    ],
+                    "endpoint": "/dna/intent/api/v1/authentication-policy-servers",
+                }
+            ],
+            "update_authentication_profile": [
+                {
+                    "data": [
+                        {
+                            "siteNameHierarchy": "Global/US/Building-A",
+                            "preAuthAcl": {
+                                "description": "Pre-auth ACL for guest captive portal redirect",
+                                "enabled": True,
+                            },
+                            "dot1xToMabFallbackTimeout": 21,
+                        }
+                    ],
+                    "endpoint": "/dna/intent/api/v1/authentication-profile",
+                }
+            ],
+        }
+        input_file = tmp_path / "catalyst_center.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["catalyst_center"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "catalyst_center.json").read_text())
+        # Descriptions and FQDNs should NOT be redacted (optional tier, not enabled)
+        assert (
+            sanitized["authentication_policy_server"][0]["data"][0]["ciscoIseDtos"][0][
+                "description"
+            ]
+            == "Primary ISE PAN node"
+        )
+        assert (
+            sanitized["authentication_policy_server"][0]["data"][0]["ciscoIseDtos"][0][
+                "fqdn"
+            ]
+            == "ise-pan-01.corp.example.com"
+        )
+        assert (
+            sanitized["update_authentication_profile"][0]["data"][0]["preAuthAcl"][
+                "description"
+            ]
+            == "Pre-auth ACL for guest captive portal redirect"
+        )
+
+    def test_cc_authentication_descriptions_redacts_when_enabled(
+        self, tmp_path
+    ) -> None:
+        """With PackConfig(enable=['authentication_descriptions']), verify descriptions/fqdns are redacted but other fields preserved."""
+        data = {
+            "authentication_policy_server": [
+                {
+                    "data": [
+                        {
+                            "ipAddress": "10.0.0.140",
+                            "protocol": "RADI_TACACS",
+                            "role": "primary",
+                            "port": 49,
+                            "isIseEnabled": True,
+                            "ciscoIseDtos": [
+                                {
+                                    "description": "Primary ISE PAN node",
+                                    "fqdn": "ise-pan-01.corp.example.com",
+                                    "ipAddress": "10.0.0.140",
+                                    "subscriberName": "ise-pan-01",
+                                    "userName": "admin",
+                                }
+                            ],
+                            "state": "ACTIVE",
+                        }
+                    ],
+                    "endpoint": "/dna/intent/api/v1/authentication-policy-servers",
+                }
+            ],
+            "update_authentication_profile": [
+                {
+                    "data": [
+                        {
+                            "siteNameHierarchy": "Global/US/Building-A",
+                            "preAuthAcl": {
+                                "description": "Pre-auth ACL for guest captive portal redirect",
+                                "enabled": True,
+                            },
+                            "dot1xToMabFallbackTimeout": 21,
+                        }
+                    ],
+                    "endpoint": "/dna/intent/api/v1/authentication-profile",
+                }
+            ],
+        }
+        input_file = tmp_path / "catalyst_center.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["catalyst_center"],
+            packs=PackConfig(enable=["authentication_descriptions"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "catalyst_center.json").read_text())
+        raw = json.dumps(sanitized)
+
+        # Descriptions and FQDNs should be redacted
+        assert "Primary ISE PAN node" not in raw
+        assert "ise-pan-01.corp.example.com" not in raw
+        assert "Pre-auth ACL for guest captive portal redirect" not in raw
+
+        # But non-sensitive fields should be preserved
+        auth_server = sanitized["authentication_policy_server"][0]["data"][0]
+        assert auth_server["ipAddress"] == "10.0.0.140"
+        assert auth_server["protocol"] == "RADI_TACACS"
+        assert auth_server["role"] == "primary"
+        assert auth_server["port"] == 49
+        assert auth_server["state"] == "ACTIVE"
+        assert auth_server["isIseEnabled"] is True
+
+        auth_profile = sanitized["update_authentication_profile"][0]["data"][0]
+        assert auth_profile["preAuthAcl"]["enabled"] is True
+        assert auth_profile["dot1xToMabFallbackTimeout"] == 21
+        assert auth_profile["siteNameHierarchy"] == "Global/US/Building-A"
