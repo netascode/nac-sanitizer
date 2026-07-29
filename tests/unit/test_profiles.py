@@ -185,6 +185,26 @@ class TestISEProfileRegistry:
         assert len(sxp_rules) > 0
         assert all(r.tier == "optional" for r in sxp_rules)
 
+    def test_ise_device_trustsec_credentials_pack_is_default_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("ise")
+        trustsec_rules = [
+            r for r in rules if r.category == "DEVICE_TRUSTSEC_CREDENTIALS"
+        ]
+        assert len(trustsec_rules) > 0
+        assert all(r.tier == "default" for r in trustsec_rules)
+
+    def test_ise_network_device_names_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("ise")
+        name_rules = [r for r in rules if r.category == "NETWORK_DEVICE_NAMES"]
+        assert len(name_rules) > 0
+        assert all(r.tier == "optional" for r in name_rules)
+
+    def test_ise_network_device_groups_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("ise")
+        group_rules = [r for r in rules if r.category == "NETWORK_DEVICE_GROUPS"]
+        assert len(group_rules) > 0
+        assert all(r.tier == "optional" for r in group_rules)
+
 
 @pytest.mark.unit
 class TestProfileIntegration:
@@ -1511,6 +1531,167 @@ class TestProfileIntegration:
         assert filt["id"] == "25cae136-f670-46bc-8e6f-14badb95b94b"
         assert filt["subnet"] == ""
         assert filt["sgt"] == ""
+
+    @staticmethod
+    def _network_device_fixture() -> dict:
+        """Fixture mirroring real ISE network_device/network_device_group collector output."""
+        return {
+            "network_device": [
+                {
+                    "data": {
+                        "id": "d9c6e490-34b9-11f0-b6a6-96c23bf9c01f",
+                        "name": "core-switch-01.example.com",
+                        "description": "",
+                        "authenticationSettings": {
+                            "networkProtocol": "RADIUS",
+                            "radiusSharedSecret": "RadiusSecret123",
+                        },
+                        "NetworkDeviceGroupList": [
+                            "Location#All Locations#Building-A#Floor-3",
+                            "Device Type#All Device Types#Switch#Catalyst",
+                        ],
+                        "trustsecsettings": {
+                            "sgaNotificationAndUpdates": {
+                                "downlaodEnvironmentDataEveryXSeconds": 86400,
+                                "otherSGADevicesToTrustThisDevice": True,
+                                "sendConfigurationToDevice": True,
+                                "coaSourceHost": "ise-pan-01.corp.local",
+                            },
+                            "deviceConfigurationDeployment": {
+                                "includeWhenDeployingSGTUpdates": True,
+                                "enableModePassword": "En@bl3Secret!",
+                                "execModePassword": "Ex3cSecret!",
+                                "execModeUsername": "ise-deploy-svc",
+                            },
+                        },
+                        "profileName": "Cisco",
+                        "coaPort": 1700,
+                    },
+                    "endpoint": "/ers/config/networkdevice/d9c6e490-34b9-11f0-b6a6-96c23bf9c01f",
+                }
+            ],
+            "network_device_group": [
+                {
+                    "data": {
+                        "id": "394f7b70-08d2-11f0-b6a6-96c23bf9c01f",
+                        "name": "Location#All Locations#Building-A",
+                        "description": "Network Device Group for Building A devices",
+                        "othername": "Location",
+                    },
+                    "endpoint": "/ers/config/networkdevicegroup/394f7b70-08d2-11f0-b6a6-96c23bf9c01f",
+                },
+                {
+                    "data": {
+                        "id": "70c79c30-8bff-11e6-996c-525400b48521",
+                        "name": "Device Type#All Device Types",
+                        "description": "All Device Types",
+                        "othername": "Device Type",
+                    },
+                    "endpoint": "/ers/config/networkdevicegroup/70c79c30-8bff-11e6-996c-525400b48521",
+                },
+            ],
+        }
+
+    def test_ise_trustsec_credentials_redacted_by_default(self, tmp_path) -> None:
+        """TrustSec device deployment credentials are redacted by default (default tier)."""
+        data = self._network_device_fixture()
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["ise"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        raw = json.dumps(sanitized)
+        # TrustSec device deployment credentials redacted
+        assert "En@bl3Secret!" not in raw
+        assert "Ex3cSecret!" not in raw
+        assert "ise-deploy-svc" not in raw
+        # Existing credentials pack still redacts RADIUS shared secret
+        assert "RadiusSecret123" not in raw
+
+        device = sanitized["network_device"][0]["data"]
+        deploy = device["trustsecsettings"]["deviceConfigurationDeployment"]
+        assert deploy["enableModePassword"] == "DEVICE_TRUSTSEC_CREDENTIALS-001"
+        assert deploy["execModePassword"] == "DEVICE_TRUSTSEC_CREDENTIALS-002"
+        assert deploy["execModeUsername"] == "DEVICE_TRUSTSEC_CREDENTIALS-003"
+        # Non-sensitive fields preserved
+        assert device["profileName"] == "Cisco"
+        assert device["coaPort"] == 1700
+        assert deploy["includeWhenDeployingSGTUpdates"] is True
+
+    def test_ise_network_device_names_excluded_by_default(self, tmp_path) -> None:
+        """Device name and CoA source host are optional-tier and untouched by default."""
+        data = self._network_device_fixture()
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["ise"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        device = sanitized["network_device"][0]["data"]
+        assert device["name"] == "core-switch-01.example.com"
+        assert (
+            device["trustsecsettings"]["sgaNotificationAndUpdates"]["coaSourceHost"]
+            == "ise-pan-01.corp.local"
+        )
+
+    def test_ise_network_device_names_redacts_when_enabled(self, tmp_path) -> None:
+        """Enabling network_device_names maps device name and coaSourceHost via hostname_map."""
+        data = self._network_device_fixture()
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["ise"],
+            packs=PackConfig(enable=["network_device_names"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        device = sanitized["network_device"][0]["data"]
+        assert device["name"] == "DEVICE-001"
+        coa_host = device["trustsecsettings"]["sgaNotificationAndUpdates"][
+            "coaSourceHost"
+        ]
+        assert coa_host == "DEVICE-002"
+
+    def test_ise_network_device_groups_redacts_when_enabled(self, tmp_path) -> None:
+        """Enabling network_device_groups redacts group list entries, name, and description."""
+        data = self._network_device_fixture()
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["ise"],
+            packs=PackConfig(enable=["network_device_groups"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        device = sanitized["network_device"][0]["data"]
+        assert device["NetworkDeviceGroupList"] == [
+            "NETWORK_DEVICE_GROUPS-001",
+            "NETWORK_DEVICE_GROUPS-002",
+        ]
+
+        groups = sanitized["network_device_group"]
+        assert groups[0]["data"]["name"] == "NETWORK_DEVICE_GROUPS-003"
+        assert groups[0]["data"]["description"] == "NETWORK_DEVICE_GROUPS-005"
+        # Non-sensitive identifiers preserved
+        assert groups[0]["data"]["id"] == "394f7b70-08d2-11f0-b6a6-96c23bf9c01f"
+        assert groups[0]["data"]["othername"] == "Location"
+        assert groups[1]["data"]["id"] == "70c79c30-8bff-11e6-996c-525400b48521"
+        assert groups[1]["data"]["othername"] == "Device Type"
 
 
 @pytest.mark.unit
