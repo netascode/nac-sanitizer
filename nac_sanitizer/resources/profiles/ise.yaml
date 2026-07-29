@@ -49,3 +49,34 @@ packs:
       - "$.tacacs_profile[*].data.sessionAttributes.sessionAttributeList[*].value"
       - "$.tacacs_command_set[*].data.name"
       - "$.tacacs_command_set[*].data.description"
+
+  device_admin_policy_names:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.device_admin_policy_set[*].data.name"
+      - "$.device_admin_policy_set_update_ranks[*].data.name"
+      - "$.device_admin_condition[*].data.name"
+      - "$..rule.name"
+
+  device_admin_condition_values:
+    tier: optional
+    strategy: token
+    paths:
+      - "$..condition.attributeValue"
+      - "$..condition.attributeName"
+      - "$..condition.dictionaryName"
+      - "$..condition.name"
+      - "$..condition.children[*].attributeValue"
+      - "$..condition.children[*].attributeName"
+      - "$..condition.children[*].dictionaryName"
+      - "$..condition.children[*].name"
+
+  device_admin_authz_refs:
+    tier: optional
+    strategy: token
+    paths:
+      - "$..device_admin_authorization_rule[*].data.profile"
+      - "$..device_admin_authorization_rule_update_ranks[*].data.profile"
+      - "$..device_admin_authorization_rule[*].data.commands[*]"
+      - "$..device_admin_authorization_rule_update_ranks[*].data.commands[*]"

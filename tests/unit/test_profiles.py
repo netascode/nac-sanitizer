@@ -143,6 +143,31 @@ class TestISEProfileRegistry:
             "$.tacacs_command_set[*].data.description",
         }
 
+    def test_ise_device_admin_policy_names_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("ise")
+        policy_name_rules = [
+            r for r in rules if r.category == "DEVICE_ADMIN_POLICY_NAMES"
+        ]
+        assert len(policy_name_rules) > 0
+        assert all(r.tier == "optional" for r in policy_name_rules)
+        assert all(r.strategy == "token" for r in policy_name_rules)
+
+    def test_ise_device_admin_condition_values_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("ise")
+        condition_rules = [
+            r for r in rules if r.category == "DEVICE_ADMIN_CONDITION_VALUES"
+        ]
+        assert len(condition_rules) > 0
+        assert all(r.tier == "optional" for r in condition_rules)
+        assert all(r.strategy == "token" for r in condition_rules)
+
+    def test_ise_device_admin_authz_refs_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("ise")
+        authz_rules = [r for r in rules if r.category == "DEVICE_ADMIN_AUTHZ_REFS"]
+        assert len(authz_rules) > 0
+        assert all(r.tier == "optional" for r in authz_rules)
+        assert all(r.strategy == "token" for r in authz_rules)
+
 
 @pytest.mark.unit
 class TestProfileIntegration:
@@ -642,6 +667,256 @@ class TestProfileIntegration:
         assert cmd_set_0["permitUnmatched"] is True
         assert cmd_set_1["permitUnmatched"] is False
         assert cmd_set_0["commands"] == {"commandList": []}
+
+    @staticmethod
+    def _device_admin_data() -> dict:
+        return {
+            "device_admin_policy_set": [
+                {
+                    "data": {
+                        "default": False,
+                        "id": "8d4c8d67-53c2-477a-bd8d-4803f3604529",
+                        "name": "WLC-Admin-Access",
+                        "hitCounts": 163,
+                        "rank": 0,
+                        "state": "enabled",
+                        "condition": {
+                            "conditionType": "ConditionAttributes",
+                            "isNegate": False,
+                            "dictionaryName": "DEVICE",
+                            "attributeName": "Device Type",
+                            "operator": "equals",
+                            "attributeValue": "WLC-Controllers",
+                        },
+                        "serviceName": "Default Device Admin",
+                    },
+                    "endpoint": "/api/v1/policy/device-admin/policy-set/8d4c8d67",
+                    "children": {
+                        "device_admin_authentication_rule": [
+                            {
+                                "data": {
+                                    "rule": {
+                                        "default": False,
+                                        "id": "e981e926-40e9-43ff-94d2-30fb1e0a7233",
+                                        "name": "AD-Auth-Rule",
+                                        "hitCounts": 91,
+                                        "rank": 0,
+                                        "state": "enabled",
+                                        "condition": {
+                                            "conditionType": "ConditionAttributes",
+                                            "isNegate": False,
+                                            "dictionaryName": "DEVICE",
+                                            "attributeName": "Location",
+                                            "operator": "equals",
+                                            "attributeValue": "Building-A",
+                                        },
+                                    },
+                                    "identitySourceName": "All_User_ID_Stores",
+                                    "ifAuthFail": "REJECT",
+                                    "ifUserNotFound": "REJECT",
+                                    "ifProcessFail": "DROP",
+                                },
+                                "endpoint": "/authentication/e981e926",
+                            }
+                        ],
+                        "device_admin_authorization_rule": [
+                            {
+                                "data": {
+                                    "rule": {
+                                        "default": False,
+                                        "id": "f123g456-78hi-90jk-lmno-pqrstuvwxyz",
+                                        "name": "Admin-Priv15-Rule",
+                                        "hitCounts": 50,
+                                        "rank": 0,
+                                        "state": "enabled",
+                                        "condition": {
+                                            "conditionType": "ConditionAttributes",
+                                            "isNegate": False,
+                                            "dictionaryName": "IdentityGroup",
+                                            "attributeName": "Name",
+                                            "operator": "equals",
+                                            "attributeValue": "Network-Admins",
+                                        },
+                                    },
+                                    "profile": "Priv15-Shell-Profile",
+                                    "commands": ["PermitAll-Commands"],
+                                },
+                                "endpoint": "/authorization/f123g456",
+                            }
+                        ],
+                    },
+                }
+            ],
+            "device_admin_condition": [
+                {
+                    "data": {
+                        "id": "cond-001",
+                        "name": "Is-Wireless-Controller",
+                        "conditionType": "LibraryConditionAttributes",
+                        "dictionaryName": "DEVICE",
+                        "attributeName": "Device Type",
+                        "operator": "equals",
+                        "attributeValue": "Wireless-LAN-Controller",
+                    },
+                    "endpoint": "/api/v1/policy/device-admin/condition/cond-001",
+                }
+            ],
+        }
+
+    def test_ise_device_admin_policy_names_excluded_by_default(self, tmp_path) -> None:
+        """ISE device_admin_policy_names pack (optional tier) is not applied unless enabled."""
+        data = self._device_admin_data()
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["ise"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+
+        policy_set = sanitized["device_admin_policy_set"][0]["data"]
+        assert policy_set["name"] == "WLC-Admin-Access"
+
+        condition = sanitized["device_admin_condition"][0]["data"]
+        assert condition["name"] == "Is-Wireless-Controller"
+
+        children = sanitized["device_admin_policy_set"][0]["children"]
+        authn_rule = children["device_admin_authentication_rule"][0]["data"]["rule"]
+        authz_rule = children["device_admin_authorization_rule"][0]["data"]["rule"]
+        assert authn_rule["name"] == "AD-Auth-Rule"
+        assert authz_rule["name"] == "Admin-Priv15-Rule"
+
+    def test_ise_device_admin_policy_names_redacts_when_enabled(self, tmp_path) -> None:
+        """ISE device_admin_policy_names pack redacts policy set/rule/condition names when enabled."""
+        data = self._device_admin_data()
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["ise"],
+            packs=PackConfig(enable=["device_admin_policy_names"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        raw = json.dumps(sanitized)
+
+        # Sensitive names redacted
+        assert "WLC-Admin-Access" not in raw
+        assert "AD-Auth-Rule" not in raw
+        assert "Admin-Priv15-Rule" not in raw
+        assert "Is-Wireless-Controller" not in raw
+
+        policy_set = sanitized["device_admin_policy_set"][0]["data"]
+        children = sanitized["device_admin_policy_set"][0]["children"]
+        authn_rule = children["device_admin_authentication_rule"][0]["data"]["rule"]
+        authz_rule = children["device_admin_authorization_rule"][0]["data"]["rule"]
+
+        # Non-sensitive fields preserved
+        assert policy_set["id"] == "8d4c8d67-53c2-477a-bd8d-4803f3604529"
+        assert policy_set["hitCounts"] == 163
+        assert policy_set["rank"] == 0
+        assert policy_set["state"] == "enabled"
+        assert policy_set["serviceName"] == "Default Device Admin"
+        assert policy_set["condition"]["operator"] == "equals"
+        assert authn_rule["id"] == "e981e926-40e9-43ff-94d2-30fb1e0a7233"
+        assert authn_rule["hitCounts"] == 91
+        assert authn_rule["state"] == "enabled"
+        assert authz_rule["id"] == "f123g456-78hi-90jk-lmno-pqrstuvwxyz"
+        assert authz_rule["hitCounts"] == 50
+        assert authz_rule["state"] == "enabled"
+
+    def test_ise_device_admin_condition_values_redacts_when_enabled(
+        self, tmp_path
+    ) -> None:
+        """ISE device_admin_condition_values pack redacts condition attributes when enabled."""
+        data = self._device_admin_data()
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["ise"],
+            packs=PackConfig(enable=["device_admin_condition_values"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        raw = json.dumps(sanitized)
+
+        # Values that occur only within a "condition" wrapper are redacted.
+        # (Device Type / DEVICE also appear unwrapped in device_admin_condition,
+        # which this pack intentionally does not target, so they are checked
+        # per-field below rather than via a blanket substring search.)
+        assert "WLC-Controllers" not in raw
+        assert "Building-A" not in raw
+        assert "Network-Admins" not in raw
+        assert "IdentityGroup" not in raw
+
+        policy_set = sanitized["device_admin_policy_set"][0]["data"]
+        children = sanitized["device_admin_policy_set"][0]["children"]
+        authn_rule = children["device_admin_authentication_rule"][0]["data"]["rule"]
+        authz_rule = children["device_admin_authorization_rule"][0]["data"]["rule"]
+
+        assert policy_set["condition"]["attributeValue"] != "WLC-Controllers"
+        assert policy_set["condition"]["attributeName"] != "Device Type"
+        assert policy_set["condition"]["dictionaryName"] != "DEVICE"
+        assert authn_rule["condition"]["attributeValue"] != "Building-A"
+        assert authn_rule["condition"]["attributeName"] != "Location"
+        assert authn_rule["condition"]["dictionaryName"] != "DEVICE"
+        assert authz_rule["condition"]["attributeValue"] != "Network-Admins"
+        assert authz_rule["condition"]["dictionaryName"] != "IdentityGroup"
+
+        # Non-sensitive fields preserved
+        assert policy_set["condition"]["conditionType"] == "ConditionAttributes"
+        assert policy_set["condition"]["isNegate"] is False
+        assert policy_set["condition"]["operator"] == "equals"
+        assert authn_rule["condition"]["conditionType"] == "ConditionAttributes"
+        assert authn_rule["condition"]["isNegate"] is False
+        assert authn_rule["condition"]["operator"] == "equals"
+
+        # device_admin_condition entries are not wrapped in a "condition" key,
+        # so this pack does not touch them.
+        condition_entry = sanitized["device_admin_condition"][0]["data"]
+        assert condition_entry["attributeValue"] == "Wireless-LAN-Controller"
+        assert condition_entry["attributeName"] == "Device Type"
+        assert condition_entry["dictionaryName"] == "DEVICE"
+
+    def test_ise_device_admin_authz_refs_redacts_when_enabled(self, tmp_path) -> None:
+        """ISE device_admin_authz_refs pack redacts authorization profile/commands when enabled."""
+        data = self._device_admin_data()
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["ise"],
+            packs=PackConfig(enable=["device_admin_authz_refs"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+        raw = json.dumps(sanitized)
+
+        # Sensitive authorization references redacted
+        assert "Priv15-Shell-Profile" not in raw
+        assert "PermitAll-Commands" not in raw
+
+        children = sanitized["device_admin_policy_set"][0]["children"]
+        authz_data = children["device_admin_authorization_rule"][0]["data"]
+        authz_rule = authz_data["rule"]
+
+        # Non-sensitive fields preserved
+        assert authz_rule["id"] == "f123g456-78hi-90jk-lmno-pqrstuvwxyz"
+        assert authz_rule["hitCounts"] == 50
+        assert authz_rule["state"] == "enabled"
+        assert authz_rule["name"] == "Admin-Priv15-Rule"
 
 
 @pytest.mark.unit
