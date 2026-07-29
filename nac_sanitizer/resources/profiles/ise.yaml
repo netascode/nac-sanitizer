@@ -39,6 +39,50 @@ packs:
     paths:
       - "$..domain"
 
+  tacacs_profiles:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.tacacs_profile[*].data.name"
+      - "$.tacacs_profile[*].data.description"
+      - "$.tacacs_profile[*].data.sessionAttributes.sessionAttributeList[*].name"
+      - "$.tacacs_profile[*].data.sessionAttributes.sessionAttributeList[*].value"
+      - "$.tacacs_command_set[*].data.name"
+      - "$.tacacs_command_set[*].data.description"
+
+  repository_config:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.repository[*].data.name"
+      - "$.repository[*].data.path"
+
+  policy_names:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.allowed_protocols[*].data.name"
+      - "$.allowed_protocols_tacacs[*].data.name"
+
+  downloadable_acl_names:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.downloadable_acl[*].data.name"
+
+  identity_sources:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.certificate_authentication_profile[*].data.name"
+      - "$..externalIdentityStoreName"
+
+  license_tier_names:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.license_tier_state[*].data[*].name"
+
   security_groups:
     tier: optional
     strategy: token
