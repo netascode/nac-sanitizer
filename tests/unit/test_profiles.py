@@ -5745,3 +5745,236 @@ class TestCatalystCenterIPPoolContextPack:
 
         lan_pool = sanitized["lan_automation"][0]["data"][0]["ipPools"][0]
         assert lan_pool["ipPoolName"] == "IP_POOL_CONTEXT-006"
+
+
+@pytest.mark.unit
+class TestCatalystCenterTemplatePacks:
+    def test_cc_template_content_pack_is_default_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("catalyst_center")
+        content_rules = [r for r in rules if r.category == "TEMPLATE_CONTENT"]
+        assert len(content_rules) > 0
+        assert all(r.tier == "default" for r in content_rules)
+
+    def test_cc_template_authors_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("catalyst_center")
+        author_rules = [r for r in rules if r.category == "TEMPLATE_AUTHORS"]
+        assert len(author_rules) > 0
+        assert all(r.tier == "optional" for r in author_rules)
+
+    def test_cc_template_metadata_pack_is_optional_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("catalyst_center")
+        metadata_rules = [r for r in rules if r.category == "TEMPLATE_METADATA"]
+        assert len(metadata_rules) > 0
+        assert all(r.tier == "optional" for r in metadata_rules)
+
+    @staticmethod
+    def _template_data() -> dict:
+        return {
+            "template": [
+                {
+                    "data": [
+                        {
+                            "id": "tmpl-001",
+                            "name": "Day0-Switch-Config",
+                            "description": "Day zero provisioning for access switches",
+                            "author": "netops-admin@example.com",
+                            "templateContent": (
+                                "hostname {{hostname}}\n"
+                                "interface Vlan1\n"
+                                " ip address {{mgmt_ip}} 255.255.255.0"
+                            ),
+                            "softwareType": "IOS-XE",
+                            "tags": [{"name": "production"}, {"name": "campus"}],
+                            "templateParams": [
+                                {
+                                    "parameterName": "hostname",
+                                    "dataType": "STRING",
+                                    "required": True,
+                                }
+                            ],
+                        }
+                    ],
+                    "endpoint": "/dna/intent/api/v1/template-programmer/template",
+                }
+            ],
+            "project": [
+                {
+                    "data": [
+                        {
+                            "id": "proj-001",
+                            "name": "Campus-Deployment-Project",
+                            "description": "Templates for campus network deployment",
+                            "templates": [
+                                {"name": "Day0-Switch-Config"},
+                                {"name": "Day1-QoS-Policy"},
+                            ],
+                        }
+                    ],
+                    "endpoint": "/dna/intent/api/v1/template-programmer/project",
+                }
+            ],
+            "extended_templates": [
+                {
+                    "data": [
+                        {
+                            "data": [
+                                {
+                                    "id": "ext-001",
+                                    "name": "WLC-Provisioning",
+                                    "description": "Wireless controller setup",
+                                    "versionsInfo": [
+                                        {
+                                            "description": "Initial version",
+                                            "author": "wireless-team@example.com",
+                                            "version": "1",
+                                        }
+                                    ],
+                                    "tags": [{"name": "wireless"}],
+                                }
+                            ]
+                        }
+                    ],
+                    "endpoint": "/dna/intent/api/v1/template-programmer/template",
+                }
+            ],
+            "template_version": [
+                {
+                    "data": [
+                        {
+                            "data": [
+                                {
+                                    "id": "ver-001",
+                                    "name": "Day0-Switch-Config",
+                                    "versionsInfo": [
+                                        {
+                                            "description": "Added QoS parameters",
+                                            "author": "senior-eng@example.com",
+                                            "version": "2",
+                                        }
+                                    ],
+                                    "tags": [{"name": "production"}],
+                                }
+                            ]
+                        }
+                    ],
+                    "endpoint": "/dna/intent/api/v1/template-programmer/template/version",
+                }
+            ],
+        }
+
+    def test_cc_template_content_redacted_by_default(self, tmp_path) -> None:
+        """catalyst_center default-tier template_content pack redacts templateContent."""
+        data = self._template_data()
+        input_file = tmp_path / "cc.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["catalyst_center"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "cc.json").read_text())
+        tmpl = sanitized["template"][0]["data"][0]
+        assert tmpl["templateContent"] == "TEMPLATE_CONTENT-001"
+        assert "{{hostname}}" not in json.dumps(sanitized)
+        # Non-sensitive fields preserved
+        assert tmpl["id"] == "tmpl-001"
+        assert tmpl["softwareType"] == "IOS-XE"
+        assert tmpl["templateParams"] == [
+            {"parameterName": "hostname", "dataType": "STRING", "required": True}
+        ]
+
+    def test_cc_template_authors_excluded_by_default(self, tmp_path) -> None:
+        """catalyst_center optional-tier template_authors pack is not applied by default."""
+        data = self._template_data()
+        input_file = tmp_path / "cc.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["catalyst_center"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "cc.json").read_text())
+        tmpl = sanitized["template"][0]["data"][0]
+        assert tmpl["author"] == "netops-admin@example.com"
+
+    def test_cc_template_authors_redacts_when_enabled(self, tmp_path) -> None:
+        """catalyst_center template_authors pack redacts author fields when enabled."""
+        data = self._template_data()
+        input_file = tmp_path / "cc.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["catalyst_center"],
+            packs=PackConfig(enable=["template_authors"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "cc.json").read_text())
+        raw = json.dumps(sanitized)
+        assert "netops-admin@example.com" not in raw
+        assert "wireless-team@example.com" not in raw
+        assert "senior-eng@example.com" not in raw
+
+        tmpl = sanitized["template"][0]["data"][0]
+        assert tmpl["author"] == "TEMPLATE_AUTHORS-001"
+
+        ext_versions_info = sanitized["extended_templates"][0]["data"][0]["data"][0][
+            "versionsInfo"
+        ][0]
+        ver_versions_info = sanitized["template_version"][0]["data"][0]["data"][0][
+            "versionsInfo"
+        ][0]
+        assert ext_versions_info["author"] == "TEMPLATE_AUTHORS-002"
+        assert ver_versions_info["author"] == "TEMPLATE_AUTHORS-003"
+        # Non-sensitive version field preserved
+        assert ext_versions_info["version"] == "1"
+        assert ver_versions_info["version"] == "2"
+
+    def test_cc_template_metadata_redacts_when_enabled(self, tmp_path) -> None:
+        """catalyst_center template_metadata pack redacts names/descriptions/tags when enabled."""
+        data = self._template_data()
+        input_file = tmp_path / "cc.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["catalyst_center"],
+            packs=PackConfig(enable=["template_metadata"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "cc.json").read_text())
+        raw = json.dumps(sanitized)
+
+        assert "Day0-Switch-Config" not in raw
+        assert "Day1-QoS-Policy" not in raw
+        assert "Day zero provisioning for access switches" not in raw
+        assert "Campus-Deployment-Project" not in raw
+        assert "Templates for campus network deployment" not in raw
+
+        tmpl = sanitized["template"][0]["data"][0]
+        proj = sanitized["project"][0]["data"][0]
+
+        assert tmpl["name"] == "TEMPLATE_METADATA-001"
+        assert tmpl["description"] == "TEMPLATE_METADATA-002"
+        assert tmpl["tags"] == [
+            {"name": "TEMPLATE_METADATA-003"},
+            {"name": "TEMPLATE_METADATA-004"},
+        ]
+        assert proj["name"] == "TEMPLATE_METADATA-010"
+        assert proj["description"] == "TEMPLATE_METADATA-011"
+        assert proj["templates"] == [
+            {"name": "TEMPLATE_METADATA-001"},
+            {"name": "TEMPLATE_METADATA-012"},
+        ]
+
+        # Non-sensitive fields preserved
+        assert tmpl["id"] == "tmpl-001"
+        assert tmpl["softwareType"] == "IOS-XE"
+        assert tmpl["templateParams"][0]["parameterName"] == "hostname"
+        assert proj["id"] == "proj-001"

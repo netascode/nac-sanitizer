@@ -166,3 +166,34 @@ packs:
       - "$.ip_pool_reservation[*].data[*].ipPools[*].ipPoolName"
       - "$.ip_pools[*].data[*].name"
       - "$.lan_automation[*].data[*].ipPools[*].ipPoolName"
+
+  template_content:
+    tier: default
+    strategy: token
+    paths:
+      - "$..templateContent"
+
+  template_authors:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.template[*].data[*].author"
+      - "$..versionsInfo[*].author"
+
+  template_metadata:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.template[*].data[*].name"
+      - "$.template[*].data[*].description"
+      - "$.template[*].data[*].tags[*].name"
+      - "$.extended_templates[*].data[*].data[*].name"
+      - "$.extended_templates[*].data[*].data[*].description"
+      - "$.extended_templates[*].data[*].data[*].versionsInfo[*].description"
+      - "$.extended_templates[*].data[*].data[*].tags[*].name"
+      - "$.template_version[*].data[*].data[*].name"
+      - "$.template_version[*].data[*].data[*].versionsInfo[*].description"
+      - "$.template_version[*].data[*].data[*].tags[*].name"
+      - "$.project[*].data[*].name"
+      - "$.project[*].data[*].description"
+      - "$.project[*].data[*].templates[*].name"
