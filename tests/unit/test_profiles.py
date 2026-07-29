@@ -368,17 +368,17 @@ class TestProfileIntegration:
         assert "CORP-LAN-ZONE" not in raw
 
         ctrl = sanitized["custom_control_topology_policy_definition"][0]["data"]
-        assert ctrl["name"] != "Hub-Spoke-Control"
+        assert ctrl["name"] == "POLICY_DEFINITION_NAMES-001"
         assert ctrl["definitionId"] == "ctrl-001"
         assert ctrl["type"] == "control"
         assert ctrl["mode"] == "global"
         assert ctrl["optimized"] == "false"
 
         td = sanitized["traffic_data_policy_definition"][0]["data"]
-        assert td["name"] != "CLASSIFIED-TRAFFIC-POLICY"
-        assert td["description"] != "Classified traffic steering policy"
+        assert td["name"] == "POLICY_DEFINITION_NAMES-002"
+        assert td["description"] == "POLICY_DEFINITION_NAMES-003"
         seq = td["sequences"][0]
-        assert seq["sequenceName"] != "CLASSIFIED-Traffic"
+        assert seq["sequenceName"] == "POLICY_DEFINITION_NAMES-007"
         assert seq["sequenceId"] == 1
         assert seq["baseAction"] == "accept"
         assert seq["sequenceType"] == "data"
@@ -387,11 +387,11 @@ class TestProfileIntegration:
         assert td["referenceCount"] == 1
 
         fw = sanitized["zone_based_firewall_policy_definition"][0]["data"]
-        assert fw["name"] != "ACME-DIA-FIREWALL"
-        assert fw["description"] != "Direct Internet Access firewall policy for ACME"
+        assert fw["name"] == "POLICY_DEFINITION_NAMES-004"
+        assert fw["description"] == "POLICY_DEFINITION_NAMES-005"
 
         zone = sanitized["zone_list_policy_object"][0]["data"]
-        assert zone["name"] != "CORP-LAN-ZONE"
+        assert zone["name"] == "POLICY_DEFINITION_NAMES-006"
         assert zone["listId"] == "zone-001"
         assert zone["readOnly"] is False
         assert zone["entries"] == [{"vpn": "1100"}]
