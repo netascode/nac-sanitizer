@@ -554,8 +554,14 @@ class TestProfileIntegration:
 
         sanitized = json.loads((output_dir / "ise.json").read_text())
         # Names should be redacted when enabled
-        assert sanitized["downloadable_acl"][0]["data"]["name"] != "DENY_ALL_IPV4"
-        assert sanitized["downloadable_acl"][1]["data"]["name"] != "QUARANTINE_ACL"
+        assert (
+            sanitized["downloadable_acl"][0]["data"]["name"]
+            == "DOWNLOADABLE_ACL_NAMES-001"
+        )
+        assert (
+            sanitized["downloadable_acl"][1]["data"]["name"]
+            == "DOWNLOADABLE_ACL_NAMES-002"
+        )
         # Other sensitive fields should NOT be redacted (id, description, dacl, daclType)
         assert (
             sanitized["downloadable_acl"][0]["data"]["id"]
