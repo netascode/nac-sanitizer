@@ -2080,3 +2080,183 @@ class TestFMCProfileIntegration:
         result = runner.invoke(app, ["profiles", "list"])
         assert result.exit_code == 0
         assert "fmc" in result.output
+
+
+@pytest.mark.unit
+class TestCatalystCenterProfileRegistry:
+    def test_cc_profile_available(self) -> None:
+        available = ProfileRegistry.available()
+        assert "catalyst_center" in available
+
+    def test_load_cc_profile(self) -> None:
+        profile = ProfileRegistry.load("catalyst_center")
+        assert profile["name"] == "catalyst_center"
+        assert "packs" in profile
+
+    def test_cc_rules_have_valid_paths(self) -> None:
+        rules = ProfileRegistry.load_rules("catalyst_center")
+        resolver = PathResolver()
+        for rule in rules:
+            resolver.parse(rule.path)
+
+    def test_cc_rules_have_valid_strategies(self) -> None:
+        valid_strategies = {
+            "token",
+            "ip_map",
+            "hostname_map",
+            "constant",
+            "hash",
+            "preserve_format",
+        }
+        rules = ProfileRegistry.load_rules("catalyst_center")
+        for rule in rules:
+            assert rule.strategy in valid_strategies, (
+                f"Unknown strategy '{rule.strategy}' in path {rule.path}"
+            )
+
+    def test_cc_credential_descriptions_pack_is_default_tier(self) -> None:
+        rules = ProfileRegistry.load_rules("catalyst_center")
+        cred_desc_rules = [r for r in rules if r.category == "CREDENTIAL_DESCRIPTIONS"]
+        assert len(cred_desc_rules) > 0
+        assert all(r.tier == "default" for r in cred_desc_rules)
+
+    def test_cc_credential_descriptions_redacted_by_default(self, tmp_path) -> None:
+        """Default tier credential_descriptions pack redacts descriptions in all credential types."""
+        data = {
+            "credentials_cli": [
+                {
+                    "data": [
+                        {
+                            "cliCredential": [
+                                {
+                                    "password": "secret123",
+                                    "username": "netadmin",
+                                    "enablePassword": "enable123",
+                                    "description": "Primary network device CLI access for Building A switches",
+                                    "instanceUuid": "1a8f70b3-984d-438e-896e-2bb199040427",
+                                    "id": "1a8f70b3-984d-438e-896e-2bb199040427",
+                                }
+                            ],
+                            "snmpV3": [
+                                {
+                                    "username": "snmpuser",
+                                    "authPassword": "authpass",
+                                    "authType": "SHA",
+                                    "privacyPassword": "privpass",
+                                    "privacyType": "AES128",
+                                    "snmpMode": "AUTHPRIV",
+                                    "description": "SNMPv3 credentials for core infrastructure monitoring",
+                                    "instanceUuid": "63cd4759-5b92-4195-b96e-c64661a8152d",
+                                    "id": "63cd4759-5b92-4195-b96e-c64661a8152d",
+                                }
+                            ],
+                            "netconfCredential": [
+                                {
+                                    "netconfPort": "830",
+                                    "description": "NETCONF access for automated config management",
+                                    "instanceUuid": "caeb7cae-8329-4bad-b49b-d1a7e0b25eeb",
+                                    "id": "caeb7cae-8329-4bad-b49b-d1a7e0b25eeb",
+                                }
+                            ],
+                        }
+                    ],
+                    "endpoint": "/dna/intent/api/v2/global-credential",
+                }
+            ]
+        }
+        input_file = tmp_path / "cc.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["catalyst_center"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "cc.json").read_text())
+
+        # Descriptions should be redacted (default tier)
+        cred_data = sanitized["credentials_cli"][0]["data"][0]
+        assert (
+            cred_data["cliCredential"][0]["description"]
+            == "CREDENTIAL_DESCRIPTIONS-001"
+        )
+        assert cred_data["snmpV3"][0]["description"] == "CREDENTIAL_DESCRIPTIONS-002"
+        assert (
+            cred_data["netconfCredential"][0]["description"]
+            == "CREDENTIAL_DESCRIPTIONS-003"
+        )
+
+        # Non-sensitive fields should be preserved
+        assert (
+            cred_data["cliCredential"][0]["instanceUuid"]
+            == "1a8f70b3-984d-438e-896e-2bb199040427"
+        )
+        assert (
+            cred_data["cliCredential"][0]["id"]
+            == "1a8f70b3-984d-438e-896e-2bb199040427"
+        )
+        assert cred_data["snmpV3"][0]["authType"] == "SHA"
+        assert cred_data["snmpV3"][0]["snmpMode"] == "AUTHPRIV"
+        assert cred_data["netconfCredential"][0]["netconfPort"] == "830"
+
+    def test_cc_credential_descriptions_can_be_disabled(self, tmp_path) -> None:
+        """credential_descriptions pack can be disabled to preserve descriptions."""
+        data = {
+            "credentials_cli": [
+                {
+                    "data": [
+                        {
+                            "cliCredential": [
+                                {
+                                    "password": "secret123",
+                                    "username": "netadmin",
+                                    "description": "Primary network device CLI access for Building A switches",
+                                    "instanceUuid": "1a8f70b3-984d-438e-896e-2bb199040427",
+                                }
+                            ],
+                            "snmpV3": [
+                                {
+                                    "username": "snmpuser",
+                                    "description": "SNMPv3 credentials for core infrastructure monitoring",
+                                    "instanceUuid": "63cd4759-5b92-4195-b96e-c64661a8152d",
+                                }
+                            ],
+                            "netconfCredential": [
+                                {
+                                    "description": "NETCONF access for automated config management",
+                                    "instanceUuid": "caeb7cae-8329-4bad-b49b-d1a7e0b25eeb",
+                                }
+                            ],
+                        }
+                    ],
+                    "endpoint": "/dna/intent/api/v2/global-credential",
+                }
+            ]
+        }
+        input_file = tmp_path / "cc.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["catalyst_center"],
+            packs=PackConfig(disable=["credential_descriptions"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "cc.json").read_text())
+
+        # Descriptions should NOT be redacted when disabled
+        cred_data = sanitized["credentials_cli"][0]["data"][0]
+        assert (
+            cred_data["cliCredential"][0]["description"]
+            == "Primary network device CLI access for Building A switches"
+        )
+        assert (
+            cred_data["snmpV3"][0]["description"]
+            == "SNMPv3 credentials for core infrastructure monitoring"
+        )
+        assert (
+            cred_data["netconfCredential"][0]["description"]
+            == "NETCONF access for automated config management"
+        )
