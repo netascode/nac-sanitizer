@@ -56,6 +56,7 @@ packs:
     paths:
       - "$.repository[*].data.name"
       - "$.repository[*].data.path"
+      - "$.repository[*].data.userName"
 
   policy_names:
     tier: optional
@@ -146,6 +147,7 @@ packs:
     paths:
       - "$.active_directory_join_point[*].data.name"
       - "$.active_directory_join_point[*].data.adgroups.groups[*].name"
+      - "$.active_directory_join_point[*].data.domain"
 
   personal_info:
     tier: default
@@ -225,6 +227,8 @@ packs:
       - "$.network_access_condition[*].data.name"
       - "$.network_access_dictionary[*].data.name"
       - "$.network_access_dictionary[*].data.description"
+      - "$.network_access_authorization_global_exception_rule[*].data.rule.name"
+      - "$.network_access_authorization_global_exception_rule_update_ranks[*].data.rule.name"
 
   network_access_condition_values:
     tier: optional

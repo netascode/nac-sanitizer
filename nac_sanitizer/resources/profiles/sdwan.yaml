@@ -116,6 +116,17 @@ packs:
     paths:
       - "$.policy_object_feature_profile[*].data.description"
       - "$.policy_object_feature_profile_parcels[*].data.description"
+  
+  feature_profile_names:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.transport_feature_profile[*].data.profileName"
+      - "$.topology_feature_profile[*].data.profileName"
+      - "$.system_feature_profile[*].data.profileName"
+      - "$.service_feature_profile[*].data.profileName"
+      - "$.other_feature_profile[*].data.profileName"
+      - "$.application_priority_feature_profile[*].data.profileName"
 
   policy_object_names:
     tier: optional
@@ -133,3 +144,5 @@ packs:
       - "$.data_ipv4_prefix_list_policy_object[*].endpoint"
       - "$.preferred_color_group_policy_object[*].endpoint"
       - "$.standard_community_list_policy_object[*].endpoint"
+      - "$.policy_group[*].data.name"
+      - "$.policy_group[*].data.profiles[*].name"
