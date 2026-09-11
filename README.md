@@ -17,6 +17,23 @@ Or with pip:
 pip install git+https://github.com/netascode/nac-sanitizer.git
 ```
 
+### Standalone binaries (no Python required)
+
+Pre-built binaries for Linux and Windows are attached to each [GitHub Release](https://github.com/netascode/nac-sanitizer/releases). These are self-contained executables with the Python runtime and all dependencies bundled in — ideal for airgapped environments or machines without Python.
+
+```bash
+# Linux
+curl -LO https://github.com/netascode/nac-sanitizer/releases/latest/download/nac-sanitizer-linux-amd64
+chmod +x nac-sanitizer-linux-amd64
+./nac-sanitizer-linux-amd64 --version
+```
+
+```powershell
+# Windows (PowerShell)
+Invoke-WebRequest -Uri https://github.com/netascode/nac-sanitizer/releases/latest/download/nac-sanitizer-windows-amd64.exe -OutFile nac-sanitizer.exe
+.\nac-sanitizer.exe --version
+```
+
 ## Updating
 
 ```bash
