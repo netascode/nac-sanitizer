@@ -6,7 +6,7 @@
 import json
 import os
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from nac_sanitizer.constants import DEFAULT_ROSETTA_PERMISSIONS, ROSETTA_FILENAME_PREFIX
@@ -22,7 +22,7 @@ class RosettaWriter:
     _created_at: datetime = field(init=False)
 
     def __post_init__(self) -> None:
-        self._created_at = datetime.now(UTC)
+        self._created_at = datetime.now(timezone.utc)
 
     def record(self, original: str, sanitized: str, category: str | None) -> None:
         """Record a single original-to-sanitized mapping."""
