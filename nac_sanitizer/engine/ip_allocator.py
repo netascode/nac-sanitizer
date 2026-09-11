@@ -98,7 +98,7 @@ class IPAllocator:
         else:
             result = self._allocate_host(value)
 
-        logger.debug("Allocated %s → %s", value, result)
+        logger.debug("Allocated %s -> %s", value, result)
         self._host_map[value] = result
         return result
 

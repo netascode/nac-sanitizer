@@ -164,7 +164,7 @@ class IPScanner:
         except ValueError:
             logger.debug("IP allocation failed for '%s', keeping original", value)
             return value
-        logger.debug("Redacted IP: %s → %s", value, sanitized)
+        logger.debug("Redacted IP: %s -> %s", value, sanitized)
         self._mappings[value] = sanitized
         return sanitized
 
