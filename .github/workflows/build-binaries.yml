@@ -1,5 +1,6 @@
 name: Build Binaries
 
+# Supports manual trigger for testing and tag-based trigger for releases
 on:
   workflow_dispatch:
   push:
