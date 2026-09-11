@@ -42,7 +42,7 @@ jobs:
         run: uv sync --group dev
 
       - name: Verify version file was generated
-        run: uv run python -c "from nac_sanitizer import __version__; print(f'Version: {__version__}')"
+        run: uv run python -c "from nac_sanitizer import __version__; print(__version__)"
 
       - name: Build binary
         run: uv run pyinstaller nac-sanitizer.spec --noconfirm
