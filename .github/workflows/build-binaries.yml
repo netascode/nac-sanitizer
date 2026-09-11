@@ -1,0 +1,102 @@
+name: Build Binaries
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.os-label }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            os-label: Linux
+            artifact-name: nac-sanitizer-linux-amd64
+            binary-name: nac-sanitizer
+          - os: windows-latest
+            os-label: Windows
+            artifact-name: nac-sanitizer-windows-amd64.exe
+            binary-name: nac-sanitizer.exe
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Set up Python
+        run: uv python install 3.10
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Verify version file was generated
+        run: uv run python -c "from nac_sanitizer import __version__; print(f'Version: {__version__}')"
+
+      - name: Build binary
+        run: uv run pyinstaller nac-sanitizer.spec --noconfirm
+
+      - name: Verify binary runs (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          chmod +x dist/nac-sanitizer
+          dist/nac-sanitizer --version
+          dist/nac-sanitizer profiles list
+
+      - name: Verify binary runs (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          dist\nac-sanitizer.exe --version
+          dist\nac-sanitizer.exe profiles list
+
+      - name: Rename artifact
+        shell: bash
+        run: mv "dist/${{ matrix.binary-name }}" "dist/${{ matrix.artifact-name }}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.artifact-name }}
+          path: dist/${{ matrix.artifact-name }}
+
+  release:
+    name: Attach binaries to release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v7
+        with:
+          path: binaries
+          merge-multiple: true
+
+      - name: List artifacts
+        run: find binaries -type f | sort
+
+      - name: Attach binaries to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          # Wait for the release to exist (created by release.yml)
+          for i in $(seq 1 30); do
+            if gh release view "$tag" > /dev/null 2>&1; then
+              break
+            fi
+            echo "Waiting for release $tag to be created... (attempt $i)"
+            sleep 10
+          done
+          gh release upload "$tag" binaries/* --clobber
