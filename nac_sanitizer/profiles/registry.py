@@ -34,7 +34,7 @@ class ProfileRegistry:
         profile_file = resources.joinpath(f"{name}.yaml")
 
         try:
-            content = profile_file.read_text()
+            content = profile_file.read_text(encoding="utf-8")
         except (FileNotFoundError, TypeError) as e:
             available = ", ".join(ProfileRegistry.available())
             raise ProfileNotFoundError(
