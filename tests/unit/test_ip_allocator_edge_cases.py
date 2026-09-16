@@ -87,7 +87,9 @@ class TestOverlappingOriginalSubnets:
 
     def test_supernet_and_subnet_get_separate_allocations(self, allocator) -> None:
         """10.0.0.0/8 and 10.1.0.0/24 are overlapping in original space
-        but should each get their own sanitized allocation."""
+        but should each get their own sanitized allocation.
+        Note: 10.0.0.0/8 self-maps here because no alternative /8 exists
+        in the default pools — the fallback allows it with a warning."""
         big = allocator.allocate("10.0.0.0/8")
         small = allocator.allocate("10.1.0.0/24")
 
@@ -96,7 +98,6 @@ class TestOverlappingOriginalSubnets:
 
         assert big_net.prefixlen == 8
         assert small_net.prefixlen == 24
-        # They should be different allocations
         assert big_net != small_net
 
     def test_two_overlapping_networks(self, allocator) -> None:
@@ -172,13 +173,14 @@ class TestOriginalInPoolRange:
     def test_original_in_rfc5737_range(self, allocator) -> None:
         """192.0.2.50 is already in TEST-NET-1 but should still be remapped."""
         result = allocator.allocate("192.0.2.50")
-        # It gets remapped - may or may not equal original, but it's valid
+        assert result != "192.0.2.50"
         addr = ipaddress.ip_address(result)
         assert addr.version == 4
 
     def test_original_in_rfc1918_range(self, allocator) -> None:
-        """10.x addresses are in our pool range and should still be remapped."""
+        """10.x addresses are in our pool range and must not self-map."""
         result = allocator.allocate("10.0.0.1")
+        assert result != "10.0.0.1"
         addr = ipaddress.ip_address(result)
         assert addr.version == 4
 
@@ -189,8 +191,9 @@ class TestOriginalInPoolRange:
         assert a != b
 
     def test_original_network_in_pool_range(self, allocator) -> None:
-        """192.0.2.0/24 is a pool itself - still gets allocated as a mapping."""
+        """192.0.2.0/24 is a pool itself - must not self-map."""
         result = allocator.allocate("192.0.2.0/24")
+        assert result != "192.0.2.0/24"
         net = ipaddress.ip_network(result)
         assert net.prefixlen == 24
 

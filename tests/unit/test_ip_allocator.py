@@ -204,12 +204,43 @@ class TestSkipLargeSubnets:
 
 
 @pytest.mark.unit
+class TestSelfMappingPrevention:
+    def test_host_at_pool_base_not_selfmapped(self, allocator) -> None:
+        result = allocator.allocate("10.0.0.1")
+        assert result != "10.0.0.1"
+
+    def test_network_at_pool_base_not_selfmapped(self, allocator) -> None:
+        result = allocator.allocate("10.0.0.0/24")
+        assert result != "10.0.0.0/24"
+
+    def test_hosts_across_pool_bases(self, allocator) -> None:
+        for ip in ["10.0.0.1", "172.16.0.1", "192.168.0.1"]:
+            result = allocator.allocate(ip)
+            assert result != ip, f"{ip} self-mapped"
+
+    def test_sequential_allocations_no_selfmap(self, allocator) -> None:
+        for i in range(50):
+            original = f"10.0.{i}.0/24"
+            result = allocator.allocate(original)
+            assert result != original, f"{original} self-mapped"
+
+    def test_selfmap_guard_preserves_topology(self, allocator) -> None:
+        a = allocator.allocate("10.0.0.1")
+        b = allocator.allocate("10.0.0.100")
+
+        net_a = ipaddress.ip_network(f"{a}/24", strict=False)
+        net_b = ipaddress.ip_network(f"{b}/24", strict=False)
+        assert net_a == net_b
+
+        offset = int(ipaddress.ip_address(b)) - int(ipaddress.ip_address(a))
+        assert offset == 99
+
+
+@pytest.mark.unit
 class TestEdgeCases:
     def test_original_in_pool_range_still_sanitized(self, allocator) -> None:
-        # Even if the original IP is already in a "safe" range, it gets remapped
         result = allocator.allocate("192.0.2.1")
-        # It should still produce a valid IP (may or may not equal the input)
-        ipaddress.ip_address(result)
+        assert result != "192.0.2.1"
 
     def test_invalid_ip_raises_value_error(self, allocator) -> None:
         with pytest.raises(ValueError, match="Cannot parse"):

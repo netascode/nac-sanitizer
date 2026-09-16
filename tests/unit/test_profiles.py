@@ -1112,7 +1112,7 @@ class TestProfileIntegration:
             rp_addr["vipValue"][0]["access-list"]["vipValue"]
             == "TEMPLATE_DEFINITION_VALUES-005"
         )
-        assert rp_addr["vipValue"][0]["address"]["vipValue"] == "10.0.0.1"
+        assert rp_addr["vipValue"][0]["address"]["vipValue"] != "10.0.0.1"
 
     @staticmethod
     def _sdwan_policy_definition_data() -> dict:
@@ -2178,10 +2178,7 @@ class TestProfileIntegration:
         assert profile_1["id"] == "9bad4c20-f36b-11ee-8954-a21daf388194"
         assert attr_0["type"] == "MANDATORY"
         assert attr_1["type"] == "MANDATORY"
-        assert (
-            profile_0["link"]["href"]
-            == "https://10.0.0.140/ers/config/tacacsprofile/73d232c0-f351-11ee-8954-a21daf388194"
-        )
+        assert "10.0.0.140" not in profile_0["link"]["href"]
 
         cmd_set_0 = sanitized["tacacs_command_set"][0]["data"]
         cmd_set_1 = sanitized["tacacs_command_set"][1]["data"]
@@ -5239,8 +5236,8 @@ class TestCatalystCenterProfileRegistry:
             == "AUTHENTICATION_DESCRIPTIONS-003"
         )
 
-        # But non-sensitive fields should be preserved
-        assert auth_server["ipAddress"] == "10.0.0.140"
+        # IP addresses should be sanitized (not self-mapped)
+        assert auth_server["ipAddress"] != "10.0.0.140"
         assert auth_server["protocol"] == "RADI_TACACS"
         assert auth_server["role"] == "primary"
         assert auth_server["port"] == 49

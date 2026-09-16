@@ -7,7 +7,7 @@ import logging
 import re
 from typing import Any
 
-from nac_sanitizer.engine.ip_allocator import IPAllocator
+from nac_sanitizer.engine.ip_allocator import IPAllocator, PoolExhaustedError
 
 logger = logging.getLogger(__name__)
 
@@ -163,6 +163,9 @@ class IPScanner:
             sanitized = self._allocator.allocate(value)
         except ValueError:
             logger.debug("IP allocation failed for '%s', keeping original", value)
+            return value
+        except PoolExhaustedError:
+            logger.warning("Pool exhausted for '%s', keeping original", value)
             return value
         logger.debug("Redacted IP: %s -> %s", value, sanitized)
         self._mappings[value] = sanitized
