@@ -129,7 +129,9 @@ class IPAllocator:
             return str(self._subnet_mappings[idx].sanitized)
 
         prefix_len = network.prefixlen
-        sanitized_network = self._next_available_network(network.version, prefix_len)
+        sanitized_network = self._next_available_network(
+            network.version, prefix_len, original=network
+        )
         idx = len(self._subnet_mappings)
         self._subnet_mappings.append(SubnetMapping(network, sanitized_network))
         self._network_exact_map[network] = idx
@@ -169,7 +171,9 @@ class IPAllocator:
             sanitized_addr = mapping.sanitized.network_address + offset
             return str(sanitized_addr)
 
-        sanitized_network = self._next_available_network(addr.version, default_prefix)
+        sanitized_network = self._next_available_network(
+            addr.version, default_prefix, original=original_network
+        )
         idx = len(self._subnet_mappings)
         self._subnet_mappings.append(SubnetMapping(original_network, sanitized_network))
         self._network_exact_map[original_network] = idx
@@ -214,18 +218,33 @@ class IPAllocator:
             pos -= 1
         return None
 
-    def _next_available_network(self, version: int, prefix_len: int) -> IPv4Or6Network:
+    def _next_available_network(
+        self,
+        version: int,
+        prefix_len: int,
+        original: IPv4Or6Network | None = None,
+    ) -> IPv4Or6Network:
         """Allocate the next available network of the given prefix length from pools."""
-        if version == 4:
-            return self._next_from_pools(self._ipv4_pool_networks, prefix_len, version)
-        else:
-            return self._next_from_pools(self._ipv6_pool_networks, prefix_len, version)
+        pools = self._ipv4_pool_networks if version == 4 else self._ipv6_pool_networks
+        try:
+            return self._next_from_pools(pools, prefix_len, version, original)
+        except PoolExhaustedError:
+            if original is not None:
+                logger.warning(
+                    "Cannot avoid self-mapping for /%d — pool has no alternative; "
+                    "allowing self-map for %s",
+                    prefix_len,
+                    original,
+                )
+                return self._next_from_pools(pools, prefix_len, version, None)
+            raise
 
     def _next_from_pools(
         self,
         pools: list,
         prefix_len: int,
         version: int,
+        original: IPv4Or6Network | None = None,
     ) -> IPv4Or6Network:
         """Compute the next available subnet via arithmetic offset.
 
@@ -248,7 +267,9 @@ class IPAllocator:
                     f"in your configuration file to increase capacity."
                 )
 
-            if not self._overlaps_sanitized(subnet):
+            if not self._overlaps_sanitized(subnet) and (
+                original is None or subnet != original
+            ):
                 self._allocation_counters[key] = offset + 1
                 self._register_sanitized_range(subnet)
                 return subnet
