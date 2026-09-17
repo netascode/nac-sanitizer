@@ -72,6 +72,6 @@ class RosettaWriter:
 
         output_path = output_dir / filename
         content = json.dumps(self.to_dict(), indent=2, ensure_ascii=False)
-        output_path.write_text(content)
+        output_path.write_text(content, encoding="utf-8")
         os.chmod(output_path, DEFAULT_ROSETTA_PERMISSIONS)
         return output_path

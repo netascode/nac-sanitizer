@@ -322,7 +322,7 @@ class Sanitizer:
     def _load_json(self, path: Path) -> object | None:
         """Load a JSON file, returning None if the file contains invalid JSON."""
         try:
-            return json.loads(path.read_text())
+            return json.loads(path.read_text(encoding="utf-8"))
         except json.JSONDecodeError as exc:
             logger.warning("Skipping %s: malformed JSON (%s)", path, exc)
             return None
@@ -338,4 +338,6 @@ class Sanitizer:
 
         dest = output_path / relative
         dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_text(json.dumps(data, indent=2, ensure_ascii=False))
+        dest.write_text(
+            json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
