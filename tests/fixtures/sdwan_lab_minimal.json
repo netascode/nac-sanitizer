@@ -1929,12 +1929,12 @@
         "csv-host-name": "chart2-r1",
         "//system/host-name": "chart2-r1",
         "//system/site-id": "252001",
-        "/0/vpn-instance/ip/route/0.0.0.0/0/next-hop/vpn0_nh_ip_address/address": "134.223.96.1",
-        "/0/vpn0_intf2_name/interface/ip/address": "134.223.92.30/24",
-        "/512/GigabitEthernet3/interface/ip/address": "9.1.36.30/24",
+        "/0/vpn-instance/ip/route/0.0.0.0/0/next-hop/vpn0_nh_ip_address/address": "198.51.100.1",
+        "/0/vpn0_intf2_name/interface/ip/address": "203.0.113.30/24",
+        "/512/GigabitEthernet3/interface/ip/address": "192.168.1.30/24",
         "//system/clock/timezone": "America/New_York",
         "/0/vpn0_intf2_name/interface/if-name": "GigabitEthernet2",
-        "/0/vpn0_intf1_name/interface/ip/address": "134.223.96.30/23",
+        "/0/vpn0_intf1_name/interface/ip/address": "198.51.100.30/23",
         "//system/gps-location/latitude": "38.9072",
         "//system/gps-location/longitude": "-77.0369",
         "//system/system-ip": "172.16.252.12",
@@ -2076,7 +2076,7 @@
           },
           {
             "name": "isp_next_hop",
-            "value": "12.79.131.169"
+            "value": "198.51.100.169"
           },
           {
             "name": "tloc_ext_inet_rx_intf_name",
@@ -2152,11 +2152,11 @@
           },
           {
             "name": "mgmt_intf_ip",
-            "value": "9.1.36.152"
+            "value": "192.168.1.152"
           },
           {
             "name": "vpn0_default_gateway_inet_direct",
-            "value": "12.79.131.169"
+            "value": "198.51.100.169"
           },
           {
             "name": "vpn0_default_gateway_inet_ext",
@@ -2172,7 +2172,7 @@
           },
           {
             "name": "dia_tracker_endpoint_ip",
-            "value": "12.119.3.161"
+            "value": "198.51.100.161"
           },
           {
             "name": "ha_r82_transport_tloc_ext_parent_intf_name",
@@ -2258,7 +2258,7 @@
           },
           {
             "name": "ha_r82_biz_dia_tracker_endpoint_ip",
-            "value": "12.119.3.161"
+            "value": "198.51.100.161"
           },
           {
             "name": "ha_r82_vpn0_mpls_subintf_name",
@@ -2298,7 +2298,7 @@
           },
           {
             "name": "ha_r82_vpn0_pub_subintf_ip",
-            "value": "12.79.131.170"
+            "value": "198.51.100.170"
           },
           {
             "name": "ha_r82_vpn0_pub_subintf_mask",
