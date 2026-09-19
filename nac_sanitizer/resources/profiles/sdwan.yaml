@@ -15,6 +15,9 @@ packs:
     strategy: hostname_map
     paths:
       - "$..host-name"
+      - "$..csv-host-name"
+      - "$..host_name"
+      - '$.."//system/host-name"'
 
   serial_numbers:
     tier: optional
@@ -24,6 +27,7 @@ packs:
       - "$..serialNumber"
       - "$..chasisNumber"  # genuine vManage API misspelling, not a typo
       - "$..uuid"
+      - "$..csv-deviceId"
 
   location_data:
     tier: optional
@@ -33,6 +37,11 @@ packs:
       - "$..longitude"
       - "$..site-name"
       - "$..site-id"
+      - '$.."//system/gps-location/latitude"'
+      - '$.."//system/gps-location/longitude"'
+      - '$.."//system/site-id"'
+      - "$..system_latitude"
+      - "$..system_longitude"
 
   url_filter_patterns:
     tier: default
