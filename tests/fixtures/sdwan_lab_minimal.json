@@ -1,0 +1,2410 @@
+{
+  "cli_device_template": [
+    {
+      "header": {
+        "generatedOn": 1789833372503,
+        "columns": [
+          {
+            "property": "csv-status",
+            "title": "Status",
+            "toolTip": "Input status",
+            "hideable": false,
+            "dataType": "string",
+            "editable": false,
+            "isDisplay": true,
+            "isLeftPinned": true,
+            "minWidth": 30,
+            "width": 30,
+            "display": "icon",
+            "iconProperty": "csv-status",
+            "icon": [
+              {
+                "key": "complete",
+                "value": "images/template_complete.png"
+              },
+              {
+                "key": "in_complete",
+                "value": "images/template_in_complete.png"
+              }
+            ]
+          },
+          {
+            "property": "csv-deviceId",
+            "title": "Chassis Number",
+            "toolTip": "UUID: csv-deviceId",
+            "hideable": false,
+            "dataType": "string",
+            "editable": false,
+            "isDisplay": true,
+            "isLeftPinned": true,
+            "objectType": "object",
+            "templateType": "None",
+            "values": false,
+            "optional": false,
+            "width": 280
+          },
+          {
+            "property": "csv-deviceIP",
+            "title": "System IP",
+            "toolTip": "Device IP: csv-deviceIP",
+            "hideable": false,
+            "dataType": "string",
+            "editable": false,
+            "isDisplay": true,
+            "isLeftPinned": true,
+            "objectType": "object",
+            "templateType": "None",
+            "values": false,
+            "optional": false,
+            "width": 100
+          },
+          {
+            "property": "csv-host-name",
+            "title": "Hostname",
+            "toolTip": "Host name: csv-host-name",
+            "hideable": false,
+            "dataType": "string",
+            "editable": false,
+            "isDisplay": true,
+            "isLeftPinned": true,
+            "objectType": "object",
+            "templateType": "None",
+            "values": false,
+            "optional": false,
+            "width": 180
+          },
+          {
+            "property": "/512/GigabitEthernet3/interface/ip/address",
+            "title": "IPv4 Address/ prefix-length(vpn512_mgmt_ip_and_mask)",
+            "toolTip": "Assign IPv4 address: /512/GigabitEthernet3/interface/ip/address",
+            "hideable": false,
+            "dataType": "ipv4-prefix",
+            "editable": true,
+            "isDisplay": true,
+            "isLeftPinned": false,
+            "objectType": "object",
+            "templateType": "cisco_vpn_interface",
+            "values": false,
+            "optional": false,
+            "width": 100
+          },
+          {
+            "property": "//system/clock/timezone",
+            "title": "Timezone(device_timezone)",
+            "toolTip": "Set the timezone: //system/clock/timezone",
+            "hideable": false,
+            "dataType": "enum",
+            "editable": true,
+            "isDisplay": true,
+            "isLeftPinned": false,
+            "objectType": "object",
+            "templateType": "cisco_system",
+            "values": [
+              {
+                "key": "Europe/Andorra",
+                "value": "Europe/Andorra"
+              },
+              {
+                "key": "Asia/Dubai",
+                "value": "Asia/Dubai"
+              },
+              {
+                "key": "Asia/Kabul",
+                "value": "Asia/Kabul"
+              },
+              {
+                "key": "America/Antigua",
+                "value": "America/Antigua"
+              },
+              {
+                "key": "America/Anguilla",
+                "value": "America/Anguilla"
+              },
+              {
+                "key": "Europe/Tirane",
+                "value": "Europe/Tirane"
+              },
+              {
+                "key": "Asia/Yerevan",
+                "value": "Asia/Yerevan"
+              },
+              {
+                "key": "Africa/Luanda",
+                "value": "Africa/Luanda"
+              },
+              {
+                "key": "Antarctica/McMurdo",
+                "value": "Antarctica/McMurdo"
+              },
+              {
+                "key": "Antarctica/Rothera",
+                "value": "Antarctica/Rothera"
+              },
+              {
+                "key": "Antarctica/Palmer",
+                "value": "Antarctica/Palmer"
+              },
+              {
+                "key": "Antarctica/Mawson",
+                "value": "Antarctica/Mawson"
+              },
+              {
+                "key": "Antarctica/Davis",
+                "value": "Antarctica/Davis"
+              },
+              {
+                "key": "Antarctica/Casey",
+                "value": "Antarctica/Casey"
+              },
+              {
+                "key": "Antarctica/Vostok",
+                "value": "Antarctica/Vostok"
+              },
+              {
+                "key": "Antarctica/DumontDUrville",
+                "value": "Antarctica/DumontDUrville"
+              },
+              {
+                "key": "Antarctica/Syowa",
+                "value": "Antarctica/Syowa"
+              },
+              {
+                "key": "America/Argentina/Buenos_Aires",
+                "value": "America/Argentina/Buenos_Aires"
+              },
+              {
+                "key": "America/Argentina/Cordoba",
+                "value": "America/Argentina/Cordoba"
+              },
+              {
+                "key": "America/Argentina/Salta",
+                "value": "America/Argentina/Salta"
+              },
+              {
+                "key": "America/Argentina/Jujuy",
+                "value": "America/Argentina/Jujuy"
+              },
+              {
+                "key": "America/Argentina/Tucuman",
+                "value": "America/Argentina/Tucuman"
+              },
+              {
+                "key": "America/Argentina/Catamarca",
+                "value": "America/Argentina/Catamarca"
+              },
+              {
+                "key": "America/Argentina/La_Rioja",
+                "value": "America/Argentina/La_Rioja"
+              },
+              {
+                "key": "America/Argentina/San_Juan",
+                "value": "America/Argentina/San_Juan"
+              },
+              {
+                "key": "America/Argentina/Mendoza",
+                "value": "America/Argentina/Mendoza"
+              },
+              {
+                "key": "America/Argentina/San_Luis",
+                "value": "America/Argentina/San_Luis"
+              },
+              {
+                "key": "America/Argentina/Rio_Gallegos",
+                "value": "America/Argentina/Rio_Gallegos"
+              },
+              {
+                "key": "America/Argentina/Ushuaia",
+                "value": "America/Argentina/Ushuaia"
+              },
+              {
+                "key": "Pacific/Pago_Pago",
+                "value": "Pacific/Pago_Pago"
+              },
+              {
+                "key": "Europe/Vienna",
+                "value": "Europe/Vienna"
+              },
+              {
+                "key": "Australia/Lord_Howe",
+                "value": "Australia/Lord_Howe"
+              },
+              {
+                "key": "Antarctica/Macquarie",
+                "value": "Antarctica/Macquarie"
+              },
+              {
+                "key": "Australia/Hobart",
+                "value": "Australia/Hobart"
+              },
+              {
+                "key": "Australia/Currie",
+                "value": "Australia/Currie"
+              },
+              {
+                "key": "Australia/Melbourne",
+                "value": "Australia/Melbourne"
+              },
+              {
+                "key": "Australia/Sydney",
+                "value": "Australia/Sydney"
+              },
+              {
+                "key": "Australia/Broken_Hill",
+                "value": "Australia/Broken_Hill"
+              },
+              {
+                "key": "Australia/Brisbane",
+                "value": "Australia/Brisbane"
+              },
+              {
+                "key": "Australia/Lindeman",
+                "value": "Australia/Lindeman"
+              },
+              {
+                "key": "Australia/Adelaide",
+                "value": "Australia/Adelaide"
+              },
+              {
+                "key": "Australia/Darwin",
+                "value": "Australia/Darwin"
+              },
+              {
+                "key": "Australia/Perth",
+                "value": "Australia/Perth"
+              },
+              {
+                "key": "Australia/Eucla",
+                "value": "Australia/Eucla"
+              },
+              {
+                "key": "America/Aruba",
+                "value": "America/Aruba"
+              },
+              {
+                "key": "Europe/Mariehamn",
+                "value": "Europe/Mariehamn"
+              },
+              {
+                "key": "Asia/Baku",
+                "value": "Asia/Baku"
+              },
+              {
+                "key": "Europe/Sarajevo",
+                "value": "Europe/Sarajevo"
+              },
+              {
+                "key": "America/Barbados",
+                "value": "America/Barbados"
+              },
+              {
+                "key": "Asia/Dhaka",
+                "value": "Asia/Dhaka"
+              },
+              {
+                "key": "Europe/Brussels",
+                "value": "Europe/Brussels"
+              },
+              {
+                "key": "Africa/Ouagadougou",
+                "value": "Africa/Ouagadougou"
+              },
+              {
+                "key": "Europe/Sofia",
+                "value": "Europe/Sofia"
+              },
+              {
+                "key": "Asia/Bahrain",
+                "value": "Asia/Bahrain"
+              },
+              {
+                "key": "Africa/Bujumbura",
+                "value": "Africa/Bujumbura"
+              },
+              {
+                "key": "Africa/Porto-Novo",
+                "value": "Africa/Porto-Novo"
+              },
+              {
+                "key": "America/St_Barthelemy",
+                "value": "America/St_Barthelemy"
+              },
+              {
+                "key": "Atlantic/Bermuda",
+                "value": "Atlantic/Bermuda"
+              },
+              {
+                "key": "Asia/Brunei",
+                "value": "Asia/Brunei"
+              },
+              {
+                "key": "America/La_Paz",
+                "value": "America/La_Paz"
+              },
+              {
+                "key": "America/Kralendijk",
+                "value": "America/Kralendijk"
+              },
+              {
+                "key": "America/Noronha",
+                "value": "America/Noronha"
+              },
+              {
+                "key": "America/Belem",
+                "value": "America/Belem"
+              },
+              {
+                "key": "America/Fortaleza",
+                "value": "America/Fortaleza"
+              },
+              {
+                "key": "America/Recife",
+                "value": "America/Recife"
+              },
+              {
+                "key": "America/Araguaina",
+                "value": "America/Araguaina"
+              },
+              {
+                "key": "America/Maceio",
+                "value": "America/Maceio"
+              },
+              {
+                "key": "America/Bahia",
+                "value": "America/Bahia"
+              },
+              {
+                "key": "America/Sao_Paulo",
+                "value": "America/Sao_Paulo"
+              },
+              {
+                "key": "America/Campo_Grande",
+                "value": "America/Campo_Grande"
+              },
+              {
+                "key": "America/Cuiaba",
+                "value": "America/Cuiaba"
+              },
+              {
+                "key": "America/Santarem",
+                "value": "America/Santarem"
+              },
+              {
+                "key": "America/Porto_Velho",
+                "value": "America/Porto_Velho"
+              },
+              {
+                "key": "America/Boa_Vista",
+                "value": "America/Boa_Vista"
+              },
+              {
+                "key": "America/Manaus",
+                "value": "America/Manaus"
+              },
+              {
+                "key": "America/Eirunepe",
+                "value": "America/Eirunepe"
+              },
+              {
+                "key": "America/Rio_Branco",
+                "value": "America/Rio_Branco"
+              },
+              {
+                "key": "America/Nassau",
+                "value": "America/Nassau"
+              },
+              {
+                "key": "Asia/Thimphu",
+                "value": "Asia/Thimphu"
+              },
+              {
+                "key": "Africa/Gaborone",
+                "value": "Africa/Gaborone"
+              },
+              {
+                "key": "Europe/Minsk",
+                "value": "Europe/Minsk"
+              },
+              {
+                "key": "America/Belize",
+                "value": "America/Belize"
+              },
+              {
+                "key": "America/St_Johns",
+                "value": "America/St_Johns"
+              },
+              {
+                "key": "America/Halifax",
+                "value": "America/Halifax"
+              },
+              {
+                "key": "America/Glace_Bay",
+                "value": "America/Glace_Bay"
+              },
+              {
+                "key": "America/Moncton",
+                "value": "America/Moncton"
+              },
+              {
+                "key": "America/Goose_Bay",
+                "value": "America/Goose_Bay"
+              },
+              {
+                "key": "America/Blanc-Sablon",
+                "value": "America/Blanc-Sablon"
+              },
+              {
+                "key": "America/Toronto",
+                "value": "America/Toronto"
+              },
+              {
+                "key": "America/Nipigon",
+                "value": "America/Nipigon"
+              },
+              {
+                "key": "America/Thunder_Bay",
+                "value": "America/Thunder_Bay"
+              },
+              {
+                "key": "America/Iqaluit",
+                "value": "America/Iqaluit"
+              },
+              {
+                "key": "America/Pangnirtung",
+                "value": "America/Pangnirtung"
+              },
+              {
+                "key": "America/Resolute",
+                "value": "America/Resolute"
+              },
+              {
+                "key": "America/Atikokan",
+                "value": "America/Atikokan"
+              },
+              {
+                "key": "America/Rankin_Inlet",
+                "value": "America/Rankin_Inlet"
+              },
+              {
+                "key": "America/Winnipeg",
+                "value": "America/Winnipeg"
+              },
+              {
+                "key": "America/Rainy_River",
+                "value": "America/Rainy_River"
+              },
+              {
+                "key": "America/Regina",
+                "value": "America/Regina"
+              },
+              {
+                "key": "America/Swift_Current",
+                "value": "America/Swift_Current"
+              },
+              {
+                "key": "America/Edmonton",
+                "value": "America/Edmonton"
+              },
+              {
+                "key": "America/Cambridge_Bay",
+                "value": "America/Cambridge_Bay"
+              },
+              {
+                "key": "America/Yellowknife",
+                "value": "America/Yellowknife"
+              },
+              {
+                "key": "America/Inuvik",
+                "value": "America/Inuvik"
+              },
+              {
+                "key": "America/Creston",
+                "value": "America/Creston"
+              },
+              {
+                "key": "America/Dawson_Creek",
+                "value": "America/Dawson_Creek"
+              },
+              {
+                "key": "America/Vancouver",
+                "value": "America/Vancouver"
+              },
+              {
+                "key": "America/Whitehorse",
+                "value": "America/Whitehorse"
+              },
+              {
+                "key": "America/Dawson",
+                "value": "America/Dawson"
+              },
+              {
+                "key": "Indian/Cocos",
+                "value": "Indian/Cocos"
+              },
+              {
+                "key": "Africa/Kinshasa",
+                "value": "Africa/Kinshasa"
+              },
+              {
+                "key": "Africa/Lubumbashi",
+                "value": "Africa/Lubumbashi"
+              },
+              {
+                "key": "Africa/Bangui",
+                "value": "Africa/Bangui"
+              },
+              {
+                "key": "Africa/Brazzaville",
+                "value": "Africa/Brazzaville"
+              },
+              {
+                "key": "Europe/Zurich",
+                "value": "Europe/Zurich"
+              },
+              {
+                "key": "Africa/Abidjan",
+                "value": "Africa/Abidjan"
+              },
+              {
+                "key": "Pacific/Rarotonga",
+                "value": "Pacific/Rarotonga"
+              },
+              {
+                "key": "America/Santiago",
+                "value": "America/Santiago"
+              },
+              {
+                "key": "Pacific/Easter",
+                "value": "Pacific/Easter"
+              },
+              {
+                "key": "Africa/Douala",
+                "value": "Africa/Douala"
+              },
+              {
+                "key": "Asia/Shanghai",
+                "value": "Asia/Shanghai"
+              },
+              {
+                "key": "Asia/Harbin",
+                "value": "Asia/Harbin"
+              },
+              {
+                "key": "Asia/Chongqing",
+                "value": "Asia/Chongqing"
+              },
+              {
+                "key": "Asia/Urumqi",
+                "value": "Asia/Urumqi"
+              },
+              {
+                "key": "Asia/Kashgar",
+                "value": "Asia/Kashgar"
+              },
+              {
+                "key": "America/Bogota",
+                "value": "America/Bogota"
+              },
+              {
+                "key": "America/Costa_Rica",
+                "value": "America/Costa_Rica"
+              },
+              {
+                "key": "America/Havana",
+                "value": "America/Havana"
+              },
+              {
+                "key": "Atlantic/Cape_Verde",
+                "value": "Atlantic/Cape_Verde"
+              },
+              {
+                "key": "America/Curacao",
+                "value": "America/Curacao"
+              },
+              {
+                "key": "Indian/Christmas",
+                "value": "Indian/Christmas"
+              },
+              {
+                "key": "Asia/Nicosia",
+                "value": "Asia/Nicosia"
+              },
+              {
+                "key": "Europe/Prague",
+                "value": "Europe/Prague"
+              },
+              {
+                "key": "Europe/Berlin",
+                "value": "Europe/Berlin"
+              },
+              {
+                "key": "Europe/Busingen",
+                "value": "Europe/Busingen"
+              },
+              {
+                "key": "Africa/Djibouti",
+                "value": "Africa/Djibouti"
+              },
+              {
+                "key": "Europe/Copenhagen",
+                "value": "Europe/Copenhagen"
+              },
+              {
+                "key": "America/Dominica",
+                "value": "America/Dominica"
+              },
+              {
+                "key": "America/Santo_Domingo",
+                "value": "America/Santo_Domingo"
+              },
+              {
+                "key": "Africa/Algiers",
+                "value": "Africa/Algiers"
+              },
+              {
+                "key": "America/Guayaquil",
+                "value": "America/Guayaquil"
+              },
+              {
+                "key": "Pacific/Galapagos",
+                "value": "Pacific/Galapagos"
+              },
+              {
+                "key": "Europe/Tallinn",
+                "value": "Europe/Tallinn"
+              },
+              {
+                "key": "Africa/Cairo",
+                "value": "Africa/Cairo"
+              },
+              {
+                "key": "Africa/El_Aaiun",
+                "value": "Africa/El_Aaiun"
+              },
+              {
+                "key": "Africa/Asmara",
+                "value": "Africa/Asmara"
+              },
+              {
+                "key": "Europe/Madrid",
+                "value": "Europe/Madrid"
+              },
+              {
+                "key": "Africa/Ceuta",
+                "value": "Africa/Ceuta"
+              },
+              {
+                "key": "Atlantic/Canary",
+                "value": "Atlantic/Canary"
+              },
+              {
+                "key": "Africa/Addis_Ababa",
+                "value": "Africa/Addis_Ababa"
+              },
+              {
+                "key": "Europe/Helsinki",
+                "value": "Europe/Helsinki"
+              },
+              {
+                "key": "Pacific/Fiji",
+                "value": "Pacific/Fiji"
+              },
+              {
+                "key": "Atlantic/Stanley",
+                "value": "Atlantic/Stanley"
+              },
+              {
+                "key": "Pacific/Chuuk",
+                "value": "Pacific/Chuuk"
+              },
+              {
+                "key": "Pacific/Pohnpei",
+                "value": "Pacific/Pohnpei"
+              },
+              {
+                "key": "Pacific/Kosrae",
+                "value": "Pacific/Kosrae"
+              },
+              {
+                "key": "Atlantic/Faroe",
+                "value": "Atlantic/Faroe"
+              },
+              {
+                "key": "Europe/Paris",
+                "value": "Europe/Paris"
+              },
+              {
+                "key": "Africa/Libreville",
+                "value": "Africa/Libreville"
+              },
+              {
+                "key": "Europe/London",
+                "value": "Europe/London"
+              },
+              {
+                "key": "America/Grenada",
+                "value": "America/Grenada"
+              },
+              {
+                "key": "Asia/Tbilisi",
+                "value": "Asia/Tbilisi"
+              },
+              {
+                "key": "America/Cayenne",
+                "value": "America/Cayenne"
+              },
+              {
+                "key": "Europe/Guernsey",
+                "value": "Europe/Guernsey"
+              },
+              {
+                "key": "Africa/Accra",
+                "value": "Africa/Accra"
+              },
+              {
+                "key": "Europe/Gibraltar",
+                "value": "Europe/Gibraltar"
+              },
+              {
+                "key": "America/Godthab",
+                "value": "America/Godthab"
+              },
+              {
+                "key": "America/Danmarkshavn",
+                "value": "America/Danmarkshavn"
+              },
+              {
+                "key": "America/Scoresbysund",
+                "value": "America/Scoresbysund"
+              },
+              {
+                "key": "America/Thule",
+                "value": "America/Thule"
+              },
+              {
+                "key": "Africa/Banjul",
+                "value": "Africa/Banjul"
+              },
+              {
+                "key": "Africa/Conakry",
+                "value": "Africa/Conakry"
+              },
+              {
+                "key": "America/Guadeloupe",
+                "value": "America/Guadeloupe"
+              },
+              {
+                "key": "Africa/Malabo",
+                "value": "Africa/Malabo"
+              },
+              {
+                "key": "Europe/Athens",
+                "value": "Europe/Athens"
+              },
+              {
+                "key": "Atlantic/South_Georgia",
+                "value": "Atlantic/South_Georgia"
+              },
+              {
+                "key": "America/Guatemala",
+                "value": "America/Guatemala"
+              },
+              {
+                "key": "Pacific/Guam",
+                "value": "Pacific/Guam"
+              },
+              {
+                "key": "Africa/Bissau",
+                "value": "Africa/Bissau"
+              },
+              {
+                "key": "America/Guyana",
+                "value": "America/Guyana"
+              },
+              {
+                "key": "Asia/Hong_Kong",
+                "value": "Asia/Hong_Kong"
+              },
+              {
+                "key": "America/Tegucigalpa",
+                "value": "America/Tegucigalpa"
+              },
+              {
+                "key": "Europe/Zagreb",
+                "value": "Europe/Zagreb"
+              },
+              {
+                "key": "America/Port-au-Prince",
+                "value": "America/Port-au-Prince"
+              },
+              {
+                "key": "Europe/Budapest",
+                "value": "Europe/Budapest"
+              },
+              {
+                "key": "Asia/Jakarta",
+                "value": "Asia/Jakarta"
+              },
+              {
+                "key": "Asia/Pontianak",
+                "value": "Asia/Pontianak"
+              },
+              {
+                "key": "Asia/Makassar",
+                "value": "Asia/Makassar"
+              },
+              {
+                "key": "Asia/Jayapura",
+                "value": "Asia/Jayapura"
+              },
+              {
+                "key": "Europe/Dublin",
+                "value": "Europe/Dublin"
+              },
+              {
+                "key": "Asia/Jerusalem",
+                "value": "Asia/Jerusalem"
+              },
+              {
+                "key": "Europe/Isle_of_Man",
+                "value": "Europe/Isle_of_Man"
+              },
+              {
+                "key": "Asia/Kolkata",
+                "value": "Asia/Kolkata"
+              },
+              {
+                "key": "Indian/Chagos",
+                "value": "Indian/Chagos"
+              },
+              {
+                "key": "Asia/Baghdad",
+                "value": "Asia/Baghdad"
+              },
+              {
+                "key": "Asia/Tehran",
+                "value": "Asia/Tehran"
+              },
+              {
+                "key": "Atlantic/Reykjavik",
+                "value": "Atlantic/Reykjavik"
+              },
+              {
+                "key": "Europe/Rome",
+                "value": "Europe/Rome"
+              },
+              {
+                "key": "Europe/Jersey",
+                "value": "Europe/Jersey"
+              },
+              {
+                "key": "America/Jamaica",
+                "value": "America/Jamaica"
+              },
+              {
+                "key": "Asia/Amman",
+                "value": "Asia/Amman"
+              },
+              {
+                "key": "Asia/Tokyo",
+                "value": "Asia/Tokyo"
+              },
+              {
+                "key": "Africa/Nairobi",
+                "value": "Africa/Nairobi"
+              },
+              {
+                "key": "Asia/Bishkek",
+                "value": "Asia/Bishkek"
+              },
+              {
+                "key": "Asia/Phnom_Penh",
+                "value": "Asia/Phnom_Penh"
+              },
+              {
+                "key": "Pacific/Tarawa",
+                "value": "Pacific/Tarawa"
+              },
+              {
+                "key": "Pacific/Enderbury",
+                "value": "Pacific/Enderbury"
+              },
+              {
+                "key": "Pacific/Kiritimati",
+                "value": "Pacific/Kiritimati"
+              },
+              {
+                "key": "Indian/Comoro",
+                "value": "Indian/Comoro"
+              },
+              {
+                "key": "America/St_Kitts",
+                "value": "America/St_Kitts"
+              },
+              {
+                "key": "Asia/Pyongyang",
+                "value": "Asia/Pyongyang"
+              },
+              {
+                "key": "Asia/Seoul",
+                "value": "Asia/Seoul"
+              },
+              {
+                "key": "Asia/Kuwait",
+                "value": "Asia/Kuwait"
+              },
+              {
+                "key": "America/Cayman",
+                "value": "America/Cayman"
+              },
+              {
+                "key": "Asia/Almaty",
+                "value": "Asia/Almaty"
+              },
+              {
+                "key": "Asia/Qyzylorda",
+                "value": "Asia/Qyzylorda"
+              },
+              {
+                "key": "Asia/Aqtobe",
+                "value": "Asia/Aqtobe"
+              },
+              {
+                "key": "Asia/Aqtau",
+                "value": "Asia/Aqtau"
+              },
+              {
+                "key": "Asia/Oral",
+                "value": "Asia/Oral"
+              },
+              {
+                "key": "Asia/Vientiane",
+                "value": "Asia/Vientiane"
+              },
+              {
+                "key": "Asia/Beirut",
+                "value": "Asia/Beirut"
+              },
+              {
+                "key": "America/St_Lucia",
+                "value": "America/St_Lucia"
+              },
+              {
+                "key": "Europe/Vaduz",
+                "value": "Europe/Vaduz"
+              },
+              {
+                "key": "Asia/Colombo",
+                "value": "Asia/Colombo"
+              },
+              {
+                "key": "Africa/Monrovia",
+                "value": "Africa/Monrovia"
+              },
+              {
+                "key": "Africa/Maseru",
+                "value": "Africa/Maseru"
+              },
+              {
+                "key": "Europe/Vilnius",
+                "value": "Europe/Vilnius"
+              },
+              {
+                "key": "Europe/Luxembourg",
+                "value": "Europe/Luxembourg"
+              },
+              {
+                "key": "Europe/Riga",
+                "value": "Europe/Riga"
+              },
+              {
+                "key": "Africa/Tripoli",
+                "value": "Africa/Tripoli"
+              },
+              {
+                "key": "Africa/Casablanca",
+                "value": "Africa/Casablanca"
+              },
+              {
+                "key": "Europe/Monaco",
+                "value": "Europe/Monaco"
+              },
+              {
+                "key": "Europe/Chisinau",
+                "value": "Europe/Chisinau"
+              },
+              {
+                "key": "Europe/Podgorica",
+                "value": "Europe/Podgorica"
+              },
+              {
+                "key": "America/Marigot",
+                "value": "America/Marigot"
+              },
+              {
+                "key": "Indian/Antananarivo",
+                "value": "Indian/Antananarivo"
+              },
+              {
+                "key": "Pacific/Majuro",
+                "value": "Pacific/Majuro"
+              },
+              {
+                "key": "Pacific/Kwajalein",
+                "value": "Pacific/Kwajalein"
+              },
+              {
+                "key": "Europe/Skopje",
+                "value": "Europe/Skopje"
+              },
+              {
+                "key": "Africa/Bamako",
+                "value": "Africa/Bamako"
+              },
+              {
+                "key": "Asia/Rangoon",
+                "value": "Asia/Rangoon"
+              },
+              {
+                "key": "Asia/Ulaanbaatar",
+                "value": "Asia/Ulaanbaatar"
+              },
+              {
+                "key": "Asia/Hovd",
+                "value": "Asia/Hovd"
+              },
+              {
+                "key": "Asia/Choibalsan",
+                "value": "Asia/Choibalsan"
+              },
+              {
+                "key": "Asia/Macau",
+                "value": "Asia/Macau"
+              },
+              {
+                "key": "Pacific/Saipan",
+                "value": "Pacific/Saipan"
+              },
+              {
+                "key": "America/Martinique",
+                "value": "America/Martinique"
+              },
+              {
+                "key": "Africa/Nouakchott",
+                "value": "Africa/Nouakchott"
+              },
+              {
+                "key": "America/Montserrat",
+                "value": "America/Montserrat"
+              },
+              {
+                "key": "Europe/Malta",
+                "value": "Europe/Malta"
+              },
+              {
+                "key": "Indian/Mauritius",
+                "value": "Indian/Mauritius"
+              },
+              {
+                "key": "Indian/Maldives",
+                "value": "Indian/Maldives"
+              },
+              {
+                "key": "Africa/Blantyre",
+                "value": "Africa/Blantyre"
+              },
+              {
+                "key": "America/Mexico_City",
+                "value": "America/Mexico_City"
+              },
+              {
+                "key": "America/Cancun",
+                "value": "America/Cancun"
+              },
+              {
+                "key": "America/Merida",
+                "value": "America/Merida"
+              },
+              {
+                "key": "America/Monterrey",
+                "value": "America/Monterrey"
+              },
+              {
+                "key": "America/Matamoros",
+                "value": "America/Matamoros"
+              },
+              {
+                "key": "America/Mazatlan",
+                "value": "America/Mazatlan"
+              },
+              {
+                "key": "America/Chihuahua",
+                "value": "America/Chihuahua"
+              },
+              {
+                "key": "America/Ojinaga",
+                "value": "America/Ojinaga"
+              },
+              {
+                "key": "America/Hermosillo",
+                "value": "America/Hermosillo"
+              },
+              {
+                "key": "America/Tijuana",
+                "value": "America/Tijuana"
+              },
+              {
+                "key": "America/Santa_Isabel",
+                "value": "America/Santa_Isabel"
+              },
+              {
+                "key": "America/Bahia_Banderas",
+                "value": "America/Bahia_Banderas"
+              },
+              {
+                "key": "Asia/Kuala_Lumpur",
+                "value": "Asia/Kuala_Lumpur"
+              },
+              {
+                "key": "Asia/Kuching",
+                "value": "Asia/Kuching"
+              },
+              {
+                "key": "Africa/Maputo",
+                "value": "Africa/Maputo"
+              },
+              {
+                "key": "Africa/Windhoek",
+                "value": "Africa/Windhoek"
+              },
+              {
+                "key": "Pacific/Noumea",
+                "value": "Pacific/Noumea"
+              },
+              {
+                "key": "Africa/Niamey",
+                "value": "Africa/Niamey"
+              },
+              {
+                "key": "Pacific/Norfolk",
+                "value": "Pacific/Norfolk"
+              },
+              {
+                "key": "Africa/Lagos",
+                "value": "Africa/Lagos"
+              },
+              {
+                "key": "America/Managua",
+                "value": "America/Managua"
+              },
+              {
+                "key": "Europe/Amsterdam",
+                "value": "Europe/Amsterdam"
+              },
+              {
+                "key": "Europe/Oslo",
+                "value": "Europe/Oslo"
+              },
+              {
+                "key": "Asia/Kathmandu",
+                "value": "Asia/Kathmandu"
+              },
+              {
+                "key": "Pacific/Nauru",
+                "value": "Pacific/Nauru"
+              },
+              {
+                "key": "Pacific/Niue",
+                "value": "Pacific/Niue"
+              },
+              {
+                "key": "Pacific/Auckland",
+                "value": "Pacific/Auckland"
+              },
+              {
+                "key": "Pacific/Chatham",
+                "value": "Pacific/Chatham"
+              },
+              {
+                "key": "Asia/Muscat",
+                "value": "Asia/Muscat"
+              },
+              {
+                "key": "America/Panama",
+                "value": "America/Panama"
+              },
+              {
+                "key": "America/Lima",
+                "value": "America/Lima"
+              },
+              {
+                "key": "Pacific/Tahiti",
+                "value": "Pacific/Tahiti"
+              },
+              {
+                "key": "Pacific/Marquesas",
+                "value": "Pacific/Marquesas"
+              },
+              {
+                "key": "Pacific/Gambier",
+                "value": "Pacific/Gambier"
+              },
+              {
+                "key": "Pacific/Port_Moresby",
+                "value": "Pacific/Port_Moresby"
+              },
+              {
+                "key": "Asia/Manila",
+                "value": "Asia/Manila"
+              },
+              {
+                "key": "Asia/Karachi",
+                "value": "Asia/Karachi"
+              },
+              {
+                "key": "Europe/Warsaw",
+                "value": "Europe/Warsaw"
+              },
+              {
+                "key": "America/Miquelon",
+                "value": "America/Miquelon"
+              },
+              {
+                "key": "Pacific/Pitcairn",
+                "value": "Pacific/Pitcairn"
+              },
+              {
+                "key": "America/Puerto_Rico",
+                "value": "America/Puerto_Rico"
+              },
+              {
+                "key": "Asia/Gaza",
+                "value": "Asia/Gaza"
+              },
+              {
+                "key": "Asia/Hebron",
+                "value": "Asia/Hebron"
+              },
+              {
+                "key": "Europe/Lisbon",
+                "value": "Europe/Lisbon"
+              },
+              {
+                "key": "Atlantic/Madeira",
+                "value": "Atlantic/Madeira"
+              },
+              {
+                "key": "Atlantic/Azores",
+                "value": "Atlantic/Azores"
+              },
+              {
+                "key": "Pacific/Palau",
+                "value": "Pacific/Palau"
+              },
+              {
+                "key": "America/Asuncion",
+                "value": "America/Asuncion"
+              },
+              {
+                "key": "Asia/Qatar",
+                "value": "Asia/Qatar"
+              },
+              {
+                "key": "Indian/Reunion",
+                "value": "Indian/Reunion"
+              },
+              {
+                "key": "Europe/Bucharest",
+                "value": "Europe/Bucharest"
+              },
+              {
+                "key": "Europe/Belgrade",
+                "value": "Europe/Belgrade"
+              },
+              {
+                "key": "Europe/Kaliningrad",
+                "value": "Europe/Kaliningrad"
+              },
+              {
+                "key": "Europe/Moscow",
+                "value": "Europe/Moscow"
+              },
+              {
+                "key": "Europe/Volgograd",
+                "value": "Europe/Volgograd"
+              },
+              {
+                "key": "Europe/Samara",
+                "value": "Europe/Samara"
+              },
+              {
+                "key": "Asia/Yekaterinburg",
+                "value": "Asia/Yekaterinburg"
+              },
+              {
+                "key": "Asia/Omsk",
+                "value": "Asia/Omsk"
+              },
+              {
+                "key": "Asia/Novosibirsk",
+                "value": "Asia/Novosibirsk"
+              },
+              {
+                "key": "Asia/Novokuznetsk",
+                "value": "Asia/Novokuznetsk"
+              },
+              {
+                "key": "Asia/Krasnoyarsk",
+                "value": "Asia/Krasnoyarsk"
+              },
+              {
+                "key": "Asia/Irkutsk",
+                "value": "Asia/Irkutsk"
+              },
+              {
+                "key": "Asia/Yakutsk",
+                "value": "Asia/Yakutsk"
+              },
+              {
+                "key": "Asia/Khandyga",
+                "value": "Asia/Khandyga"
+              },
+              {
+                "key": "Asia/Vladivostok",
+                "value": "Asia/Vladivostok"
+              },
+              {
+                "key": "Asia/Sakhalin",
+                "value": "Asia/Sakhalin"
+              },
+              {
+                "key": "Asia/Ust-Nera",
+                "value": "Asia/Ust-Nera"
+              },
+              {
+                "key": "Asia/Magadan",
+                "value": "Asia/Magadan"
+              },
+              {
+                "key": "Asia/Kamchatka",
+                "value": "Asia/Kamchatka"
+              },
+              {
+                "key": "Asia/Anadyr",
+                "value": "Asia/Anadyr"
+              },
+              {
+                "key": "Africa/Kigali",
+                "value": "Africa/Kigali"
+              },
+              {
+                "key": "Asia/Riyadh",
+                "value": "Asia/Riyadh"
+              },
+              {
+                "key": "Pacific/Guadalcanal",
+                "value": "Pacific/Guadalcanal"
+              },
+              {
+                "key": "Indian/Mahe",
+                "value": "Indian/Mahe"
+              },
+              {
+                "key": "Africa/Khartoum",
+                "value": "Africa/Khartoum"
+              },
+              {
+                "key": "Europe/Stockholm",
+                "value": "Europe/Stockholm"
+              },
+              {
+                "key": "Asia/Singapore",
+                "value": "Asia/Singapore"
+              },
+              {
+                "key": "Atlantic/St_Helena",
+                "value": "Atlantic/St_Helena"
+              },
+              {
+                "key": "Europe/Ljubljana",
+                "value": "Europe/Ljubljana"
+              },
+              {
+                "key": "Arctic/Longyearbyen",
+                "value": "Arctic/Longyearbyen"
+              },
+              {
+                "key": "Europe/Bratislava",
+                "value": "Europe/Bratislava"
+              },
+              {
+                "key": "Africa/Freetown",
+                "value": "Africa/Freetown"
+              },
+              {
+                "key": "Europe/San_Marino",
+                "value": "Europe/San_Marino"
+              },
+              {
+                "key": "Africa/Dakar",
+                "value": "Africa/Dakar"
+              },
+              {
+                "key": "Africa/Mogadishu",
+                "value": "Africa/Mogadishu"
+              },
+              {
+                "key": "America/Paramaribo",
+                "value": "America/Paramaribo"
+              },
+              {
+                "key": "Africa/Juba",
+                "value": "Africa/Juba"
+              },
+              {
+                "key": "Africa/Sao_Tome",
+                "value": "Africa/Sao_Tome"
+              },
+              {
+                "key": "America/El_Salvador",
+                "value": "America/El_Salvador"
+              },
+              {
+                "key": "America/Lower_Princes",
+                "value": "America/Lower_Princes"
+              },
+              {
+                "key": "Asia/Damascus",
+                "value": "Asia/Damascus"
+              },
+              {
+                "key": "Africa/Mbabane",
+                "value": "Africa/Mbabane"
+              },
+              {
+                "key": "America/Grand_Turk",
+                "value": "America/Grand_Turk"
+              },
+              {
+                "key": "Africa/Ndjamena",
+                "value": "Africa/Ndjamena"
+              },
+              {
+                "key": "Indian/Kerguelen",
+                "value": "Indian/Kerguelen"
+              },
+              {
+                "key": "Africa/Lome",
+                "value": "Africa/Lome"
+              },
+              {
+                "key": "Asia/Bangkok",
+                "value": "Asia/Bangkok"
+              },
+              {
+                "key": "Asia/Dushanbe",
+                "value": "Asia/Dushanbe"
+              },
+              {
+                "key": "Pacific/Fakaofo",
+                "value": "Pacific/Fakaofo"
+              },
+              {
+                "key": "Asia/Dili",
+                "value": "Asia/Dili"
+              },
+              {
+                "key": "Asia/Ashgabat",
+                "value": "Asia/Ashgabat"
+              },
+              {
+                "key": "Africa/Tunis",
+                "value": "Africa/Tunis"
+              },
+              {
+                "key": "Pacific/Tongatapu",
+                "value": "Pacific/Tongatapu"
+              },
+              {
+                "key": "Europe/Istanbul",
+                "value": "Europe/Istanbul"
+              },
+              {
+                "key": "America/Port_of_Spain",
+                "value": "America/Port_of_Spain"
+              },
+              {
+                "key": "Pacific/Funafuti",
+                "value": "Pacific/Funafuti"
+              },
+              {
+                "key": "Asia/Taipei",
+                "value": "Asia/Taipei"
+              },
+              {
+                "key": "Africa/Dar_es_Salaam",
+                "value": "Africa/Dar_es_Salaam"
+              },
+              {
+                "key": "Europe/Kiev",
+                "value": "Europe/Kiev"
+              },
+              {
+                "key": "Europe/Uzhgorod",
+                "value": "Europe/Uzhgorod"
+              },
+              {
+                "key": "Europe/Zaporozhye",
+                "value": "Europe/Zaporozhye"
+              },
+              {
+                "key": "Europe/Simferopol",
+                "value": "Europe/Simferopol"
+              },
+              {
+                "key": "Africa/Kampala",
+                "value": "Africa/Kampala"
+              },
+              {
+                "key": "Pacific/Johnston",
+                "value": "Pacific/Johnston"
+              },
+              {
+                "key": "Pacific/Midway",
+                "value": "Pacific/Midway"
+              },
+              {
+                "key": "Pacific/Wake",
+                "value": "Pacific/Wake"
+              },
+              {
+                "key": "America/New_York",
+                "value": "America/New_York"
+              },
+              {
+                "key": "America/Detroit",
+                "value": "America/Detroit"
+              },
+              {
+                "key": "America/Kentucky/Louisville",
+                "value": "America/Kentucky/Louisville"
+              },
+              {
+                "key": "America/Kentucky/Monticello",
+                "value": "America/Kentucky/Monticello"
+              },
+              {
+                "key": "America/Indiana/Indianapolis",
+                "value": "America/Indiana/Indianapolis"
+              },
+              {
+                "key": "America/Indiana/Vincennes",
+                "value": "America/Indiana/Vincennes"
+              },
+              {
+                "key": "America/Indiana/Winamac",
+                "value": "America/Indiana/Winamac"
+              },
+              {
+                "key": "America/Indiana/Marengo",
+                "value": "America/Indiana/Marengo"
+              },
+              {
+                "key": "America/Indiana/Petersburg",
+                "value": "America/Indiana/Petersburg"
+              },
+              {
+                "key": "America/Indiana/Vevay",
+                "value": "America/Indiana/Vevay"
+              },
+              {
+                "key": "America/Chicago",
+                "value": "America/Chicago"
+              },
+              {
+                "key": "America/Indiana/Tell_City",
+                "value": "America/Indiana/Tell_City"
+              },
+              {
+                "key": "America/Indiana/Knox",
+                "value": "America/Indiana/Knox"
+              },
+              {
+                "key": "America/Menominee",
+                "value": "America/Menominee"
+              },
+              {
+                "key": "America/North_Dakota/Center",
+                "value": "America/North_Dakota/Center"
+              },
+              {
+                "key": "America/North_Dakota/New_Salem",
+                "value": "America/North_Dakota/New_Salem"
+              },
+              {
+                "key": "America/North_Dakota/Beulah",
+                "value": "America/North_Dakota/Beulah"
+              },
+              {
+                "key": "America/Denver",
+                "value": "America/Denver"
+              },
+              {
+                "key": "America/Boise",
+                "value": "America/Boise"
+              },
+              {
+                "key": "America/Phoenix",
+                "value": "America/Phoenix"
+              },
+              {
+                "key": "America/Los_Angeles",
+                "value": "America/Los_Angeles"
+              },
+              {
+                "key": "America/Anchorage",
+                "value": "America/Anchorage"
+              },
+              {
+                "key": "America/Juneau",
+                "value": "America/Juneau"
+              },
+              {
+                "key": "America/Sitka",
+                "value": "America/Sitka"
+              },
+              {
+                "key": "America/Yakutat",
+                "value": "America/Yakutat"
+              },
+              {
+                "key": "America/Nome",
+                "value": "America/Nome"
+              },
+              {
+                "key": "America/Adak",
+                "value": "America/Adak"
+              },
+              {
+                "key": "America/Metlakatla",
+                "value": "America/Metlakatla"
+              },
+              {
+                "key": "Pacific/Honolulu",
+                "value": "Pacific/Honolulu"
+              },
+              {
+                "key": "America/Montevideo",
+                "value": "America/Montevideo"
+              },
+              {
+                "key": "Asia/Samarkand",
+                "value": "Asia/Samarkand"
+              },
+              {
+                "key": "Asia/Tashkent",
+                "value": "Asia/Tashkent"
+              },
+              {
+                "key": "Europe/Vatican",
+                "value": "Europe/Vatican"
+              },
+              {
+                "key": "America/St_Vincent",
+                "value": "America/St_Vincent"
+              },
+              {
+                "key": "America/Caracas",
+                "value": "America/Caracas"
+              },
+              {
+                "key": "America/Tortola",
+                "value": "America/Tortola"
+              },
+              {
+                "key": "America/St_Thomas",
+                "value": "America/St_Thomas"
+              },
+              {
+                "key": "Asia/Ho_Chi_Minh",
+                "value": "Asia/Ho_Chi_Minh"
+              },
+              {
+                "key": "Pacific/Efate",
+                "value": "Pacific/Efate"
+              },
+              {
+                "key": "Pacific/Wallis",
+                "value": "Pacific/Wallis"
+              },
+              {
+                "key": "Pacific/Apia",
+                "value": "Pacific/Apia"
+              },
+              {
+                "key": "Asia/Aden",
+                "value": "Asia/Aden"
+              },
+              {
+                "key": "Indian/Mayotte",
+                "value": "Indian/Mayotte"
+              },
+              {
+                "key": "Africa/Johannesburg",
+                "value": "Africa/Johannesburg"
+              },
+              {
+                "key": "Africa/Lusaka",
+                "value": "Africa/Lusaka"
+              },
+              {
+                "key": "Africa/Harare",
+                "value": "Africa/Harare"
+              },
+              {
+                "key": "UTC",
+                "value": "UTC"
+              }
+            ],
+            "optional": false,
+            "width": 100
+          },
+          {
+            "property": "//system/host-name",
+            "title": "Hostname(host_name)",
+            "toolTip": "Set the hostname: //system/host-name",
+            "hideable": false,
+            "dataType": "string",
+            "editable": true,
+            "isDisplay": true,
+            "isLeftPinned": false,
+            "objectType": "object",
+            "templateType": "cisco_system",
+            "values": false,
+            "optional": false,
+            "width": 100
+          },
+          {
+            "property": "//system/gps-location/latitude",
+            "title": "Latitude(system_latitude)",
+            "toolTip": "Set the device\u2019s physical latitude: //system/gps-location/latitude",
+            "hideable": false,
+            "dataType": "float",
+            "editable": true,
+            "isDisplay": true,
+            "isLeftPinned": false,
+            "objectType": "object",
+            "templateType": "cisco_system",
+            "values": false,
+            "optional": false,
+            "width": 100
+          },
+          {
+            "property": "//system/gps-location/longitude",
+            "title": "Longitude(system_longitude)",
+            "toolTip": "Set the device\u2019s physical longitude: //system/gps-location/longitude",
+            "hideable": false,
+            "dataType": "float",
+            "editable": true,
+            "isDisplay": true,
+            "isLeftPinned": false,
+            "objectType": "object",
+            "templateType": "cisco_system",
+            "values": false,
+            "optional": false,
+            "width": 100
+          },
+          {
+            "property": "//system/system-ip",
+            "title": "System IP(system_ip)",
+            "toolTip": "Set the system IP address: //system/system-ip",
+            "hideable": false,
+            "dataType": "string",
+            "editable": true,
+            "isDisplay": true,
+            "isLeftPinned": false,
+            "objectType": "object",
+            "templateType": "cisco_system",
+            "values": false,
+            "optional": false,
+            "width": 100
+          },
+          {
+            "property": "//system/site-id",
+            "title": "Site ID(site_id)",
+            "toolTip": "Set the site identifier: //system/site-id",
+            "hideable": false,
+            "dataType": "number",
+            "editable": true,
+            "isDisplay": true,
+            "isLeftPinned": false,
+            "objectType": "object",
+            "templateType": "cisco_system",
+            "values": false,
+            "optional": false,
+            "width": 100
+          },
+          {
+            "property": "/0/vpn-instance/ip/route/0.0.0.0/0/next-hop/vpn0_nh_ip_address/address",
+            "title": "Address(vpn0_nh_ip_address)",
+            "toolTip": "IP Address: /0/vpn-instance/ip/route/0.0.0.0/0/next-hop/vpn0_nh_ip_address/address",
+            "hideable": false,
+            "dataType": "string",
+            "editable": true,
+            "isDisplay": true,
+            "isLeftPinned": false,
+            "objectType": "object",
+            "templateType": "cisco_vpn",
+            "values": false,
+            "optional": false,
+            "width": 100
+          },
+          {
+            "property": "/0/vpn0_intf2_name/interface/if-name",
+            "title": "Interface Name(vpn0_intf2_name)",
+            "toolTip": "Interface name: ge0/<0-..> or ge0/<0-..>.vlanid or irb<bridgeid:1-63> or loopback<string> or natpool-<1..31> when present: /0/vpn0_intf2_name/interface/if-name",
+            "hideable": false,
+            "dataType": "string",
+            "editable": true,
+            "isDisplay": true,
+            "isLeftPinned": false,
+            "objectType": "object",
+            "templateType": "cisco_vpn_interface",
+            "values": false,
+            "optional": false,
+            "width": 100
+          },
+          {
+            "property": "/0/vpn0_intf2_name/interface/ip/address",
+            "title": "IPv4 Address/ prefix-length(vpn0_intf2_ip_and_mask)",
+            "toolTip": "Assign IPv4 address: /0/vpn0_intf2_name/interface/ip/address",
+            "hideable": false,
+            "dataType": "ipv4-prefix",
+            "editable": true,
+            "isDisplay": true,
+            "isLeftPinned": false,
+            "objectType": "object",
+            "templateType": "cisco_vpn_interface",
+            "values": false,
+            "optional": false,
+            "width": 100
+          },
+          {
+            "property": "/0/vpn0_intf1_name/interface/if-name",
+            "title": "Interface Name(vpn0_intf1_name)",
+            "toolTip": "Interface name: ge0/<0-..> or ge0/<0-..>.vlanid or irb<bridgeid:1-63> or loopback<string> or natpool-<1..31> when present: /0/vpn0_intf1_name/interface/if-name",
+            "hideable": false,
+            "dataType": "string",
+            "editable": true,
+            "isDisplay": true,
+            "isLeftPinned": false,
+            "objectType": "object",
+            "templateType": "cisco_vpn_interface",
+            "values": false,
+            "optional": false,
+            "width": 100
+          },
+          {
+            "property": "/0/vpn0_intf1_name/interface/ip/address",
+            "title": "IPv4 Address/ prefix-length(vpn0_intf1_ip_and_mask)",
+            "toolTip": "Assign IPv4 address: /0/vpn0_intf1_name/interface/ip/address",
+            "hideable": false,
+            "dataType": "ipv4-prefix",
+            "editable": true,
+            "isDisplay": true,
+            "isLeftPinned": false,
+            "objectType": "object",
+            "templateType": "cisco_vpn_interface",
+            "values": false,
+            "optional": false,
+            "width": 100
+          }
+        ],
+        "templateVariableCount": 12,
+        "fields": {}
+      },
+      "data": {
+        "csv-status": "complete",
+        "csv-deviceId": "C8K-F5034D2F-CD50-8BC5-FDDD-5C59689EFB1A",
+        "csv-deviceIP": "172.16.252.12",
+        "csv-host-name": "chart2-r1",
+        "//system/host-name": "chart2-r1",
+        "//system/site-id": "252001",
+        "/0/vpn-instance/ip/route/0.0.0.0/0/next-hop/vpn0_nh_ip_address/address": "134.223.96.1",
+        "/0/vpn0_intf2_name/interface/ip/address": "134.223.92.30/24",
+        "/512/GigabitEthernet3/interface/ip/address": "9.1.36.30/24",
+        "//system/clock/timezone": "America/New_York",
+        "/0/vpn0_intf2_name/interface/if-name": "GigabitEthernet2",
+        "/0/vpn0_intf1_name/interface/ip/address": "134.223.96.30/23",
+        "//system/gps-location/latitude": "38.9072",
+        "//system/gps-location/longitude": "-77.0369",
+        "//system/system-ip": "172.16.252.12",
+        "/0/vpn0_intf1_name/interface/if-name": "GigabitEthernet1"
+      },
+      "endpoint": "/template/device/config/attached/3d0c1202-2e55-48de-ab55-ce2b3c7b4497"
+    }
+  ],
+  "device": [
+    {
+      "data": {
+        "deviceId": "172.16.252.12",
+        "system-ip": "172.16.252.12",
+        "host-name": "chart2-r1",
+        "reachability": "reachable",
+        "status": "normal",
+        "personality": "vedge",
+        "device-type": "vedge",
+        "timezone": "EDT -0400",
+        "device-groups": [
+          "No groups"
+        ],
+        "lastupdated": 1789833061083,
+        "bfdSessionsUp": 9,
+        "domain-id": "1",
+        "board-serial": "200B57BE2B9D69BE9E9DAF6540220E0568E222EB",
+        "certificate-validity": "Valid",
+        "max-controllers": "0",
+        "uuid": "C8K-F5034D2F-CD50-8BC5-FDDD-5C59689EFB1A",
+        "bfdSessions": "9 (19)",
+        "controlConnections": "3",
+        "device-model": "vedge-C8000V",
+        "version": "17.18.04.0.759",
+        "connectedVManages": [
+          "172.16.252.1"
+        ],
+        "site-id": "252001",
+        "ompPeers": "2",
+        "latitude": "38.9072",
+        "longitude": "-77.0369",
+        "isDeviceGeoData": false,
+        "platform": "x86_64",
+        "uptime-date": 1789756410078,
+        "statusOrder": 4,
+        "validity": "valid",
+        "state": "green",
+        "state_description": "All daemons up",
+        "model_sku": "None",
+        "local-system-ip": "172.16.252.12",
+        "total_cpu_count": "16",
+        "linux_cpu_count": "2",
+        "testbed_mode": false,
+        "layoutLevel": 4,
+        "site-name": "SITE_252001"
+      },
+      "endpoint": "/device/172.16.252.12"
+    }
+  ],
+  "configuration_group_devices": [
+    {
+      "data": {
+        "device-id": "C8375-E-G2-FLM3008100D",
+        "variables": [
+          {
+            "name": "system_ip",
+            "value": "172.16.252.61"
+          },
+          {
+            "name": "host_name",
+            "value": "txirvfre-r82"
+          },
+          {
+            "name": "site_id",
+            "value": 252060
+          },
+          {
+            "name": "ipv6_strict_control",
+            "value": false
+          },
+          {
+            "name": "pseudo_commit_timer",
+            "value": 300
+          },
+          {
+            "name": "device_timezone",
+            "value": "America/Chicago"
+          },
+          {
+            "name": "unilink_physical",
+            "value": "TwoGigabitEthernet0/0/2"
+          },
+          {
+            "name": "unilink_phys_intf_bw",
+            "value": "150000"
+          },
+          {
+            "name": "unilink_inet_intf_name",
+            "value": "TwoGigabitEthernet0/0/2.110"
+          },
+          {
+            "name": "unilink_inet_intf_bw",
+            "value": "100000"
+          },
+          {
+            "name": "unilink_mpls_intf_name",
+            "value": "TwoGigabitEthernet0/0/2.60"
+          },
+          {
+            "name": "unilink_mpls_intf_bw",
+            "value": "50000"
+          },
+          {
+            "name": "tloc_ext_inet_intf_name",
+            "value": "TwoGigabitEthernet0/0/1.1"
+          },
+          {
+            "name": "tloc_ext_inet_intf_bw",
+            "value": "100000"
+          },
+          {
+            "name": "tloc_ext_mpls_intf_name",
+            "value": "TwoGigabitEthernet0/0/1.3"
+          },
+          {
+            "name": "tloc_ext_mpls_intf_bw",
+            "value": "50000"
+          },
+          {
+            "name": "tloc_ext_receiving_int_1",
+            "value": "TwoGigabitEthernet0/0/1.2"
+          },
+          {
+            "name": "tloc_ext_receiving_int_2",
+            "value": "TwoGigabitEthernet0/0/1.4"
+          },
+          {
+            "name": "other_router_tloc_ext_inet_ip",
+            "value": "10.20.2.1"
+          },
+          {
+            "name": "isp_next_hop",
+            "value": "12.79.131.169"
+          },
+          {
+            "name": "tloc_ext_inet_rx_intf_name",
+            "value": "TwoGigabitEthernet0/0/1.2"
+          },
+          {
+            "name": "resource_profile",
+            "value": "medium"
+          },
+          {
+            "name": "ha_r82_loopback0_ip",
+            "value": "10.218.252.61"
+          },
+          {
+            "name": "ha_r82_loopback0_mask",
+            "value": "255.255.255.255"
+          },
+          {
+            "name": "ha_r82_vpn1_lan_intf_name_2",
+            "value": "TenGigabitEthernet0/0/4"
+          },
+          {
+            "name": "ha_r82_vpn1_lan_intf_ip_2",
+            "value": "10.221.25.145"
+          },
+          {
+            "name": "ha_r82_vpn1_lan_intf_mask_2",
+            "value": "255.255.255.248"
+          },
+          {
+            "name": "ha_r82_vpn1_lan_intf_duplex_2"
+          },
+          {
+            "name": "ha_r82_vpn1_lan_intf_speed_2"
+          },
+          {
+            "name": "ha_r82_vpn1_lan_intf_autonegotiate_2",
+            "value": true
+          },
+          {
+            "name": "ha_r82_vpn1_lan_intf_name_1",
+            "value": "TenGigabitEthernet0/0/5"
+          },
+          {
+            "name": "ha_r82_vpn1_lan_intf_ip_1",
+            "value": "10.221.25.153"
+          },
+          {
+            "name": "ha_r82_vpn1_lan_intf_mask_1",
+            "value": "255.255.255.248"
+          },
+          {
+            "name": "ha_r82_vpn1_lan_intf_duplex_1"
+          },
+          {
+            "name": "ha_r82_vpn1_lan_intf_speed_1"
+          },
+          {
+            "name": "ha_r82_vpn1_lan_intf_autonegotiate_1",
+            "value": true
+          },
+          {
+            "name": "ha_r82_ospf_router_id",
+            "value": "10.218.252.61"
+          },
+          {
+            "name": "ha_r82_ospf_intf_name_1",
+            "value": "TenGigabitEthernet0/0/5"
+          },
+          {
+            "name": "ha_r82_ospf_intf_name_2",
+            "value": "TenGigabitEthernet0/0/4"
+          },
+          {
+            "name": "mgmt_intf_ip",
+            "value": "9.1.36.152"
+          },
+          {
+            "name": "vpn0_default_gateway_inet_direct",
+            "value": "12.79.131.169"
+          },
+          {
+            "name": "vpn0_default_gateway_inet_ext",
+            "value": "10.20.1.1"
+          },
+          {
+            "name": "vpn0_default_gateway_mpls_ext",
+            "value": "10.20.3.1"
+          },
+          {
+            "name": "vpn0_default_gateway_mpls_direct",
+            "value": "10.102.97.189"
+          },
+          {
+            "name": "dia_tracker_endpoint_ip",
+            "value": "12.119.3.161"
+          },
+          {
+            "name": "ha_r82_transport_tloc_ext_parent_intf_name",
+            "value": "TwoGigabitEthernet0/0/1"
+          },
+          {
+            "name": "ha_r82_transport_unilink_parent_intf_name",
+            "value": "TwoGigabitEthernet0/0/2"
+          },
+          {
+            "name": "ha_r82_transport_unilink_parent_intf_duplex"
+          },
+          {
+            "name": "ha_r82_transport_unilink_parent_intf_speed"
+          },
+          {
+            "name": "ha_r82_transport_unilink_parent_intf_autonegotiate",
+            "value": true
+          },
+          {
+            "name": "ha_bgp_asn",
+            "value": 64542
+          },
+          {
+            "name": "ha_bgp_router_id",
+            "value": "10.218.252.61"
+          },
+          {
+            "name": "ha_ebgp_neighbor_ip",
+            "value": "10.102.97.189"
+          },
+          {
+            "name": "ha_ebgp_neighbor_remote_asn",
+            "value": 13979
+          },
+          {
+            "name": "ha_ibgp_neighbor_ip_1",
+            "value": "10.20.4.1"
+          },
+          {
+            "name": "ha_ibgp_neighbor_ip_2",
+            "value": "10.20.3.1"
+          },
+          {
+            "name": "ha_tloc_ext_mpls_receiving_subnet",
+            "value": "10.20.4.0"
+          },
+          {
+            "name": "ha_tloc_ext_mpls_receiving_mask",
+            "value": "255.255.255.252"
+          },
+          {
+            "name": "ha_r82_vpn0_tloc_ext_private1_receiving_subintf_name",
+            "value": "TwoGigabitEthernet0/0/1.4"
+          },
+          {
+            "name": "ha_r82_vpn0_tloc_ext_private1_receiving_subintf_ip",
+            "value": "10.20.4.2"
+          },
+          {
+            "name": "ha_r82_vpn0_tloc_ext_private1_receiving_subintf_mask",
+            "value": "255.255.255.252"
+          },
+          {
+            "name": "ha_r82_vpn0_private1_subintf_name",
+            "value": "TwoGigabitEthernet0/0/2.60"
+          },
+          {
+            "name": "ha_r82_vpn0_biz_subintf_name",
+            "value": "TwoGigabitEthernet0/0/1.1"
+          },
+          {
+            "name": "ha_r81_ili_ckt_id",
+            "value": "AT&T ILI BCEC556505"
+          },
+          {
+            "name": "ha_r82_vpn0_biz_subintf_ip",
+            "value": "10.20.1.2"
+          },
+          {
+            "name": "ha_r82_vpn0_biz_subintf_mask",
+            "value": "255.255.255.252"
+          },
+          {
+            "name": "ha_r82_biz_dia_tracker_endpoint_ip",
+            "value": "12.119.3.161"
+          },
+          {
+            "name": "ha_r82_vpn0_mpls_subintf_name",
+            "value": "TwoGigabitEthernet0/0/1.3"
+          },
+          {
+            "name": "ha_r81_mpls_ckt_id",
+            "value": "AT&T IPWAN BCEC556505"
+          },
+          {
+            "name": "ha_r82_vpn0_mpls_subintf_ip",
+            "value": "10.20.3.2"
+          },
+          {
+            "name": "ha_r82_vpn0_mpls_subintf_mask",
+            "value": "255.255.255.252"
+          },
+          {
+            "name": "ha_r82_mpls_ckt_id",
+            "value": "AT&T IPWAN BCEC555871"
+          },
+          {
+            "name": "ha_r82_vpn0_private1_subintf_ip",
+            "value": "10.102.97.190"
+          },
+          {
+            "name": "ha_r82_vpn0_private1_subintf_mask",
+            "value": "255.255.255.252"
+          },
+          {
+            "name": "ha_r82_vpn0_pub_subintf_name",
+            "value": "TwoGigabitEthernet0/0/2.110"
+          },
+          {
+            "name": "ha_r82_ili_ckt_id",
+            "value": "AT&T ILI BCEC555871"
+          },
+          {
+            "name": "ha_r82_vpn0_pub_subintf_ip",
+            "value": "12.79.131.170"
+          },
+          {
+            "name": "ha_r82_vpn0_pub_subintf_mask",
+            "value": "255.255.255.252"
+          },
+          {
+            "name": "ha_r82_vpn0_tloc_ext_pub_receiving_subintf_name",
+            "value": "TwoGigabitEthernet0/0/1.2"
+          },
+          {
+            "name": "ha_r82_vpn0_tloc_ext_pub_receiving_subintf_ip",
+            "value": "10.20.2.2"
+          },
+          {
+            "name": "ha_r82_vpn0_tloc_ext_pub_receiving_subintf_mask",
+            "value": "255.255.255.252"
+          },
+          {
+            "name": "ha_r81_pub_dia_tracker_endpoint_ip"
+          }
+        ]
+      },
+      "endpoint": "/v1/config-group/741e2ad5-e946-4ca1-b47e-9937df560ba9/device/variables"
+    }
+  ],
+  "feature_device_template": [
+    {
+      "data": {
+        "configType": "template",
+        "factoryDefault": false,
+        "featureTemplateUidRange": [],
+        "templateName": "DT-SANITIZER-TEST-C8000V",
+        "templateDescription": "Sanitizer test - legacy feature template for nac-sanitizer deviceTemplateVariables testing",
+        "deviceType": "vedge-C8000V",
+        "deviceRole": "sdwan-edge",
+        "policyId": "",
+        "generalTemplates": [
+          {
+            "templateId": "014aa157-c31e-47d0-9857-cb9a838de730",
+            "templateType": "cedge_aaa",
+            "subTemplates": []
+          },
+          {
+            "templateId": "41bfc83d-e135-4dd6-a5c9-f4953f0398c5",
+            "templateType": "cisco_bfd",
+            "subTemplates": []
+          },
+          {
+            "templateId": "799351ee-41e1-43c0-9efb-d29351d581b4",
+            "templateType": "cedge_global",
+            "subTemplates": []
+          },
+          {
+            "templateId": "7c589c06-0521-49fd-ab14-538d7ced8d1d",
+            "templateType": "cisco_vpn",
+            "subTemplates": [
+              {
+                "templateId": "7f755915-0d4e-492d-9670-6818c85a5924",
+                "templateType": "cisco_vpn_interface",
+                "subTemplates": []
+              },
+              {
+                "templateId": "849dcc7a-cb3d-42a8-8e48-c25cdd30bcf4",
+                "templateType": "cisco_vpn_interface",
+                "subTemplates": []
+              }
+            ]
+          },
+          {
+            "templateId": "8d08562a-91ec-43c3-a5e8-4be05bba14fe",
+            "templateType": "cisco_security",
+            "subTemplates": []
+          },
+          {
+            "templateId": "f4e7bb69-4de8-4965-80df-bb3482ee527b",
+            "templateType": "cisco_omp",
+            "subTemplates": []
+          },
+          {
+            "templateId": "fb5f7083-3977-48b3-b8ee-5e9aeefd99e3",
+            "templateType": "cisco_system",
+            "subTemplates": [
+              {
+                "templateId": "2861d730-92a9-486d-8b0e-32b07fa77374",
+                "templateType": "cisco_logging",
+                "subTemplates": []
+              }
+            ]
+          },
+          {
+            "templateId": "fbfd1b82-fe0f-4a61-821a-fc530f1ae881",
+            "templateType": "cisco_vpn",
+            "subTemplates": [
+              {
+                "templateId": "2cb83071-2f29-4e4a-8b2b-7d610506c800",
+                "templateType": "cisco_vpn_interface",
+                "subTemplates": []
+              }
+            ]
+          }
+        ],
+        "templateId": "3d0c1202-2e55-48de-ab55-ce2b3c7b4497",
+        "templateClass": "cedge",
+        "draftMode": false
+      },
+      "endpoint": "/template/device/object/"
+    }
+  ]
+}
