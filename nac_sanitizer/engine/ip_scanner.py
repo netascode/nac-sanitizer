@@ -133,7 +133,12 @@ class IPScanner:
         while stack:
             node = stack.pop()
             if isinstance(node, dict):
-                for key in node:
+                for key in list(node.keys()):
+                    if isinstance(key, str) and _could_contain_ipv4(key):
+                        new_key = self._redact_embedded(key)
+                        if new_key is not key:
+                            node[new_key] = node.pop(key)
+                            key = new_key
                     value = node[key]
                     if isinstance(value, str) and value:
                         if is_ip_like(value):
