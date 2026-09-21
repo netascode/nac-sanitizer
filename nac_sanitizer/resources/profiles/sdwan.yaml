@@ -43,6 +43,19 @@ packs:
       - "$..system_latitude"
       - "$..system_longitude"
 
+  # configuration_group_devices[*].data.variables stores device-specific
+  # values as generic {name, value} pairs. The generic "value" key can't be
+  # matched by name alone, so these paths use jsonpath_ng filter expressions
+  # to conditionally match "value" based on its sibling "name" field.
+  # See: https://github.com/netascode/nac-sanitizer/issues/167
+  configuration_group_variable_values:
+    tier: optional
+    strategy: token
+    paths:
+      - '$.configuration_group_devices[*].data.variables[?(@.name == "host_name")].value'
+      - '$.configuration_group_devices[*].data.variables[?(@.name == "site_id")].value'
+      - '$.configuration_group_devices[*].data.variables[?(@.name =~ ".*_ckt_id$")].value'
+
   url_filter_patterns:
     tier: default
     strategy: token

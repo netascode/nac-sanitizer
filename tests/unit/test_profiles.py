@@ -258,6 +258,17 @@ class TestProfileRegistry:
         assert len(policy_object_rules) > 0
         assert all(r.tier == "optional" for r in policy_object_rules)
 
+    def test_sdwan_configuration_group_variable_values_pack_is_optional_tier(
+        self,
+    ) -> None:
+        rules = ProfileRegistry.load_rules("sdwan")
+        variable_rules = [
+            r for r in rules if r.category == "CONFIGURATION_GROUP_VARIABLE_VALUES"
+        ]
+        assert len(variable_rules) > 0
+        assert all(r.tier == "optional" for r in variable_rules)
+        assert all(r.strategy == "token" for r in variable_rules)
+
 
 @pytest.mark.unit
 class TestISEProfileRegistry:
@@ -4538,6 +4549,159 @@ class TestProfileIntegration:
         assert authn_data["ifAuthFail"] == "CONTINUE"
         assert authn_data["ifUserNotFound"] == "CONTINUE"
         assert authn_data["ifProcessFail"] == "CONTINUE"
+
+
+@pytest.mark.unit
+class TestSdwanConfigurationGroupVariableValues:
+    """Conditional {name, value} redaction for configuration_group_devices.
+
+    See https://github.com/netascode/nac-sanitizer/issues/167.
+    """
+
+    @staticmethod
+    def _config_group_device_data(variables: list[dict]) -> dict:
+        return {
+            "configuration_group_devices": [
+                {
+                    "data": {
+                        "device-id": "C8375-E-G2-FLM3008100D",
+                        "variables": variables,
+                    },
+                    "endpoint": "/dataservice/v1/config-group/device",
+                }
+            ]
+        }
+
+    def _sanitize(self, tmp_path, data: dict, enabled_packs: list[str]) -> dict:
+        input_file = tmp_path / "sdwan.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["sdwan"],
+            packs=PackConfig(enable=enabled_packs),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+        return json.loads((output_dir / "sdwan.json").read_text())
+
+    @staticmethod
+    def _values_by_name(sanitized: dict) -> dict:
+        variables = sanitized["configuration_group_devices"][0]["data"]["variables"]
+        return {v["name"]: v.get("value") for v in variables}
+
+    def test_host_name_variable_value_redacted_when_enabled(self, tmp_path) -> None:
+        data = self._config_group_device_data(
+            [{"name": "host_name", "value": "branch-router-01"}]
+        )
+        sanitized = self._sanitize(
+            tmp_path, data, ["configuration_group_variable_values"]
+        )
+        by_name = self._values_by_name(sanitized)
+        assert by_name["host_name"] != "branch-router-01"
+        assert by_name["host_name"].startswith("CONFIGURATION_GROUP_VARIABLE_VALUES-")
+
+    def test_site_id_variable_value_redacted_when_enabled(self, tmp_path) -> None:
+        data = self._config_group_device_data([{"name": "site_id", "value": 100200}])
+        sanitized = self._sanitize(
+            tmp_path, data, ["configuration_group_variable_values"]
+        )
+        by_name = self._values_by_name(sanitized)
+        assert by_name["site_id"] != 100200
+        assert str(by_name["site_id"]).startswith(
+            "CONFIGURATION_GROUP_VARIABLE_VALUES-"
+        )
+
+    def test_ckt_id_suffix_variable_values_redacted_when_enabled(
+        self, tmp_path
+    ) -> None:
+        data = self._config_group_device_data(
+            [
+                {"name": "wan_ckt_id", "value": "ISP-A CKT-00112233"},
+                {"name": "ha_r82_mpls_ckt_id", "value": "AT&T IPWAN BCEC555871"},
+            ]
+        )
+        sanitized = self._sanitize(
+            tmp_path, data, ["configuration_group_variable_values"]
+        )
+        by_name = self._values_by_name(sanitized)
+        assert by_name["wan_ckt_id"] != "ISP-A CKT-00112233"
+        assert by_name["ha_r82_mpls_ckt_id"] != "AT&T IPWAN BCEC555871"
+
+    def test_non_sensitive_variable_values_not_redacted(self, tmp_path) -> None:
+        """Variables whose name doesn't match a sensitive pattern are untouched."""
+        data = self._config_group_device_data(
+            [
+                {"name": "device_timezone", "value": "America/Chicago"},
+                {"name": "resource_profile", "value": "medium"},
+            ]
+        )
+        sanitized = self._sanitize(
+            tmp_path, data, ["configuration_group_variable_values"]
+        )
+        by_name = self._values_by_name(sanitized)
+        assert by_name["device_timezone"] == "America/Chicago"
+        assert by_name["resource_profile"] == "medium"
+
+    def test_excluded_by_default_since_optional_tier(self, tmp_path) -> None:
+        """Without enabling the pack, sensitive variable values pass through."""
+        data = self._config_group_device_data(
+            [
+                {"name": "host_name", "value": "branch-router-01"},
+                {"name": "site_id", "value": 100200},
+                {"name": "wan_ckt_id", "value": "ISP-A CKT-00112233"},
+            ]
+        )
+        sanitized = self._sanitize(tmp_path, data, [])
+        by_name = self._values_by_name(sanitized)
+        assert by_name["host_name"] == "branch-router-01"
+        assert by_name["site_id"] == 100200
+        assert by_name["wan_ckt_id"] == "ISP-A CKT-00112233"
+
+    def test_ip_values_still_redacted_by_ip_scanner_without_double_redaction(
+        self, tmp_path
+    ) -> None:
+        """IP-valued variables (e.g. system_ip) are handled by the IP scanner,
+        not the conditional variable-value pack, and are redacted exactly once.
+        """
+        data = self._config_group_device_data(
+            [
+                {"name": "system_ip", "value": "10.50.1.1"},
+                {"name": "host_name", "value": "branch-router-01"},
+            ]
+        )
+        sanitized = self._sanitize(
+            tmp_path, data, ["configuration_group_variable_values"]
+        )
+        by_name = self._values_by_name(sanitized)
+        # IP scanner replaces the address with a sanitized IP, not a token
+        assert by_name["system_ip"] != "10.50.1.1"
+        assert not by_name["system_ip"].startswith(
+            "CONFIGURATION_GROUP_VARIABLE_VALUES-"
+        )
+        assert by_name["host_name"] != "branch-router-01"
+
+    def test_real_fixture_redacts_sensitive_variables(
+        self, fixtures_dir, tmp_path
+    ) -> None:
+        """End-to-end against the real vManage fixture with 82 variables."""
+        fixture = fixtures_dir / "sdwan_lab_minimal.json"
+        data = json.loads(fixture.read_text())
+        sanitized = self._sanitize(
+            tmp_path, data, ["configuration_group_variable_values"]
+        )
+
+        by_name = self._values_by_name(sanitized)
+        assert by_name["host_name"] != "txirvfre-r82"
+        assert by_name["site_id"] != 252060
+        assert by_name["ha_r81_ili_ckt_id"] != "AT&T ILI BCEC556505"
+        assert by_name["ha_r81_mpls_ckt_id"] != "AT&T IPWAN BCEC556505"
+        assert by_name["ha_r82_ili_ckt_id"] != "AT&T ILI BCEC555871"
+        assert by_name["ha_r82_mpls_ckt_id"] != "AT&T IPWAN BCEC555871"
+        # Untouched non-sensitive variable
+        assert by_name["device_timezone"] == "America/Chicago"
+        # IP-valued variable is redacted by the IP scanner, unaffected by the pack
+        assert by_name["system_ip"] != "172.16.252.61"
 
 
 @pytest.mark.unit
