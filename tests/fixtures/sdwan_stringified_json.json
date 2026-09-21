@@ -1,0 +1,24 @@
+{
+  "feature_device_template": [
+    {
+      "data": {
+        "templateName": "Test-Template-01",
+        "templateDescription": "Test template for stringified JSON",
+        "deviceType": "vedge-C8000V",
+        "configType": "template",
+        "deviceTemplateVariables": "{\"templateId\":\"tmpl-001\",\"device\":[{\"csv-status\":\"complete\",\"csv-deviceId\":\"C8K-AABBCCDD-1122-3344-5566-778899001122\",\"csv-deviceIP\":\"10.50.1.1\",\"csv-host-name\":\"test-router-01\",\"host_name\":\"test-router-01\",\"system_ip\":\"10.50.1.1\",\"siteid\":\"100200\",\"vbond-dns-name\":\"vbond.example.internal\",\"ntp_server\":\"ntp.example.internal\",\"csv-templateId\":\"tmpl-001\"}],\"isEdited\":true}"
+      }
+    }
+  ],
+  "device": [
+    {
+      "data": {
+        "host-name": "test-router-01",
+        "system-ip": "10.50.1.1",
+        "device-type": "vedge",
+        "reachability": "reachable",
+        "normal_field": "this is not JSON"
+      }
+    }
+  ]
+}

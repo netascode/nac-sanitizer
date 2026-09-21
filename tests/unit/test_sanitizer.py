@@ -4,11 +4,15 @@
 """Tests for the orchestration layer."""
 
 import json
+from pathlib import Path
+from typing import Any
 
 import pytest
 
-from nac_sanitizer.config.models import RedactionRule, SanitizerConfig
+from nac_sanitizer.config.models import PackConfig, RedactionRule, SanitizerConfig
 from nac_sanitizer.sanitizer import Sanitizer
+
+FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
 
 
 @pytest.fixture
@@ -262,3 +266,228 @@ class TestMalformedJson:
         summary = sanitizer.run_dry(input_dir)
 
         assert summary["total_matches"] > 0
+
+
+@pytest.mark.unit
+class TestStringifiedJsonUnwrapping:
+    """Tests for unwrapping/re-wrapping JSON-encoded string values (issue #170)."""
+
+    def test_ips_inside_stringified_json_are_replaced(self, tmp_path) -> None:
+        """Bare IPs embedded in a stringified JSON blob get sanitized."""
+        input_file = tmp_path / "sdwan.json"
+        input_file.write_text(
+            (FIXTURES_DIR / "sdwan_stringified_json.json").read_text(encoding="utf-8")
+        )
+
+        config = SanitizerConfig(profiles=["sdwan"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "sdwan.json").read_text())
+        raw = json.dumps(sanitized)
+        assert "10.50.1.1" not in raw
+
+    def test_hostnames_inside_stringified_json_are_redacted(self, tmp_path) -> None:
+        """Non-IP sensitive fields (hostnames) inside the blob get redacted
+        when a profile rule matches, since unwrapping makes them traversable."""
+        input_file = tmp_path / "sdwan.json"
+        input_file.write_text(
+            (FIXTURES_DIR / "sdwan_stringified_json.json").read_text(encoding="utf-8")
+        )
+
+        config = SanitizerConfig(
+            profiles=["sdwan"],
+            packs=PackConfig(enable=["hostnames"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "sdwan.json").read_text())
+        raw = json.dumps(sanitized)
+        assert "test-router-01" not in raw
+
+    def test_rewrapped_value_is_valid_json_matching_compact_format(
+        self, tmp_path
+    ) -> None:
+        """The re-wrapped string is still valid JSON, compact (no whitespace),
+        and its structure still matches the original."""
+        input_file = tmp_path / "sdwan.json"
+        input_file.write_text(
+            (FIXTURES_DIR / "sdwan_stringified_json.json").read_text(encoding="utf-8")
+        )
+
+        config = SanitizerConfig(profiles=["sdwan"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "sdwan.json").read_text())
+        variables_str = sanitized["feature_device_template"][0]["data"][
+            "deviceTemplateVariables"
+        ]
+        assert isinstance(variables_str, str)
+
+        # Must still be valid JSON.
+        parsed = json.loads(variables_str)
+        assert isinstance(parsed, dict)
+        assert "device" in parsed
+        assert isinstance(parsed["device"], list)
+        assert parsed["templateId"] == "tmpl-001"
+        assert parsed["isEdited"] is True
+
+        # Must be compact (no spaces after separators), matching vManage's
+        # original json.dumps(..., separators=(",", ":")) style formatting.
+        assert " " not in variables_str
+
+    def test_non_json_strings_are_left_untouched(self, tmp_path) -> None:
+        """A plain string value should never be parsed/unwrapped."""
+        input_file = tmp_path / "sdwan.json"
+        input_file.write_text(
+            (FIXTURES_DIR / "sdwan_stringified_json.json").read_text(encoding="utf-8")
+        )
+
+        config = SanitizerConfig(profiles=["sdwan"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "sdwan.json").read_text())
+        assert sanitized["device"][0]["data"]["normal_field"] == "this is not JSON"
+
+    def test_normal_non_stringified_json_still_works(self, tmp_path) -> None:
+        """Ordinary (non-stringified) fields elsewhere in the same document
+        continue to be sanitized normally alongside the unwrap logic."""
+        input_file = tmp_path / "sdwan.json"
+        input_file.write_text(
+            (FIXTURES_DIR / "sdwan_stringified_json.json").read_text(encoding="utf-8")
+        )
+
+        config = SanitizerConfig(profiles=["sdwan"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "sdwan.json").read_text())
+        raw = json.dumps(sanitized)
+        # The top-level device[*].data["system-ip"] IP should also be redacted.
+        assert "10.50.1.1" not in raw
+        # host-name field on the top-level device entry (not inside the
+        # stringified blob) should also have been sanitized when the
+        # hostnames pack is disabled by default it stays, but confirm the
+        # structure survived intact.
+        assert sanitized["device"][0]["data"]["device-type"] == "vedge"
+        assert sanitized["device"][0]["data"]["reachability"] == "reachable"
+
+
+@pytest.mark.unit
+class TestUnwrapJsonStringsUnit:
+    """Direct unit tests for Sanitizer._unwrap_json_strings/_rewrap_json_strings."""
+
+    def _sanitizer(self) -> Sanitizer:
+        return Sanitizer(SanitizerConfig(custom_rules=[]))
+
+    def test_unwraps_dict_stringified_json(self) -> None:
+        sanitizer = self._sanitizer()
+        data = {"blob": '{"a": 1, "b": "x"}'}
+        unwrapped = sanitizer._unwrap_json_strings(data)
+
+        assert isinstance(data["blob"], dict)
+        assert data["blob"] == {"a": 1, "b": "x"}
+        assert len(unwrapped) == 1
+
+    def test_unwraps_list_stringified_json(self) -> None:
+        sanitizer = self._sanitizer()
+        data = {"blob": "[1, 2, 3]"}
+        unwrapped = sanitizer._unwrap_json_strings(data)
+
+        assert data["blob"] == [1, 2, 3]
+        assert len(unwrapped) == 1
+
+    def test_does_not_unwrap_plain_string(self) -> None:
+        sanitizer = self._sanitizer()
+        data = {"note": "just a normal string"}
+        unwrapped = sanitizer._unwrap_json_strings(data)
+
+        assert data["note"] == "just a normal string"
+        assert unwrapped == []
+
+    def test_does_not_unwrap_json_primitives(self) -> None:
+        """Strings that are valid JSON but decode to a primitive (bool, int,
+        str, None) must not be unwrapped - only dict/list containers count."""
+        sanitizer = self._sanitizer()
+        data = {
+            "bool_str": "true",
+            "int_str": "123",
+            "float_str": "1.5",
+            "null_str": "null",
+            "quoted_str": '"hello"',
+        }
+        unwrapped = sanitizer._unwrap_json_strings(data)
+
+        assert data["bool_str"] == "true"
+        assert data["int_str"] == "123"
+        assert data["float_str"] == "1.5"
+        assert data["null_str"] == "null"
+        assert data["quoted_str"] == '"hello"'
+        assert unwrapped == []
+
+    def test_does_not_unwrap_malformed_json_looking_string(self) -> None:
+        sanitizer = self._sanitizer()
+        data = {"blob": "{not valid json"}
+        unwrapped = sanitizer._unwrap_json_strings(data)
+
+        assert data["blob"] == "{not valid json"
+        assert unwrapped == []
+
+    def test_rewrap_restores_compact_json_string(self) -> None:
+        sanitizer = self._sanitizer()
+        original = '{"a":1,"b":[1,2,3]}'
+        data = {"blob": original}
+        unwrapped = sanitizer._unwrap_json_strings(data)
+        assert isinstance(data["blob"], dict)
+
+        sanitizer._rewrap_json_strings(unwrapped)
+
+        assert data["blob"] == original
+
+    def test_rewrap_reflects_mutations_made_while_unwrapped(self) -> None:
+        """If the unwrapped structure is mutated (as the sanitization
+        pipeline would do), the re-wrapped string reflects those changes."""
+        sanitizer = self._sanitizer()
+        data: dict[str, Any] = {"blob": '{"host_name":"secret-host","other":"kept"}'}
+        unwrapped = sanitizer._unwrap_json_strings(data)
+
+        # Simulate a redaction rule mutating the unwrapped dict in-place.
+        blob = data["blob"]
+        assert isinstance(blob, dict)
+        blob["host_name"] = "REDACTED-001"
+
+        sanitizer._rewrap_json_strings(unwrapped)
+
+        assert data["blob"] == '{"host_name":"REDACTED-001","other":"kept"}'
+        # Round-trips back to valid JSON with the mutation intact.
+        assert json.loads(data["blob"]) == {
+            "host_name": "REDACTED-001",
+            "other": "kept",
+        }
+
+    def test_nested_stringified_json_unwrapped_recursively(self) -> None:
+        """A dict/list value nested inside a stringified JSON blob (which
+        itself may contain further stringified JSON) is also unwrapped."""
+        sanitizer = self._sanitizer()
+        inner = '{"deep":"value"}'
+        outer = json.dumps({"nested_blob": inner}, separators=(",", ":"))
+        data = {"blob": outer}
+
+        unwrapped = sanitizer._unwrap_json_strings(data)
+
+        assert isinstance(data["blob"], dict)
+        assert isinstance(data["blob"]["nested_blob"], dict)
+        assert data["blob"]["nested_blob"] == {"deep": "value"}
+        assert len(unwrapped) == 2
+
+        sanitizer._rewrap_json_strings(unwrapped)
+        assert data["blob"] == outer
+        assert json.loads(data["blob"]) == {"nested_blob": inner}

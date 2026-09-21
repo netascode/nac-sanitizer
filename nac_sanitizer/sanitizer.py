@@ -60,8 +60,11 @@ class Sanitizer:
                 skipped += 1
                 continue
             self._rosetta.add_source_file(str(file))
+            unwrapped = self._unwrap_json_strings(data)
             data = self._ip_scanner.scan(data)
             data = self._sanitize_data(data, rules)
+            if unwrapped:
+                self._rewrap_json_strings(unwrapped)
             self._write_output(data, file, input_path, output_path)
 
         for original, sanitized in self._ip_scanner.mappings.items():
@@ -194,6 +197,90 @@ class Sanitizer:
             )
 
         return filtered
+
+    # Minimum length for a candidate stringified-JSON value. Shortest useful
+    # JSON container is "{}" or "[]" (len 2), but we require a bit more to
+    # avoid wasting a json.loads() call on trivially empty containers.
+    _MIN_STRINGIFIED_JSON_LEN = 2
+
+    def _unwrap_json_strings(self, data: object) -> list[tuple[dict | list, Any]]:
+        """Walk the JSON tree and unwrap strings that are themselves JSON.
+
+        Some vManage exports store a nested JSON document as a string (e.g.
+        ``feature_device_template[*].data.deviceTemplateVariables``). That
+        opaque string can't be traversed by JSONPath rules, so bare IPs get
+        caught by the embedded-IP regex but non-IP sensitive fields (hostnames,
+        device IDs, etc.) inside it pass through untouched.
+
+        This unwraps any string value that parses as JSON *and* decodes to a
+        dict or list (not a bare string/number/bool/null - those aren't
+        "stringified JSON objects", they're just primitives that happen to be
+        valid JSON), replacing the string in-place with the parsed structure
+        so the normal IP scan and rule pipeline can traverse into it.
+
+        Returns a list of (container, key) locations that were unwrapped, so
+        :meth:`_rewrap_json_strings` can re-serialize only those locations
+        back to strings after sanitization runs.
+        """
+        unwrapped: list[tuple[dict | list, Any]] = []
+        self._walk_and_unwrap(data, unwrapped)
+        if unwrapped:
+            logger.debug("Unwrapped %d stringified JSON value(s)", len(unwrapped))
+        return unwrapped
+
+    def _walk_and_unwrap(
+        self, node: object, unwrapped: list[tuple[dict | list, Any]]
+    ) -> None:
+        """Recursively find and unwrap stringified JSON dicts/lists in-place."""
+        if isinstance(node, dict):
+            items: Any = node.items()
+        elif isinstance(node, list):
+            items = enumerate(node)
+        else:
+            return
+
+        for key, value in list(items):
+            if isinstance(value, str):
+                parsed = self._try_parse_json_container(value)
+                if parsed is not None:
+                    node[key] = parsed
+                    unwrapped.append((node, key))
+                    self._walk_and_unwrap(parsed, unwrapped)
+            elif isinstance(value, (dict, list)):
+                self._walk_and_unwrap(value, unwrapped)
+
+    def _try_parse_json_container(self, value: str) -> dict | list | None:
+        """Try to parse a string as a JSON object/array.
+
+        Uses a cheap pre-check before calling ``json.loads()`` to avoid the
+        parsing cost on the vast majority of strings that are obviously not
+        JSON. Only returns a result for values that decode to a ``dict`` or
+        ``list`` - strings that happen to be valid JSON primitives (e.g.
+        ``"true"``, ``"123"``, ``'"quoted"'``) are intentionally left alone.
+        """
+        if len(value) < self._MIN_STRINGIFIED_JSON_LEN:
+            return None
+        first, last = value[0], value[-1]
+        if not ((first == "{" and last == "}") or (first == "[" and last == "]")):
+            return None
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError:
+            return None
+        if isinstance(parsed, (dict, list)):
+            return parsed
+        return None
+
+    def _rewrap_json_strings(self, unwrapped: list[tuple[dict | list, Any]]) -> None:
+        """Re-serialize previously unwrapped locations back to JSON strings.
+
+        Processed in reverse (deepest-first) order so that a location nested
+        inside another unwrapped location is re-serialized before its parent
+        string is rebuilt from the now-sanitized structure.
+        """
+        for container, key in reversed(unwrapped):
+            value = container[key]
+            container[key] = json.dumps(value, separators=(",", ":"))
 
     _SIMPLE_DESCENT_RE = re.compile(r"^\$\.\.([a-zA-Z_][a-zA-Z0-9_-]*)$")
 
