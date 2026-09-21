@@ -56,12 +56,22 @@ packs:
       - '$.configuration_group_devices[*].data.variables[?(@.name == "site_id")].value'
       - '$.configuration_group_devices[*].data.variables[?(@.name =~ ".*_ckt_id$")].value'
 
+  # See: https://github.com/netascode/nac-sanitizer/issues/161
   url_filter_patterns:
     tier: default
     strategy: token
     paths:
       - "$.allow_url_list_policy_object[*].data.entries[*].pattern"
       - "$.block_url_list_policy_object[*].data.entries[*].pattern"
+      - "$.tls_ssl_profile_policy_definition[*].data.definition.filteredUrlBlackList[*].entries[*].pattern"
+      - "$.tls_ssl_profile_policy_definition[*].data.definition.filteredUrlBlackList[*].entries[*].name"
+      - "$.tls_ssl_profile_policy_definition[*].data.definition.filteredUrlWhiteList[*].entries[*].pattern"
+      - "$.tls_ssl_profile_policy_definition[*].data.definition.filteredUrlWhiteList[*].entries[*].name"
+      # policy_object_feature_profile children (feature profile parcels) may
+      # also contain URL list entries. Not reproducible in lab data (children
+      # array was empty in available samples) - added as a safety net based
+      # on the reported field-naming convention.
+      - "$.policy_object_feature_profile[*].children[*].data.payload.data.entries[*].pattern"
 
   configuration_group_names:
     tier: optional
