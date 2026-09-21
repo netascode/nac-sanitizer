@@ -240,3 +240,105 @@ class TestIPScanner:
         assert "10.1.1.254" not in data["range"]
         assert "from " in data["range"]
         assert " to " in data["range"]
+
+    def test_scan_ip_in_key_name(self) -> None:
+        """IPs embedded in dict key names are replaced (basic case)."""
+        allocator = IPAllocator()
+        scanner = IPScanner(allocator)
+        data = {"/interface/ip/address/10.50.1.1/prefix-length": "24"}
+        scanner.scan(data)
+        keys = list(data.keys())
+        assert len(keys) == 1
+        assert "10.50.1.1" not in keys[0]
+        assert keys[0].startswith("/interface/ip/address/")
+        assert keys[0].endswith("/prefix-length")
+
+    def test_scan_cidr_prefix_in_key_name(self) -> None:
+        """CIDR prefixes embedded in key names are replaced."""
+        allocator = IPAllocator()
+        scanner = IPScanner(allocator)
+        data = {
+            "/vpn-instance/ip/route/10.50.0.0/24/next-hop/nh_addr/address": "10.50.1.254"
+        }
+        scanner.scan(data)
+        keys = list(data.keys())
+        assert len(keys) == 1
+        assert "10.50.0.0" not in keys[0]
+        assert keys[0].startswith("/vpn-instance/ip/route/")
+        assert keys[0].endswith("/next-hop/nh_addr/address")
+
+    def test_scan_key_and_value_same_ip_consistent(self) -> None:
+        """The same IP appearing in a key and a value maps to the same sanitized address."""
+        allocator = IPAllocator()
+        scanner = IPScanner(allocator)
+        data = {"/vpn-instance/ip/address/10.50.1.1/mask": "10.50.1.1"}
+        scanner.scan(data)
+        keys = list(data.keys())
+        assert len(keys) == 1
+        sanitized_value = data[keys[0]]
+        assert sanitized_value in keys[0]
+        assert sanitized_value != "10.50.1.1"
+
+    def test_scan_key_without_ip_unchanged(self) -> None:
+        """Keys that do not contain an IP are left unchanged."""
+        allocator = IPAllocator()
+        scanner = IPScanner(allocator)
+        data = {"hostname": "rtr1", "description": "uplink interface"}
+        scanner.scan(data)
+        assert set(data.keys()) == {"hostname", "description"}
+
+    def test_scan_nested_ips_in_keys_at_various_depths(self) -> None:
+        """Nested structures with IPs in keys at various depths are all sanitized."""
+        allocator = IPAllocator()
+        scanner = IPScanner(allocator)
+        data = {
+            "top/10.1.1.1/level": {
+                "mid/10.2.2.2/level": [
+                    {"leaf/10.3.3.3/level": "value"},
+                ]
+            }
+        }
+        scanner.scan(data)
+        top_keys = list(data.keys())
+        assert len(top_keys) == 1
+        assert "10.1.1.1" not in top_keys[0]
+
+        mid_keys = list(data[top_keys[0]].keys())
+        assert len(mid_keys) == 1
+        assert "10.2.2.2" not in mid_keys[0]
+
+        leaf_dict = data[top_keys[0]][mid_keys[0]][0]
+        leaf_keys = list(leaf_dict.keys())
+        assert len(leaf_keys) == 1
+        assert "10.3.3.3" not in leaf_keys[0]
+
+    def test_scan_sdwan_cli_device_template_key_patterns(self) -> None:
+        """Mimics real SD-WAN cli_device_template key patterns with IPs embedded in keys."""
+        allocator = IPAllocator()
+        scanner = IPScanner(allocator)
+        data = {
+            "cli_device_template": [
+                {
+                    "data": {
+                        "/512/vpn-instance/interface/if-name/ip/address/10.50.1.1/prefix-length": "24",
+                        "/0/vpn-instance/ip/route/10.50.0.0/24/next-hop/nh_addr/address": (
+                            "10.50.1.254"
+                        ),
+                    }
+                }
+            ]
+        }
+        scanner.scan(data)
+        template_data = data["cli_device_template"][0]["data"]
+        keys = list(template_data.keys())
+        assert len(keys) == 2
+        for key in keys:
+            assert "10.50.1.1" not in key
+            assert "10.50.0.0" not in key
+        assert all(value != "10.50.1.254" for value in template_data.values())
+
+        # The IP 10.50.1.1 appears only in the first key; verify it was recorded
+        # consistently via the shared allocator/mappings cache.
+        assert "10.50.1.1" in scanner.mappings
+        assert "10.50.0.0/24" in scanner.mappings or "10.50.0.0" in scanner.mappings
+        assert "10.50.1.254" in scanner.mappings
