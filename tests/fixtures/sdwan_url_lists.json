@@ -1,0 +1,69 @@
+{
+  "allow_url_list_policy_object": [
+    {
+      "data": {
+        "name": "ALLOW-URLS-01",
+        "entries": [
+          {"pattern": "trusted.example.com"},
+          {"pattern": "internal.example.org"}
+        ]
+      }
+    }
+  ],
+  "block_url_list_policy_object": [
+    {
+      "data": {
+        "name": "BLOCK-URLS-01",
+        "entries": [
+          {"pattern": "blocked.example.com"},
+          {"pattern": "https://dangerous.example.net/"}
+        ]
+      }
+    }
+  ],
+  "tls_ssl_profile_policy_definition": [
+    {
+      "data": {
+        "name": "TLS-PROFILE-01",
+        "definition": {
+          "filteredUrlBlackList": [
+            {
+              "entries": [
+                {"pattern": "malware.example.com", "name": "malware.example.com"},
+                {"pattern": "phishing.example.net", "name": "phishing.example.net"}
+              ]
+            }
+          ],
+          "filteredUrlWhiteList": [
+            {
+              "entries": [
+                {"pattern": "safe.example.com", "name": "safe.example.com"}
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "policy_object_feature_profile": [
+    {
+      "data": {
+        "profileName": "POLICY-PROFILE-01",
+        "description": "Test policy profile"
+      },
+      "children": [
+        {
+          "data": {
+            "payload": {
+              "data": {
+                "entries": [
+                  {"pattern": "urlfilter.example.com"}
+                ]
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

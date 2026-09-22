@@ -6672,3 +6672,136 @@ class TestCatalystCenterTemplatePacks:
         assert tmpl["softwareType"] == "IOS-XE"
         assert tmpl["templateParams"][0]["parameterName"] == "hostname"
         assert proj["id"] == "proj-001"
+
+
+@pytest.mark.unit
+class TestSdwanUrlListCoverage:
+    """URL list entries across all known SD-WAN URL filter locations.
+
+    See https://github.com/netascode/nac-sanitizer/issues/161.
+    """
+
+    def _sanitize(self, tmp_path, data: dict) -> dict:
+        input_file = tmp_path / "sdwan.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["sdwan"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+        return json.loads((output_dir / "sdwan.json").read_text())
+
+    def test_allow_url_list_policy_object_entries_redacted(
+        self, fixtures_dir, tmp_path
+    ) -> None:
+        """Regression test: allow_url_list_policy_object[*].data.entries[*].pattern."""
+        data = json.loads((fixtures_dir / "sdwan_url_lists.json").read_text())
+        sanitized = self._sanitize(tmp_path, data)
+
+        allow_entries = sanitized["allow_url_list_policy_object"][0]["data"]["entries"]
+        patterns = [e["pattern"] for e in allow_entries]
+        assert "trusted.example.com" not in patterns
+        assert "internal.example.org" not in patterns
+        assert all(p.startswith("URL_FILTER_PATTERNS-") for p in patterns)
+        # Name is not targeted by this path and should survive untouched.
+        assert sanitized["allow_url_list_policy_object"][0]["data"]["name"] == (
+            "ALLOW-URLS-01"
+        )
+
+    def test_block_url_list_policy_object_entries_redacted(
+        self, fixtures_dir, tmp_path
+    ) -> None:
+        """Regression test: block_url_list_policy_object[*].data.entries[*].pattern.
+
+        Covers the reported issue where entries such as meta.com, cnn.com,
+        and nfl.com allegedly survived sanitization - verifies the [*]
+        wildcard path actually matches every entry in the array, not just
+        the first.
+        """
+        data = json.loads((fixtures_dir / "sdwan_url_lists.json").read_text())
+        sanitized = self._sanitize(tmp_path, data)
+
+        block_entries = sanitized["block_url_list_policy_object"][0]["data"]["entries"]
+        patterns = [e["pattern"] for e in block_entries]
+        assert "blocked.example.com" not in patterns
+        assert "https://dangerous.example.net/" not in patterns
+        assert len(patterns) == 2
+        assert all(p.startswith("URL_FILTER_PATTERNS-") for p in patterns)
+
+    def test_tls_ssl_profile_url_black_and_white_lists_redacted(
+        self, fixtures_dir, tmp_path
+    ) -> None:
+        """New path: tls_ssl_profile_policy_definition filtered URL lists."""
+        data = json.loads((fixtures_dir / "sdwan_url_lists.json").read_text())
+        sanitized = self._sanitize(tmp_path, data)
+
+        definition = sanitized["tls_ssl_profile_policy_definition"][0]["data"][
+            "definition"
+        ]
+        black_entries = definition["filteredUrlBlackList"][0]["entries"]
+        white_entries = definition["filteredUrlWhiteList"][0]["entries"]
+
+        for entry in black_entries:
+            assert entry["pattern"].startswith("URL_FILTER_PATTERNS-")
+            assert entry["name"].startswith("URL_FILTER_PATTERNS-")
+            assert "malware.example.com" != entry["pattern"]
+            assert "phishing.example.net" != entry["pattern"]
+
+        for entry in white_entries:
+            assert entry["pattern"].startswith("URL_FILTER_PATTERNS-")
+            assert entry["name"].startswith("URL_FILTER_PATTERNS-")
+            assert entry["pattern"] != "safe.example.com"
+
+        # Profile name itself is untouched by this pack.
+        assert (
+            sanitized["tls_ssl_profile_policy_definition"][0]["data"]["name"]
+            == "TLS-PROFILE-01"
+        )
+
+    def test_policy_object_feature_profile_children_entries_redacted(
+        self, fixtures_dir, tmp_path
+    ) -> None:
+        """New (safety-net) path: policy_object_feature_profile children entries.
+
+        Reported by the user but not reproducible in lab data (children array
+        was empty in available samples). This exercises the path against a
+        synthetic fixture shaped to the reported convention.
+        """
+        data = json.loads((fixtures_dir / "sdwan_url_lists.json").read_text())
+        sanitized = self._sanitize(tmp_path, data)
+
+        child_entries = sanitized["policy_object_feature_profile"][0]["children"][0][
+            "data"
+        ]["payload"]["data"]["entries"]
+        patterns = [e["pattern"] for e in child_entries]
+        assert "urlfilter.example.com" not in patterns
+        assert all(p.startswith("URL_FILTER_PATTERNS-") for p in patterns)
+
+        # profileName/description belong to a different pack and are
+        # untouched by url_filter_patterns.
+        assert (
+            sanitized["policy_object_feature_profile"][0]["data"]["profileName"]
+            == "POLICY-PROFILE-01"
+        )
+        assert (
+            sanitized["policy_object_feature_profile"][0]["data"]["description"]
+            == "Test policy profile"
+        )
+
+    def test_non_url_fields_not_affected(self, fixtures_dir, tmp_path) -> None:
+        """Fields outside the targeted URL paths should pass through untouched."""
+        data = json.loads((fixtures_dir / "sdwan_url_lists.json").read_text())
+        sanitized = self._sanitize(tmp_path, data)
+
+        assert sanitized["block_url_list_policy_object"][0]["data"]["name"] == (
+            "BLOCK-URLS-01"
+        )
+        assert sanitized["tls_ssl_profile_policy_definition"][0]["data"]["definition"][
+            "filteredUrlBlackList"
+        ][0]["entries"][0].get("pattern") != ("malware.example.com")
+        # Non-entries structural keys stay intact.
+        assert set(
+            sanitized["tls_ssl_profile_policy_definition"][0]["data"][
+                "definition"
+            ].keys()
+        ) == {"filteredUrlBlackList", "filteredUrlWhiteList"}
