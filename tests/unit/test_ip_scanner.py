@@ -6,7 +6,11 @@
 import pytest
 
 from nac_sanitizer.engine.ip_allocator import IPAllocator
-from nac_sanitizer.engine.ip_scanner import IPScanner, is_ip_like
+from nac_sanitizer.engine.ip_scanner import (
+    IPScanner,
+    _is_subnet_or_wildcard_mask,
+    is_ip_like,
+)
 
 
 @pytest.mark.unit
@@ -342,3 +346,175 @@ class TestIPScanner:
         assert "10.50.1.1" in scanner.mappings
         assert "10.50.0.0/24" in scanner.mappings or "10.50.0.0" in scanner.mappings
         assert "10.50.1.254" in scanner.mappings
+
+
+@pytest.mark.unit
+class TestIsSubnetOrWildcardMask:
+    """Tests for the _is_subnet_or_wildcard_mask helper."""
+
+    @pytest.mark.parametrize(
+        "mask",
+        [
+            "255.255.255.0",
+            "255.255.0.0",
+            "255.0.0.0",
+            "255.255.255.128",
+            "255.255.255.192",
+            "255.255.255.224",
+            "255.255.255.240",
+            "255.255.255.248",
+            "255.255.255.252",
+            "255.255.255.254",
+            "255.255.252.0",
+            "255.255.248.0",
+            "255.255.240.0",
+            "255.255.224.0",
+            "255.255.192.0",
+            "255.255.128.0",
+            "255.254.0.0",
+            "255.252.0.0",
+            "255.248.0.0",
+            "255.240.0.0",
+            "255.224.0.0",
+            "255.192.0.0",
+            "255.128.0.0",
+            "128.0.0.0",
+        ],
+    )
+    def test_valid_subnet_masks(self, mask: str) -> None:
+        assert _is_subnet_or_wildcard_mask(mask) is True
+
+    @pytest.mark.parametrize(
+        "mask",
+        [
+            "0.0.0.255",
+            "0.0.0.127",
+            "0.0.0.63",
+            "0.0.0.31",
+            "0.0.0.15",
+            "0.0.0.7",
+            "0.0.0.3",
+            "0.0.0.1",
+            "0.0.1.255",
+            "0.0.3.255",
+            "0.0.7.255",
+            "0.0.15.255",
+            "0.0.31.255",
+            "0.0.63.255",
+            "0.0.127.255",
+            "0.0.255.255",
+            "0.1.255.255",
+            "0.3.255.255",
+            "0.255.255.255",
+            "0.127.255.255",
+            "127.255.255.255",
+        ],
+    )
+    def test_valid_wildcard_masks(self, mask: str) -> None:
+        assert _is_subnet_or_wildcard_mask(mask) is True
+
+    def test_all_ones(self) -> None:
+        assert _is_subnet_or_wildcard_mask("255.255.255.255") is True
+
+    def test_all_zeros(self) -> None:
+        assert _is_subnet_or_wildcard_mask("0.0.0.0") is True
+
+    @pytest.mark.parametrize(
+        "addr",
+        [
+            "10.1.1.1",
+            "192.168.1.0",
+            "172.16.0.1",
+            "255.0.255.0",
+            "0.255.0.255",
+            "10.255.0.1",
+            "192.168.1.100",
+        ],
+    )
+    def test_non_masks(self, addr: str) -> None:
+        assert _is_subnet_or_wildcard_mask(addr) is False
+
+
+@pytest.mark.unit
+class TestSubnetMaskPreservation:
+    """Subnet masks and wildcard masks should not be sanitized."""
+
+    def test_subnet_mask_not_ip_like(self) -> None:
+        assert is_ip_like("255.255.255.0") is False
+        assert is_ip_like("255.255.252.0") is False
+        assert is_ip_like("255.255.248.0") is False
+
+    def test_wildcard_mask_not_ip_like(self) -> None:
+        assert is_ip_like("0.0.0.255") is False
+        assert is_ip_like("0.0.3.255") is False
+        assert is_ip_like("0.0.0.7") is False
+
+    def test_regular_ips_still_ip_like(self) -> None:
+        assert is_ip_like("10.1.1.1") is True
+        assert is_ip_like("192.168.1.0") is True
+        assert is_ip_like("172.16.0.1") is True
+
+    def test_non_contiguous_mask_still_ip_like(self) -> None:
+        assert is_ip_like("255.0.255.0") is True
+
+    def test_scan_preserves_subnet_mask(self) -> None:
+        allocator = IPAllocator()
+        scanner = IPScanner(allocator)
+        data = {"mask": "255.255.255.0", "ip": "10.1.1.1"}
+        scanner.scan(data)
+        assert data["mask"] == "255.255.255.0"
+        assert data["ip"] != "10.1.1.1"
+
+    def test_scan_preserves_wildcard_mask(self) -> None:
+        allocator = IPAllocator()
+        scanner = IPScanner(allocator)
+        data = {"wildcard": "0.0.0.255", "ip": "192.168.1.0"}
+        scanner.scan(data)
+        assert data["wildcard"] == "0.0.0.255"
+        assert data["ip"] != "192.168.1.0"
+
+    def test_scan_preserves_various_masks(self) -> None:
+        allocator = IPAllocator()
+        scanner = IPScanner(allocator)
+        data = {
+            "mask_24": "255.255.255.0",
+            "mask_22": "255.255.252.0",
+            "mask_16": "255.255.0.0",
+            "wildcard_24": "0.0.0.255",
+            "wildcard_22": "0.0.3.255",
+            "wildcard_16": "0.0.255.255",
+        }
+        scanner.scan(data)
+        assert data["mask_24"] == "255.255.255.0"
+        assert data["mask_22"] == "255.255.252.0"
+        assert data["mask_16"] == "255.255.0.0"
+        assert data["wildcard_24"] == "0.0.0.255"
+        assert data["wildcard_22"] == "0.0.3.255"
+        assert data["wildcard_16"] == "0.0.255.255"
+
+    def test_scan_preserves_mask_in_acl_string(self) -> None:
+        """Wildcard masks embedded in ACL strings are preserved."""
+        allocator = IPAllocator()
+        scanner = IPScanner(allocator)
+        data = {"acl": "access-list 10 permit 192.168.1.0 0.0.0.255"}
+        scanner.scan(data)
+        assert "0.0.0.255" in data["acl"]
+        assert "192.168.1.0" not in data["acl"]
+
+    def test_scan_preserves_mask_in_list(self) -> None:
+        allocator = IPAllocator()
+        scanner = IPScanner(allocator)
+        data = {"values": ["255.255.255.0", "10.1.1.1", "0.0.0.255"]}
+        scanner.scan(data)
+        assert data["values"][0] == "255.255.255.0"
+        assert data["values"][1] != "10.1.1.1"
+        assert data["values"][2] == "0.0.0.255"
+
+    def test_masks_not_in_scanner_mappings(self) -> None:
+        allocator = IPAllocator()
+        scanner = IPScanner(allocator)
+        data = {"mask": "255.255.255.0", "wildcard": "0.0.0.255", "ip": "10.1.1.1"}
+        scanner.scan(data)
+        assert "255.255.255.0" not in scanner.mappings
+        assert "0.0.0.255" not in scanner.mappings
+        assert "10.1.1.1" in scanner.mappings

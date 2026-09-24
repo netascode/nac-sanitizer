@@ -20,6 +20,34 @@ _EMBEDDED_IPV4_PATTERN = re.compile(
 _IPV6_PATTERN = re.compile(r"^([0-9a-fA-F:]{2,39})(/\d{1,3})?$")
 
 
+def _is_subnet_or_wildcard_mask(addr: str) -> bool:
+    """Check if a dotted-decimal value is a valid subnet mask or wildcard mask.
+
+    A subnet mask has contiguous 1-bits from the MSB (e.g. 255.255.252.0).
+    A wildcard mask is the bitwise inverse (e.g. 0.0.3.255).
+    """
+    octets = addr.split(".")
+    if len(octets) != 4:
+        return False
+    try:
+        n = (
+            (int(octets[0]) << 24)
+            | (int(octets[1]) << 16)
+            | (int(octets[2]) << 8)
+            | int(octets[3])
+        )
+    except ValueError:
+        return False
+    if n == 0 or n == 0xFFFFFFFF:
+        return True
+    inv = n ^ 0xFFFFFFFF
+    if (inv & (inv + 1)) == 0:
+        return True
+    if (n & (n + 1)) == 0:
+        return True
+    return False
+
+
 def _is_ipv4(value: str) -> bool:
     """Check if a string looks like an IPv4 address or prefix."""
     match = _IPV4_PATTERN.match(value)
@@ -92,9 +120,6 @@ _EXCLUDED_VALUES = frozenset(
         "0.0.0.0",
         "0.0.0.0/0",
         "255.255.255.255",
-        "255.255.255.0",
-        "255.255.0.0",
-        "255.0.0.0",
         "::",
         "::0",
         "::/0",
@@ -108,7 +133,10 @@ def is_ip_like(value: str) -> bool:
         return False
     if value in _EXCLUDED_VALUES:
         return False
-    return _is_ipv4(value) or _is_ipv6(value)
+    if _is_ipv4(value):
+        addr = value.split("/")[0]
+        return not _is_subnet_or_wildcard_mask(addr)
+    return _is_ipv6(value)
 
 
 class IPScanner:
@@ -189,6 +217,8 @@ class IPScanner:
             if prefix and not (0 <= int(prefix) <= 32):
                 return ip_str
             if ip_str in _EXCLUDED_VALUES or addr in _EXCLUDED_VALUES:
+                return ip_str
+            if _is_subnet_or_wildcard_mask(addr):
                 return ip_str
             return self._redact(ip_str)
 
