@@ -146,3 +146,103 @@ class TestUpdateValue:
         assert (
             sample_data["devices"][1]["config"]["aaa"]["password"] == "***REDACTED***"
         )
+
+
+@pytest.mark.unit
+class TestUpdateCoercedSliceMatches:
+    """Regression tests for issue #137: ``[*]`` over a scalar coerces it to a list.
+
+    jsonpath_ng's ``Slice`` wraps non-list values in a temporary one-element
+    list, so writing into ``match.context.value`` never touched the document.
+    """
+
+    @staticmethod
+    def _redact_all(resolver: PathResolver, path: str, data: object) -> int:
+        matches = resolver.find_matches(path, data)
+        for match in matches:
+            resolver.update_value(match, data, "REDACTED")
+        return len(matches)
+
+    def test_scalar_under_dict_key(self, resolver) -> None:
+        data = {"x": {"siteNames": "Global/A", "id": "keep"}}
+        assert self._redact_all(resolver, "$..siteNames[*]", data) == 1
+        assert data == {"x": {"siteNames": "REDACTED", "id": "keep"}}
+
+    def test_scalar_under_list_element(self, resolver) -> None:
+        data = {"profiles": [{"siteNames": "Global/A"}, {"siteNames": "Global/B"}]}
+        assert self._redact_all(resolver, "$..siteNames[*]", data) == 2
+        assert data == {
+            "profiles": [{"siteNames": "REDACTED"}, {"siteNames": "REDACTED"}]
+        }
+
+    def test_scalar_list_element_via_double_slice(self, resolver) -> None:
+        """Scalars sitting directly inside a real list, reached via ``[*][*]``."""
+        data = {"a": ["x", ["y", "z"]]}
+        assert self._redact_all(resolver, "$.a[*][*]", data) == 3
+        assert data == {"a": ["REDACTED", ["REDACTED", "REDACTED"]]}
+
+    def test_real_list_unchanged_behavior(self, resolver) -> None:
+        inner = ["Global/A", "Global/B"]
+        data = {"x": {"siteNames": inner}}
+        assert self._redact_all(resolver, "$..siteNames[*]", data) == 2
+        assert data == {"x": {"siteNames": ["REDACTED", "REDACTED"]}}
+        # Elements are rewritten in place; the list object itself is preserved.
+        assert data["x"]["siteNames"] is inner
+
+    def test_single_dict_through_slice_unchanged(self, resolver) -> None:
+        data = {"users": {"email": "solo@example.com", "name": "keep"}}
+        assert self._redact_all(resolver, "$..users[*].email", data) == 1
+        assert data == {"users": {"email": "REDACTED", "name": "keep"}}
+
+    def test_nested_slice_chain_with_scalar_leaf(self, resolver) -> None:
+        data = {
+            "device_admin_authorization_rule": [
+                {"data": {"commands": "PermitShow", "profile": "keep"}},
+                {"data": {"commands": ["CmdA", "CmdB"]}},
+            ]
+        }
+        path = "$..device_admin_authorization_rule[*].data.commands[*]"
+        assert self._redact_all(resolver, path, data) == 3
+        rules = data["device_admin_authorization_rule"]
+        assert rules[0]["data"] == {"commands": "REDACTED", "profile": "keep"}
+        assert rules[1]["data"] == {"commands": ["REDACTED", "REDACTED"]}
+
+    def test_nested_slice_chain_over_single_dict_with_scalar_leaf(
+        self, resolver
+    ) -> None:
+        """Both ``[*]`` selectors coerce: a lone dict, then a scalar leaf."""
+        data = {"device_admin_authorization_rule": {"data": {"commands": "Cmd"}}}
+        path = "$..device_admin_authorization_rule[*].data.commands[*]"
+        assert self._redact_all(resolver, path, data) == 1
+        assert data == {
+            "device_admin_authorization_rule": {"data": {"commands": "REDACTED"}}
+        }
+
+    def test_consecutive_slices_over_single_scalar(self, resolver) -> None:
+        """``[*][*]`` over a scalar nests two coerced wrappers."""
+        data = {"a": {"b": "secret"}}
+        assert self._redact_all(resolver, "$.a.b[*][*]", data) == 1
+        assert data == {"a": {"b": "REDACTED"}}
+
+    def test_filtered_parent_with_scalar_leaf(self, resolver) -> None:
+        data = {"a": [{"n": "k", "v": "secret"}, {"n": "other", "v": "keep"}]}
+        assert self._redact_all(resolver, "$.a[?(@.n=='k')].v[*]", data) == 1
+        assert data == {"a": [{"n": "k", "v": "REDACTED"}, {"n": "other", "v": "keep"}]}
+
+    def test_scalar_at_explicit_index_through_slice(self, resolver) -> None:
+        data = {"a": ["secret", "other"]}
+        assert self._redact_all(resolver, "$.a[0][*]", data) == 1
+        assert data == {"a": ["REDACTED", "other"]}
+
+    def test_numeric_scalar_is_replaced(self, resolver) -> None:
+        data = {"x": {"vlan": 42}}
+        assert self._redact_all(resolver, "$..vlan[*]", data) == 1
+        assert data == {"x": {"vlan": "REDACTED"}}
+
+    def test_root_scalar_through_slice(self, resolver) -> None:
+        """A coerced root has no real parent, so fall back to update_or_create."""
+        data = {"k": "v"}
+        matches = resolver.find_matches("$[*].k", data)
+        assert len(matches) == 1
+        resolver.update_value(matches[0], data, "REDACTED")
+        assert data == {"k": "REDACTED"}
