@@ -3,6 +3,8 @@
 
 """Shared constants for nac-sanitizer."""
 
+import ipaddress
+
 ROSETTA_FILENAME_PREFIX = "nac-sanitizer-rosetta"
 DEFAULT_ROSETTA_PERMISSIONS = 0o600
 
@@ -16,6 +18,10 @@ DEFAULT_IPV4_POOLS = [
     "100.64.0.0/10",
 ]
 
+DEFAULT_IPV4_MULTICAST_POOLS = [
+    "239.0.0.0/8",
+]
+
 DEFAULT_IPV6_POOLS = [
     "2001:db8::/32",
     "fc00::/7",
@@ -23,3 +29,15 @@ DEFAULT_IPV6_POOLS = [
 
 DEFAULT_IPV4_PREFIX = 24
 DEFAULT_IPV6_PREFIX = 64
+
+WELL_KNOWN_MULTICAST_V4_RANGES = (ipaddress.IPv4Network("224.0.0.0/24"),)
+
+WELL_KNOWN_MULTICAST_V4_ADDRESSES = frozenset(
+    {
+        ipaddress.IPv4Address("224.0.1.1"),
+        ipaddress.IPv4Address("224.0.1.39"),
+        ipaddress.IPv4Address("224.0.1.40"),
+    }
+)
+
+WELL_KNOWN_MULTICAST_V6_RANGES = (ipaddress.IPv6Network("ff02::/16"),)

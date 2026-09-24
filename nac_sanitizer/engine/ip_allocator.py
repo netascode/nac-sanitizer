@@ -10,6 +10,7 @@ import re
 from dataclasses import dataclass, field
 
 from nac_sanitizer.constants import (
+    DEFAULT_IPV4_MULTICAST_POOLS,
     DEFAULT_IPV4_POOLS,
     DEFAULT_IPV4_PREFIX,
     DEFAULT_IPV6_POOLS,
@@ -48,6 +49,9 @@ class IPAllocator:
     """
 
     ipv4_pools: list[str] = field(default_factory=lambda: list(DEFAULT_IPV4_POOLS))
+    ipv4_multicast_pools: list[str] = field(
+        default_factory=lambda: list(DEFAULT_IPV4_MULTICAST_POOLS)
+    )
     ipv6_pools: list[str] = field(default_factory=lambda: list(DEFAULT_IPV6_POOLS))
     preserve_prefix_length: bool = True
     default_ipv4_prefix: int = DEFAULT_IPV4_PREFIX
@@ -65,6 +69,9 @@ class IPAllocator:
     _ipv6_pool_networks: list[ipaddress.IPv6Network] = field(
         default_factory=list, init=False
     )
+    _ipv4_multicast_pool_networks: list[ipaddress.IPv4Network] = field(
+        default_factory=list, init=False
+    )
     # O(1) exact network lookup (keyed by network object)
     _network_exact_map: dict[IPv4Or6Network, int] = field(
         default_factory=dict, init=False
@@ -77,14 +84,17 @@ class IPAllocator:
     # Sorted list of (network_address_int, broadcast_address_int)
     # for O(log n) overlap checks on sanitized networks
     _sorted_sanitized: list[tuple[int, int]] = field(default_factory=list, init=False)
-    # Tracks the next sequential offset per (version, prefix_len) for O(1) allocation
-    _allocation_counters: dict[tuple[int, int], int] = field(
+    # Tracks the next sequential offset per (version, prefix_len, is_multicast)
+    _allocation_counters: dict[tuple[int, int, bool], int] = field(
         default_factory=dict, init=False
     )
 
     def __post_init__(self) -> None:
         self._ipv4_pool_networks = [ipaddress.IPv4Network(p) for p in self.ipv4_pools]
         self._ipv6_pool_networks = [ipaddress.IPv6Network(p) for p in self.ipv6_pools]
+        self._ipv4_multicast_pool_networks = [
+            ipaddress.IPv4Network(p) for p in self.ipv4_multicast_pools
+        ]
 
     def allocate(self, value: str) -> str:
         """Allocate a sanitized IP/prefix for the given original value."""
@@ -218,6 +228,17 @@ class IPAllocator:
             pos -= 1
         return None
 
+    def _select_pools(self, version: int, original: IPv4Or6Network | None) -> list:
+        """Select the appropriate pool list based on address version and type."""
+        is_mcast = original is not None and original.network_address.is_multicast
+        if version == 4:
+            return (
+                self._ipv4_multicast_pool_networks
+                if is_mcast
+                else self._ipv4_pool_networks
+            )
+        return self._ipv6_pool_networks
+
     def _next_available_network(
         self,
         version: int,
@@ -225,7 +246,7 @@ class IPAllocator:
         original: IPv4Or6Network | None = None,
     ) -> IPv4Or6Network:
         """Allocate the next available network of the given prefix length from pools."""
-        pools = self._ipv4_pool_networks if version == 4 else self._ipv6_pool_networks
+        pools = self._select_pools(version, original)
         try:
             return self._next_from_pools(pools, prefix_len, version, original)
         except PoolExhaustedError:
@@ -252,18 +273,25 @@ class IPAllocator:
         (version, prefix_len) and compute the N-th subnet directly. Cross-prefix
         overlaps are checked via O(log n) bisect on the sanitized range structure.
         """
-        key = (version, prefix_len)
+        is_mcast = pools is self._ipv4_multicast_pool_networks
+        key = (version, prefix_len, is_mcast)
         offset = self._allocation_counters.get(key, 0)
 
         while True:
             subnet = self._subnet_at_offset(pools, prefix_len, version, offset)
             if subnet is None:
                 pool_cidrs = ", ".join(str(p) for p in pools)
+                pool_key = (
+                    f"ip_pools.ipv{version}_multicast"
+                    if is_mcast
+                    else f"ip_pools.ipv{version}"
+                )
                 raise PoolExhaustedError(
-                    f"Ran out of IPv{version} /{prefix_len} address space for "
+                    f"Ran out of IPv{version} /{prefix_len} "
+                    f"{'multicast ' if is_mcast else ''}address space for "
                     f"sanitization. All {len(self._subnet_mappings)} allocated subnets "
                     f"have consumed the configured pools ({pool_cidrs}). "
-                    f"Add larger or additional pools under 'ip_pools.ipv{version}' "
+                    f"Add larger or additional pools under '{pool_key}' "
                     f"in your configuration file to increase capacity."
                 )
 

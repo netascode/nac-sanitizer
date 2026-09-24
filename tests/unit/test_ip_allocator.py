@@ -249,3 +249,71 @@ class TestEdgeCases:
     def test_invalid_network_raises_value_error(self, allocator) -> None:
         with pytest.raises(ValueError, match="Cannot parse"):
             allocator.allocate("not-a-network/24")
+
+
+@pytest.mark.unit
+class TestMulticastAllocation:
+    def test_multicast_host_maps_to_multicast(self, allocator) -> None:
+        result = allocator.allocate("239.1.1.1")
+        assert ipaddress.ip_address(result).is_multicast
+
+    def test_multicast_network_maps_to_multicast(self, allocator) -> None:
+        result = allocator.allocate("239.1.0.0/24")
+        net = ipaddress.ip_network(result)
+        assert net.network_address.is_multicast
+        assert net.prefixlen == 24
+
+    def test_multicast_result_in_default_pool(self, allocator) -> None:
+        result = allocator.allocate("239.1.1.1")
+        addr = ipaddress.ip_address(result)
+        assert addr in ipaddress.ip_network("239.0.0.0/8")
+
+    def test_multicast_consistency(self, allocator) -> None:
+        first = allocator.allocate("239.1.1.1")
+        second = allocator.allocate("239.1.1.1")
+        assert first == second
+
+    def test_multicast_uniqueness(self, allocator) -> None:
+        a = allocator.allocate("239.1.1.1")
+        b = allocator.allocate("239.2.2.2")
+        assert a != b
+
+    def test_multicast_topology_preserved(self, allocator) -> None:
+        a = allocator.allocate("239.1.1.1")
+        b = allocator.allocate("239.1.1.2")
+        net_a = ipaddress.ip_network(f"{a}/24", strict=False)
+        net_b = ipaddress.ip_network(f"{b}/24", strict=False)
+        assert net_a == net_b
+
+    def test_multicast_prefix_16_preserved(self, allocator) -> None:
+        result = allocator.allocate("239.0.0.0/16")
+        net = ipaddress.ip_network(result)
+        assert net.prefixlen == 16
+        assert net.network_address.is_multicast
+
+    def test_multicast_does_not_collide_with_unicast(self, allocator) -> None:
+        unicast = allocator.allocate("10.1.1.1")
+        multicast = allocator.allocate("239.1.1.1")
+        assert unicast != multicast
+        assert not ipaddress.ip_address(unicast).is_multicast
+        assert ipaddress.ip_address(multicast).is_multicast
+
+    def test_unicast_unaffected_by_multicast_pools(self, allocator) -> None:
+        result = allocator.allocate("10.1.1.1")
+        assert not ipaddress.ip_address(result).is_multicast
+
+    def test_multicast_self_mapping_prevention(self, allocator) -> None:
+        result = allocator.allocate("239.0.0.1")
+        assert result != "239.0.0.1"
+
+    def test_custom_multicast_pool(self) -> None:
+        alloc = IPAllocator(ipv4_multicast_pools=["232.0.0.0/8"])
+        result = alloc.allocate("239.1.1.1")
+        addr = ipaddress.ip_address(result)
+        assert addr in ipaddress.ip_network("232.0.0.0/8")
+
+    def test_multicast_host_offset_preserved(self, allocator) -> None:
+        a = allocator.allocate("239.1.1.1")
+        b = allocator.allocate("239.1.1.100")
+        offset = int(ipaddress.ip_address(b)) - int(ipaddress.ip_address(a))
+        assert offset == 99

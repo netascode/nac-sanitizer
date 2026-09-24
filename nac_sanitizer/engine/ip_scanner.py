@@ -3,10 +3,16 @@
 
 """Value-pattern scanner that identifies and redacts IPs/prefixes across an entire JSON tree."""
 
+import ipaddress
 import logging
 import re
 from typing import Any
 
+from nac_sanitizer.constants import (
+    WELL_KNOWN_MULTICAST_V4_ADDRESSES,
+    WELL_KNOWN_MULTICAST_V4_RANGES,
+    WELL_KNOWN_MULTICAST_V6_RANGES,
+)
 from nac_sanitizer.engine.ip_allocator import IPAllocator, PoolExhaustedError
 
 logger = logging.getLogger(__name__)
@@ -127,6 +133,25 @@ _EXCLUDED_VALUES = frozenset(
 )
 
 
+def _is_well_known_multicast(addr_str: str) -> bool:
+    """Check if an IPv4/IPv6 address string is a well-known multicast constant."""
+    try:
+        addr = ipaddress.ip_address(addr_str)
+    except ValueError:
+        return False
+    if not addr.is_multicast:
+        return False
+    if addr.version == 4:
+        for net in WELL_KNOWN_MULTICAST_V4_RANGES:
+            if addr in net:
+                return True
+        return addr in WELL_KNOWN_MULTICAST_V4_ADDRESSES
+    for net in WELL_KNOWN_MULTICAST_V6_RANGES:
+        if addr in net:
+            return True
+    return False
+
+
 def is_ip_like(value: str) -> bool:
     """Determine if a string value looks like an IP address or prefix."""
     if len(value) > _MAX_IP_LEN:
@@ -135,8 +160,13 @@ def is_ip_like(value: str) -> bool:
         return False
     if _is_ipv4(value):
         addr = value.split("/")[0]
-        return not _is_subnet_or_wildcard_mask(addr)
-    return _is_ipv6(value)
+        if _is_subnet_or_wildcard_mask(addr):
+            return False
+        return not _is_well_known_multicast(addr)
+    if _is_ipv6(value):
+        addr_part = value.split("/")[0]
+        return not _is_well_known_multicast(addr_part)
+    return False
 
 
 class IPScanner:
@@ -219,6 +249,8 @@ class IPScanner:
             if ip_str in _EXCLUDED_VALUES or addr in _EXCLUDED_VALUES:
                 return ip_str
             if _is_subnet_or_wildcard_mask(addr):
+                return ip_str
+            if _is_well_known_multicast(addr):
                 return ip_str
             return self._redact(ip_str)
 

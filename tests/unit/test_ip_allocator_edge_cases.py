@@ -248,3 +248,48 @@ class TestMixedOperations:
             r = allocator.allocate(f"10.{i}.1.1")
             results.add(r)
         assert len(results) == 100
+
+
+@pytest.mark.unit
+class TestMulticastEdgeCases:
+    def test_multicast_pool_exhaustion(self) -> None:
+        """Small multicast pool exhausts correctly."""
+        alloc = IPAllocator(ipv4_multicast_pools=["239.0.0.0/24"])
+        alloc.allocate("232.1.0.0/24")
+        with pytest.raises(PoolExhaustedError, match="multicast"):
+            alloc.allocate("232.2.0.0/24")
+
+    def test_many_multicast_networks(self, allocator) -> None:
+        """Can allocate many multicast /24s from default pool."""
+        results = set()
+        for i in range(50):
+            r = allocator.allocate(f"232.{i}.0.0/24")
+            results.add(r)
+        assert len(results) == 50
+        for r in results:
+            assert ipaddress.ip_network(r).network_address.is_multicast
+
+    def test_interleaved_unicast_and_multicast(self, allocator) -> None:
+        """Interleaved allocations stay in correct address spaces."""
+        u1 = allocator.allocate("10.1.1.1")
+        m1 = allocator.allocate("239.1.1.1")
+        u2 = allocator.allocate("10.2.2.2")
+        m2 = allocator.allocate("239.2.2.2")
+        assert not ipaddress.ip_address(u1).is_multicast
+        assert not ipaddress.ip_address(u2).is_multicast
+        assert ipaddress.ip_address(m1).is_multicast
+        assert ipaddress.ip_address(m2).is_multicast
+
+    def test_multicast_host_then_network(self, allocator) -> None:
+        """Multicast host then its containing network stay consistent."""
+        host = allocator.allocate("239.5.5.1")
+        network = allocator.allocate("239.5.5.0/24")
+        host_addr = ipaddress.ip_address(host)
+        sanitized_net = ipaddress.ip_network(network)
+        assert host_addr in sanitized_net
+
+    def test_ssm_range_sanitized_to_multicast(self, allocator) -> None:
+        """SSM range (232.0.0.0/8) is not well-known — should be sanitized to multicast."""
+        result = allocator.allocate("232.1.1.1")
+        addr = ipaddress.ip_address(result)
+        assert addr.is_multicast

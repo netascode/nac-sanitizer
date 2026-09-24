@@ -518,3 +518,109 @@ class TestSubnetMaskPreservation:
         assert "255.255.255.0" not in scanner.mappings
         assert "0.0.0.255" not in scanner.mappings
         assert "10.1.1.1" in scanner.mappings
+
+
+@pytest.mark.unit
+class TestMulticastHandling:
+    """Tests for well-known multicast preservation and routed multicast sanitization."""
+
+    def test_well_known_ospf_all_routers(self) -> None:
+        assert is_ip_like("224.0.0.5") is False
+
+    def test_well_known_ospf_designated_routers(self) -> None:
+        assert is_ip_like("224.0.0.6") is False
+
+    def test_well_known_all_hosts(self) -> None:
+        assert is_ip_like("224.0.0.1") is False
+
+    def test_well_known_ripv2(self) -> None:
+        assert is_ip_like("224.0.0.9") is False
+
+    def test_well_known_pim(self) -> None:
+        assert is_ip_like("224.0.0.13") is False
+
+    def test_well_known_vrrp(self) -> None:
+        assert is_ip_like("224.0.0.18") is False
+
+    def test_well_known_hsrp(self) -> None:
+        assert is_ip_like("224.0.0.102") is False
+
+    def test_well_known_igmpv3(self) -> None:
+        assert is_ip_like("224.0.0.22") is False
+
+    def test_well_known_auto_rp_announce(self) -> None:
+        assert is_ip_like("224.0.1.39") is False
+
+    def test_well_known_auto_rp_discovery(self) -> None:
+        assert is_ip_like("224.0.1.40") is False
+
+    def test_well_known_ntp(self) -> None:
+        assert is_ip_like("224.0.1.1") is False
+
+    def test_routed_multicast_is_ip_like(self) -> None:
+        assert is_ip_like("239.1.1.1") is True
+
+    def test_routed_multicast_network_is_ip_like(self) -> None:
+        assert is_ip_like("239.0.0.0/24") is True
+
+    def test_ssm_multicast_is_ip_like(self) -> None:
+        assert is_ip_like("232.1.1.1") is True
+
+    def test_scanner_preserves_well_known_multicast(self) -> None:
+        allocator = IPAllocator()
+        scanner = IPScanner(allocator)
+        data = {"ospf_group": "224.0.0.5", "pim_group": "224.0.0.13"}
+        scanner.scan(data)
+        assert data["ospf_group"] == "224.0.0.5"
+        assert data["pim_group"] == "224.0.0.13"
+
+    def test_scanner_preserves_auto_rp(self) -> None:
+        allocator = IPAllocator()
+        scanner = IPScanner(allocator)
+        data = {"auto_rp_announce": "224.0.1.39", "auto_rp_discover": "224.0.1.40"}
+        scanner.scan(data)
+        assert data["auto_rp_announce"] == "224.0.1.39"
+        assert data["auto_rp_discover"] == "224.0.1.40"
+
+    def test_scanner_sanitizes_routed_multicast(self) -> None:
+        allocator = IPAllocator()
+        scanner = IPScanner(allocator)
+        data = {"mcast_group": "239.1.1.1"}
+        scanner.scan(data)
+        assert data["mcast_group"] != "239.1.1.1"
+
+    def test_scanner_routed_multicast_stays_multicast(self) -> None:
+        import ipaddress
+
+        allocator = IPAllocator()
+        scanner = IPScanner(allocator)
+        data = {"mcast_group": "239.1.1.1"}
+        scanner.scan(data)
+        assert ipaddress.ip_address(data["mcast_group"]).is_multicast
+
+    def test_embedded_well_known_multicast_preserved(self) -> None:
+        allocator = IPAllocator()
+        scanner = IPScanner(allocator)
+        data = {"config": "ip igmp join-group 224.0.0.5"}
+        scanner.scan(data)
+        assert "224.0.0.5" in data["config"]
+
+    def test_embedded_routed_multicast_sanitized(self) -> None:
+        allocator = IPAllocator()
+        scanner = IPScanner(allocator)
+        data = {"config": "ip igmp join-group 239.1.1.1"}
+        scanner.scan(data)
+        assert "239.1.1.1" not in data["config"]
+
+    def test_well_known_ipv6_multicast_preserved(self) -> None:
+        assert is_ip_like("ff02::5") is False
+
+    def test_well_known_ipv6_all_nodes(self) -> None:
+        assert is_ip_like("ff02::1") is False
+
+    def test_scanner_preserves_ipv6_well_known_multicast(self) -> None:
+        allocator = IPAllocator()
+        scanner = IPScanner(allocator)
+        data = {"ospfv3": "ff02::5"}
+        scanner.scan(data)
+        assert data["ospfv3"] == "ff02::5"
