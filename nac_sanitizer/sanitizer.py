@@ -28,6 +28,7 @@ class Sanitizer:
         self._resolver = PathResolver()
         self._ip_allocator = IPAllocator(
             ipv4_pools=config.settings.ip_pools.ipv4_pools,
+            ipv4_multicast_pools=config.settings.ip_pools.ipv4_multicast_pools,
             ipv6_pools=config.settings.ip_pools.ipv6_pools,
             preserve_prefix_length=config.settings.ip_pools.preserve_prefix_length,
             default_ipv4_prefix=config.settings.ip_pools.default_ipv4_prefix,

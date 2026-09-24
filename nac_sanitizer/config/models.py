@@ -6,6 +6,7 @@
 from pydantic import BaseModel
 
 from nac_sanitizer.constants import (
+    DEFAULT_IPV4_MULTICAST_POOLS,
     DEFAULT_IPV4_POOLS,
     DEFAULT_IPV4_PREFIX,
     DEFAULT_IPV6_POOLS,
@@ -41,6 +42,7 @@ class IPPoolSettings(BaseModel):
     """Configuration for IP address sanitization pools."""
 
     ipv4_pools: list[str] = list(DEFAULT_IPV4_POOLS)
+    ipv4_multicast_pools: list[str] = list(DEFAULT_IPV4_MULTICAST_POOLS)
     ipv6_pools: list[str] = list(DEFAULT_IPV6_POOLS)
     preserve_prefix_length: bool = True
     default_ipv4_prefix: int = DEFAULT_IPV4_PREFIX
