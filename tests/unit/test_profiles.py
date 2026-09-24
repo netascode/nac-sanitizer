@@ -6313,6 +6313,173 @@ class TestCatalystCenterSiteHierarchyIntegration:
 
 
 @pytest.mark.unit
+class TestCatalystCenterLocationDataArrayValues:
+    """siteNameHierarchy arrays in extended_templates must be redacted (#179)."""
+
+    def test_cc_location_data_redacts_array_of_strings(self, tmp_path) -> None:
+        """Enabling location_data pack redacts siteNameHierarchy arrays in networkProfileDetails."""
+        data = {
+            "extended_templates": [
+                {
+                    "data": [
+                        {
+                            "data": [
+                                {
+                                    "networkProfileDetails": [
+                                        {
+                                            "siteNameHierarchy": [
+                                                "Global/US/NYC-HQ",
+                                                "Global/EU/London-DC",
+                                            ],
+                                            "profileType": "switching",
+                                        }
+                                    ],
+                                    "id": "tmpl-np-001",
+                                }
+                            ]
+                        }
+                    ],
+                    "endpoint": "/dna/intent/api/v1/template-programmer/template",
+                }
+            ],
+        }
+        input_file = tmp_path / "cc.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["catalyst_center"],
+            packs=PackConfig(enable=["location_data"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "cc.json").read_text())
+        np_details = sanitized["extended_templates"][0]["data"][0]["data"][0][
+            "networkProfileDetails"
+        ][0]
+        assert np_details["siteNameHierarchy"] == [
+            "LOCATION_DATA-001",
+            "LOCATION_DATA-002",
+        ]
+        assert np_details["profileType"] == "switching"
+        assert (
+            sanitized["extended_templates"][0]["data"][0]["data"][0]["id"]
+            == "tmpl-np-001"
+        )
+
+    def test_cc_location_data_excluded_by_default_for_arrays(self, tmp_path) -> None:
+        """location_data pack is optional — array values must survive when not enabled."""
+        data = {
+            "extended_templates": [
+                {
+                    "data": [
+                        {
+                            "data": [
+                                {
+                                    "networkProfileDetails": [
+                                        {
+                                            "siteNameHierarchy": [
+                                                "Global/US/NYC-HQ",
+                                                "Global/EU/London-DC",
+                                            ],
+                                        }
+                                    ],
+                                }
+                            ]
+                        }
+                    ],
+                    "endpoint": "/dna/intent/api/v1/template-programmer/template",
+                }
+            ],
+        }
+        input_file = tmp_path / "cc.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["catalyst_center"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "cc.json").read_text())
+        np_details = sanitized["extended_templates"][0]["data"][0]["data"][0][
+            "networkProfileDetails"
+        ][0]
+        assert np_details["siteNameHierarchy"] == [
+            "Global/US/NYC-HQ",
+            "Global/EU/London-DC",
+        ]
+
+    def test_cc_location_data_redacts_scalar_and_array_together(self, tmp_path) -> None:
+        """Both scalar and array siteNameHierarchy values are redacted in the same file."""
+        data = {
+            "fabric_authentication_profile": [
+                {
+                    "data": [
+                        {
+                            "data": [
+                                {
+                                    "siteNameHierarchy": "Global/US/Building-A",
+                                    "authenticationOrder": "dot1x",
+                                }
+                            ]
+                        }
+                    ],
+                    "endpoint": "/dna/intent/api/v1/business/sda/authentication-profile",
+                }
+            ],
+            "extended_templates": [
+                {
+                    "data": [
+                        {
+                            "data": [
+                                {
+                                    "networkProfileDetails": [
+                                        {
+                                            "siteNameHierarchy": [
+                                                "Global/US/NYC-HQ",
+                                                "Global/EU/London-DC",
+                                            ],
+                                        }
+                                    ],
+                                }
+                            ]
+                        }
+                    ],
+                    "endpoint": "/dna/intent/api/v1/template-programmer/template",
+                }
+            ],
+        }
+        input_file = tmp_path / "cc.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["catalyst_center"],
+            packs=PackConfig(enable=["location_data"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "cc.json").read_text())
+        scalar_val = sanitized["fabric_authentication_profile"][0]["data"][0]["data"][
+            0
+        ]["siteNameHierarchy"]
+        array_val = sanitized["extended_templates"][0]["data"][0]["data"][0][
+            "networkProfileDetails"
+        ][0]["siteNameHierarchy"]
+
+        assert scalar_val == "LOCATION_DATA-001"
+        assert array_val == ["LOCATION_DATA-002", "LOCATION_DATA-003"]
+        assert (
+            sanitized["fabric_authentication_profile"][0]["data"][0]["data"][0][
+                "authenticationOrder"
+            ]
+            == "dot1x"
+        )
+
+
+@pytest.mark.unit
 class TestCatalystCenterIPPoolContextPack:
     def test_cc_ip_pool_context_pack_is_optional_tier(self) -> None:
         rules = ProfileRegistry.load_rules("catalyst_center")
