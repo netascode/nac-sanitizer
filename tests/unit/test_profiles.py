@@ -4248,6 +4248,157 @@ class TestProfileIntegration:
         assert condition_entry["attributeName"] == "Device Type"
         assert condition_entry["dictionaryName"] == "DEVICE"
 
+    def test_ise_device_admin_condition_values_redacts_deeply_nested_children(
+        self, tmp_path
+    ) -> None:
+        """ISE device_admin_condition_values pack redacts attributeValue at all nesting depths."""
+        data = {
+            "device_admin_policy_set": [
+                {
+                    "data": {
+                        "default": False,
+                        "id": "deep-nest-policy-001",
+                        "name": "Deep-Nested-Policy",
+                        "hitCounts": 10,
+                        "rank": 0,
+                        "state": "enabled",
+                        "condition": {
+                            "conditionType": "ConditionAttributes",
+                            "isNegate": False,
+                            "dictionaryName": "DEVICE",
+                            "attributeName": "Device Type",
+                            "operator": "equals",
+                            "attributeValue": "root-level-value",
+                        },
+                        "serviceName": "Default Device Admin",
+                    },
+                    "endpoint": "/api/v1/policy/device-admin/policy-set/deep-nest",
+                    "children": {
+                        "device_admin_authorization_rule": [
+                            {
+                                "data": {
+                                    "rule": {
+                                        "default": False,
+                                        "id": "deep-authz-001",
+                                        "name": "Nested-AND-OR-Rule",
+                                        "hitCounts": 5,
+                                        "rank": 0,
+                                        "state": "enabled",
+                                        "condition": {
+                                            "conditionType": "ConditionAndBlock",
+                                            "isNegate": False,
+                                            "children": [
+                                                {
+                                                    "conditionType": "ConditionOrBlock",
+                                                    "isNegate": False,
+                                                    "children": [
+                                                        {
+                                                            "conditionType": "ConditionAttributes",
+                                                            "isNegate": False,
+                                                            "dictionaryName": "ActiveDirectory",
+                                                            "attributeName": "ExternalGroups",
+                                                            "operator": "equals",
+                                                            "name": "AD-Group-Check",
+                                                            "attributeValue": "corp.example.com/Groups/IT/Network-Admins",
+                                                        },
+                                                        {
+                                                            "conditionType": "ConditionAttributes",
+                                                            "isNegate": False,
+                                                            "dictionaryName": "ActiveDirectory",
+                                                            "attributeName": "ExternalGroups",
+                                                            "operator": "equals",
+                                                            "name": "AD-Backup-Check",
+                                                            "attributeValue": "corp.example.com/Groups/IT/Backup-Admins",
+                                                        },
+                                                    ],
+                                                },
+                                                {
+                                                    "conditionType": "ConditionAndBlock",
+                                                    "isNegate": False,
+                                                    "children": [
+                                                        {
+                                                            "conditionType": "ConditionOrBlock",
+                                                            "isNegate": False,
+                                                            "children": [
+                                                                {
+                                                                    "conditionType": "ConditionAttributes",
+                                                                    "isNegate": False,
+                                                                    "dictionaryName": "ActiveDirectory",
+                                                                    "attributeName": "ExternalGroups",
+                                                                    "operator": "equals",
+                                                                    "name": "AD-Deep-Check",
+                                                                    "attributeValue": "corp.example.com/Groups/Security/SOC-Analysts",
+                                                                },
+                                                            ],
+                                                        },
+                                                    ],
+                                                },
+                                            ],
+                                        },
+                                    },
+                                    "profile": "Priv15-Shell-Profile",
+                                    "commands": ["PermitAll-Commands"],
+                                },
+                                "endpoint": "/authorization/deep-authz-001",
+                            }
+                        ],
+                    },
+                }
+            ],
+        }
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["ise"],
+            packs=PackConfig(enable=["device_admin_condition_values"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+
+        policy_set = sanitized["device_admin_policy_set"][0]["data"]
+        assert (
+            policy_set["condition"]["attributeValue"]
+            == "DEVICE_ADMIN_CONDITION_VALUES-001"
+        )
+
+        authz_rule = sanitized["device_admin_policy_set"][0]["children"][
+            "device_admin_authorization_rule"
+        ][0]["data"]["rule"]
+        top_children = authz_rule["condition"]["children"]
+
+        # Level 2: children[0].children (ConditionOrBlock -> leaf conditions)
+        level2_or = top_children[0]["children"]
+        assert (
+            level2_or[0]["attributeValue"]
+            != "corp.example.com/Groups/IT/Network-Admins"
+        )
+        assert (
+            level2_or[1]["attributeValue"] != "corp.example.com/Groups/IT/Backup-Admins"
+        )
+        assert level2_or[0]["attributeName"] != "ExternalGroups"
+        assert level2_or[0]["dictionaryName"] != "ActiveDirectory"
+        assert level2_or[0]["name"] != "AD-Group-Check"
+
+        # Level 3: children[1].children[0].children (AND -> OR -> leaf)
+        level3_or = top_children[1]["children"][0]["children"]
+        assert (
+            level3_or[0]["attributeValue"]
+            != "corp.example.com/Groups/Security/SOC-Analysts"
+        )
+        assert level3_or[0]["attributeName"] != "ExternalGroups"
+        assert level3_or[0]["dictionaryName"] != "ActiveDirectory"
+        assert level3_or[0]["name"] != "AD-Deep-Check"
+
+        # Structural fields preserved at all levels
+        assert authz_rule["condition"]["conditionType"] == "ConditionAndBlock"
+        assert top_children[0]["conditionType"] == "ConditionOrBlock"
+        assert level2_or[0]["operator"] == "equals"
+        assert level3_or[0]["operator"] == "equals"
+
     def test_ise_device_admin_authz_refs_redacts_when_enabled(self, tmp_path) -> None:
         """ISE device_admin_authz_refs pack redacts authorization profile/commands when enabled."""
         data = self._device_admin_data()
@@ -4516,6 +4667,151 @@ class TestProfileIntegration:
             cond_children[1]["attributeValue"] == "NETWORK_ACCESS_CONDITION_VALUES-006"
         )
         assert cond_children[1]["operator"] == "equals"
+
+    def test_ise_network_access_condition_values_redacts_deeply_nested_children(
+        self, tmp_path
+    ) -> None:
+        """ISE network_access_condition_values pack redacts attributeValue at all nesting depths."""
+        data = {
+            "network_access_authorization_rule": [
+                {
+                    "data": {
+                        "rule": {
+                            "default": False,
+                            "id": "deep-authz-na-001",
+                            "name": "Deep-Nested-Authz",
+                            "hitCounts": 100,
+                            "rank": 0,
+                            "state": "enabled",
+                            "condition": {
+                                "conditionType": "ConditionAndBlock",
+                                "isNegate": False,
+                                "children": [
+                                    {
+                                        "conditionType": "ConditionOrBlock",
+                                        "isNegate": False,
+                                        "children": [
+                                            {
+                                                "conditionType": "ConditionAttributes",
+                                                "isNegate": False,
+                                                "dictionaryName": "ActiveDirectory",
+                                                "attributeName": "ExternalGroups",
+                                                "operator": "equals",
+                                                "name": "AD-Group-Check",
+                                                "attributeValue": "corp.example.com/Users and Groups/Employees/IT/Network-Admins",
+                                            },
+                                        ],
+                                    },
+                                    {
+                                        "conditionType": "ConditionAndBlock",
+                                        "isNegate": False,
+                                        "children": [
+                                            {
+                                                "conditionType": "ConditionOrBlock",
+                                                "isNegate": False,
+                                                "children": [
+                                                    {
+                                                        "conditionType": "ConditionAttributes",
+                                                        "isNegate": False,
+                                                        "dictionaryName": "ActiveDirectory",
+                                                        "attributeName": "ExternalGroups",
+                                                        "operator": "equals",
+                                                        "name": "AD-Deep-Check",
+                                                        "attributeValue": "corp.example.com/Users and Groups/Employees/Security/SOC-Analysts",
+                                                    },
+                                                ],
+                                            },
+                                        ],
+                                    },
+                                ],
+                            },
+                        },
+                        "profile": ["PermitAccess"],
+                        "securityGroup": "Employees_SGT",
+                    },
+                    "endpoint": "/authorization/deep-authz-na-001",
+                }
+            ],
+            "network_access_authorization_rule_update_ranks": [
+                {
+                    "data": {
+                        "rule": {
+                            "default": False,
+                            "id": "deep-update-001",
+                            "name": "Deep-Nested-Update",
+                            "hitCounts": 50,
+                            "rank": 1,
+                            "state": "enabled",
+                            "condition": {
+                                "conditionType": "ConditionOrBlock",
+                                "isNegate": False,
+                                "children": [
+                                    {
+                                        "conditionType": "ConditionAttributes",
+                                        "isNegate": False,
+                                        "dictionaryName": "ActiveDirectory",
+                                        "attributeName": "ExternalGroups",
+                                        "operator": "equals",
+                                        "name": "AD-Update-Check",
+                                        "attributeValue": "corp.example.com/Groups/IT/Server-Admins",
+                                    },
+                                ],
+                            },
+                        },
+                    },
+                    "endpoint": "/authorization/deep-update-001",
+                }
+            ],
+        }
+        input_file = tmp_path / "ise.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["ise"],
+            packs=PackConfig(enable=["network_access_condition_values"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "ise.json").read_text())
+
+        authz_rule = sanitized["network_access_authorization_rule"][0]["data"]["rule"]
+        top_children = authz_rule["condition"]["children"]
+
+        # Level 2: children[0].children (OR -> leaf)
+        level2_or = top_children[0]["children"]
+        assert level2_or[0]["attributeValue"] != (
+            "corp.example.com/Users and Groups/Employees/IT/Network-Admins"
+        )
+        assert level2_or[0]["attributeName"] != "ExternalGroups"
+        assert level2_or[0]["dictionaryName"] != "ActiveDirectory"
+        assert level2_or[0]["name"] != "AD-Group-Check"
+
+        # Level 3: children[1].children[0].children (AND -> OR -> leaf)
+        level3_or = top_children[1]["children"][0]["children"]
+        assert level3_or[0]["attributeValue"] != (
+            "corp.example.com/Users and Groups/Employees/Security/SOC-Analysts"
+        )
+        assert level3_or[0]["attributeName"] != "ExternalGroups"
+        assert level3_or[0]["dictionaryName"] != "ActiveDirectory"
+        assert level3_or[0]["name"] != "AD-Deep-Check"
+
+        # update_ranks nested children also redacted (level 1 nesting)
+        update_rule = sanitized["network_access_authorization_rule_update_ranks"][0][
+            "data"
+        ]["rule"]
+        update_children = update_rule["condition"]["children"]
+        assert update_children[0]["attributeValue"] != (
+            "corp.example.com/Groups/IT/Server-Admins"
+        )
+        assert update_children[0]["name"] != "AD-Update-Check"
+
+        # Structural fields preserved
+        assert authz_rule["condition"]["conditionType"] == "ConditionAndBlock"
+        assert top_children[0]["conditionType"] == "ConditionOrBlock"
+        assert level2_or[0]["operator"] == "equals"
+        assert level3_or[0]["operator"] == "equals"
 
     def test_ise_network_access_authz_refs_redacts_when_enabled(self, tmp_path) -> None:
         """ISE network_access_authz_refs pack redacts profile/SGT/identity source refs."""

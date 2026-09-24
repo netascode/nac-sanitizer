@@ -202,10 +202,10 @@ packs:
       - "$..condition.attributeName"
       - "$..condition.dictionaryName"
       - "$..condition.name"
-      - "$..condition.children[*].attributeValue"
-      - "$..condition.children[*].attributeName"
-      - "$..condition.children[*].dictionaryName"
-      - "$..condition.children[*].name"
+      - "$..children[*].attributeValue"
+      - "$..children[*].attributeName"
+      - "$..children[*].dictionaryName"
+      - "$..children[*].name"
 
   device_admin_authz_refs:
     tier: optional
@@ -234,10 +234,10 @@ packs:
       - "$..condition.attributeName"
       - "$..condition.dictionaryName"
       - "$..condition.name"
-      - "$..condition.children[*].attributeValue"
-      - "$..condition.children[*].attributeName"
-      - "$..condition.children[*].dictionaryName"
-      - "$..condition.children[*].name"
+      - "$..children[*].attributeValue"
+      - "$..children[*].attributeName"
+      - "$..children[*].dictionaryName"
+      - "$..children[*].name"
 
   network_access_authz_refs:
     tier: optional
