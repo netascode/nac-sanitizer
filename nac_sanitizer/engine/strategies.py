@@ -31,19 +31,51 @@ class TokenStrategy:
 
 
 class HostnameMapStrategy:
-    """Map hostnames to generic sequential identifiers."""
+    """Map hostnames to generic sequential identifiers.
+
+    Handles both bare hostnames (``switch01``) and FQDNs
+    (``switch01.corp.example.com``).  For FQDNs the hostname portion is
+    mapped through the same counter so that a bare hostname and its FQDN
+    variant share the same ``DEVICE-NNN`` identifier; the domain portion
+    is replaced with ``redacted.local``.
+    """
+
+    _FQDN_DOMAIN_REPLACEMENT = "redacted.local"
 
     def __init__(self) -> None:
         self._counter = 0
         self._seen: dict[str, str] = {}
+        self._host_seen: dict[str, str] = {}
 
     def redact(self, value: str, category: str | None = None) -> str:
         if value in self._seen:
             return self._seen[value]
-        self._counter += 1
-        sanitized = f"DEVICE-{self._counter:03d}"
+
+        hostname = self._extract_hostname(value)
+        if hostname is not None:
+            device_id = self._map_hostname(hostname)
+            sanitized = f"{device_id}.{self._FQDN_DOMAIN_REPLACEMENT}"
+        else:
+            sanitized = self._map_hostname(value)
+
         self._seen[value] = sanitized
         return sanitized
+
+    def _extract_hostname(self, value: str) -> str | None:
+        """Return the hostname portion if *value* looks like an FQDN, else None."""
+        from nac_sanitizer.engine.ip_scanner import is_ip_like
+
+        if "." not in value or is_ip_like(value):
+            return None
+        return value.split(".", 1)[0]
+
+    def _map_hostname(self, hostname: str) -> str:
+        if hostname in self._host_seen:
+            return self._host_seen[hostname]
+        self._counter += 1
+        device_id = f"DEVICE-{self._counter:03d}"
+        self._host_seen[hostname] = device_id
+        return device_id
 
 
 class ConstantStrategy:

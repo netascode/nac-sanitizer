@@ -80,6 +80,37 @@ class TestHostnameMapStrategy:
         result = s.redact("host1", "IGNORED")
         assert result == "DEVICE-001"
 
+    def test_fqdn_splits_hostname_from_domain(self) -> None:
+        s = HostnameMapStrategy()
+        result = s.redact("switch01.corp.example.com")
+        assert result == "DEVICE-001.redacted.local"
+
+    def test_fqdn_reuses_bare_hostname_mapping(self) -> None:
+        s = HostnameMapStrategy()
+        bare = s.redact("switch01")
+        fqdn = s.redact("switch01.dc.corp.com")
+        assert bare == "DEVICE-001"
+        assert fqdn == "DEVICE-001.redacted.local"
+
+    def test_fqdn_bare_after_fqdn_reuses_mapping(self) -> None:
+        s = HostnameMapStrategy()
+        fqdn = s.redact("switch01.dc.corp.com")
+        bare = s.redact("switch01")
+        assert fqdn == "DEVICE-001.redacted.local"
+        assert bare == "DEVICE-001"
+
+    def test_fqdn_consistency(self) -> None:
+        s = HostnameMapStrategy()
+        first = s.redact("switch01.corp.example.com")
+        second = s.redact("switch01.corp.example.com")
+        assert first == second
+
+    def test_ip_like_value_not_treated_as_fqdn(self) -> None:
+        s = HostnameMapStrategy()
+        result = s.redact("10.1.1.1")
+        assert result == "DEVICE-001"
+        assert "redacted.local" not in result
+
 
 @pytest.mark.unit
 class TestConstantStrategy:
