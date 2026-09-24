@@ -6580,6 +6580,54 @@ class TestCatalystCenterSiteHierarchyIntegration:
         assert site["type"] == "global"
         assert pool["ipPools"][0]["totalIpAddressCount"] == 32
 
+    def test_cc_site_names_redacts_scalar_matched_by_slice(self, tmp_path) -> None:
+        """``$..siteNames[*]`` redacts a scalar siteNames value (issue #137).
+
+        jsonpath_ng coerces the scalar into a temporary list, which previously
+        caused the redaction to be written to that list and silently dropped.
+        """
+        data = {
+            "network_profile": [
+                {
+                    "data": [
+                        {"id": "prof-001", "siteNames": "Global/US/East/NYC-HQ"},
+                        {
+                            "id": "prof-002",
+                            "siteNames": ["Global/EU/London", "Global/EU/Paris"],
+                        },
+                    ]
+                }
+            ],
+            "wireless_profile": {"siteNames": "Global/APAC/Tokyo"},
+        }
+        input_file = tmp_path / "cc.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["catalyst_center"],
+            packs=PackConfig(enable=["site_names"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        output = (output_dir / "cc.json").read_text()
+        sanitized = json.loads(output)
+        scalar_profile, list_profile = sanitized["network_profile"][0]["data"]
+        token = re.compile(r"^SITE_NAMES-\d{3}$")
+
+        assert isinstance(scalar_profile["siteNames"], str)
+        assert token.match(scalar_profile["siteNames"])
+        assert token.match(sanitized["wireless_profile"]["siteNames"])
+        assert len(list_profile["siteNames"]) == 2
+        assert all(token.match(name) for name in list_profile["siteNames"])
+        for original in ("NYC-HQ", "London", "Paris", "Tokyo"):
+            assert original not in output
+
+        # Non-sensitive fields preserved
+        assert scalar_profile["id"] == "prof-001"
+        assert list_profile["id"] == "prof-002"
+
     def test_cc_physical_addresses_redacts_when_enabled(self, tmp_path) -> None:
         """Enabling the physical_addresses pack redacts street addresses and countries."""
         data = _cc_site_hierarchy_data()
