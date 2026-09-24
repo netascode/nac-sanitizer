@@ -114,6 +114,93 @@ class TestSingleFileSanitization:
 
 
 @pytest.mark.unit
+class TestArrayOfStringRedaction:
+    """$..field simple-descent rules must redact array-of-string values (#179)."""
+
+    def test_simple_descent_redacts_array_of_strings(self, tmp_path) -> None:
+        data = {
+            "profiles": [
+                {
+                    "siteNames": ["Global/US/Site1", "Global/EU/Site2"],
+                    "id": "prof-001",
+                }
+            ]
+        }
+        input_file = tmp_path / "input.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            custom_rules=[
+                RedactionRule(path="$..siteNames", strategy="token", category="SITES"),
+            ]
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "input.json").read_text())
+        assert sanitized["profiles"][0]["siteNames"] == [
+            "SITES-001",
+            "SITES-002",
+        ]
+        assert sanitized["profiles"][0]["id"] == "prof-001"
+
+    def test_simple_descent_handles_mixed_array(self, tmp_path) -> None:
+        """Array containing strings, nested dicts with matching keys, and empty strings."""
+        data = {
+            "items": [
+                {
+                    "tags": [
+                        "sensitive-tag",
+                        "",
+                        {"nested": True, "tags": "inner-tag"},
+                    ]
+                }
+            ]
+        }
+        input_file = tmp_path / "input.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            custom_rules=[
+                RedactionRule(path="$..tags", strategy="token", category="TAGS"),
+            ]
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "input.json").read_text())
+        tags = sanitized["items"][0]["tags"]
+        assert tags[0] == "TAGS-001"
+        assert tags[1] == ""
+        assert tags[2]["nested"] is True
+        assert tags[2]["tags"] == "TAGS-002"
+
+    def test_simple_descent_scalar_still_works(self, tmp_path) -> None:
+        """Scalar string values continue to be redacted (no regression)."""
+        data = {"device": {"siteNameHierarchy": "Global/US/NYC"}}
+        input_file = tmp_path / "input.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            custom_rules=[
+                RedactionRule(
+                    path="$..siteNameHierarchy",
+                    strategy="token",
+                    category="LOC",
+                ),
+            ]
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "input.json").read_text())
+        assert sanitized["device"]["siteNameHierarchy"] == "LOC-001"
+
+
+@pytest.mark.unit
 class TestDirectorySanitization:
     def test_processes_all_json_files(self, basic_config, tmp_path) -> None:
         input_dir = tmp_path / "input"

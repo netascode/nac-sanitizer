@@ -348,6 +348,29 @@ class Sanitizer:
                         self._rosetta.record(str(value), sanitized, rule.category)
                         node[key] = sanitized
                         applied[key] = applied.get(key, 0) + 1
+                elif key in rules and isinstance(value, list):
+                    rule = rules[key]
+                    for i, elem in enumerate(value):
+                        if isinstance(elem, (str, int, float)) and elem != "":
+                            try:
+                                sanitized = self._strategies.apply(
+                                    rule.strategy, elem, rule.category
+                                )
+                            except (ValueError, KeyError) as e:
+                                logger.warning(
+                                    "Strategy '%s' failed for '$..%s[%d]' value '%s': %s",
+                                    rule.strategy,
+                                    key,
+                                    i,
+                                    elem,
+                                    e,
+                                )
+                                continue
+                            self._rosetta.record(str(elem), sanitized, rule.category)
+                            value[i] = sanitized
+                            applied[key] = applied.get(key, 0) + 1
+                        elif isinstance(elem, (dict, list)):
+                            self._walk_and_redact(elem, rules, applied)
                 elif isinstance(value, (dict, list)):
                     self._walk_and_redact(value, rules, applied)
         elif isinstance(node, list):
