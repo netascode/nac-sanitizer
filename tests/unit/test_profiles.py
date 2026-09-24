@@ -3151,11 +3151,11 @@ class TestProfileIntegration:
 
         sanitized = json.loads((output_dir / "ise.json").read_text())
         device = sanitized["network_device"][0]["data"]
-        assert device["name"] == "DEVICE-001"
+        assert device["name"] == "DEVICE-001.redacted.local"
         coa_host = device["trustsecsettings"]["sgaNotificationAndUpdates"][
             "coaSourceHost"
         ]
-        assert coa_host == "DEVICE-002"
+        assert coa_host == "DEVICE-002.redacted.local"
 
     def test_ise_network_device_groups_redacts_when_enabled(self, tmp_path) -> None:
         """Enabling network_device_groups redacts group list entries, name, and description."""
@@ -5280,6 +5280,14 @@ class TestCatalystCenterProfileRegistry:
         assert len(device_name_rules) > 0
         assert all(r.tier == "optional" for r in device_name_rules)
 
+    def test_cc_device_names_includes_management_ip_address_path(self) -> None:
+        rules = ProfileRegistry.load_rules("catalyst_center")
+        device_name_rules = [r for r in rules if r.category == "DEVICE_NAMES"]
+        paths = {r.path for r in device_name_rules}
+        assert (
+            "$.update_device_management_address[*].data[*].managementIpAddress" in paths
+        )
+
     def test_cc_device_descriptions_pack_is_optional_tier(self) -> None:
         rules = ProfileRegistry.load_rules("catalyst_center")
         device_desc_rules = [r for r in rules if r.category == "DEVICE_DESCRIPTIONS"]
@@ -5998,14 +6006,14 @@ class TestCatalystCenterProfileRegistry:
         sanitized = json.loads((output_dir / "cc.json").read_text())
 
         replacement = sanitized["device_replacement"][0]["data"][0]
-        assert replacement["faultyDeviceName"] == "DEVICE-001"
+        assert replacement["faultyDeviceName"] == "DEVICE-001.redacted.local"
         assert replacement["replacementStatus"] == "READY-FOR-REPLACEMENT"
         assert replacement["faultyDeviceSerialNumber"] == "FDO98765432"
 
         discovered = sanitized["lan_automation"][0]["data"][0]["discoveredDeviceList"][
             0
         ]
-        assert discovered["name"] == "DEVICE-002"
+        assert discovered["name"] == "DEVICE-002.redacted.local"
         assert discovered["serialNumber"] == "FCW1234ABCD"
 
     def test_cc_device_descriptions_excluded_by_default(self, tmp_path) -> None:
@@ -7268,3 +7276,74 @@ class TestSdwanUrlListCoverage:
                 "definition"
             ].keys()
         ) == {"filteredUrlBlackList", "filteredUrlWhiteList"}
+
+
+@pytest.mark.unit
+class TestCatalystCenterManagementIpFQDN:
+    """Issue #178: managementIpAddress containing an FQDN must be sanitized."""
+
+    def _cc_data(self, mgmt_value: str) -> dict:
+        return {
+            "update_device_management_address": [
+                {"data": [{"managementIpAddress": mgmt_value}]}
+            ]
+        }
+
+    def test_fqdn_not_redacted_by_default(self, tmp_path) -> None:
+        data = self._cc_data("switch01.corp.example.com")
+        input_file = tmp_path / "cc.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(profiles=["catalyst_center"])
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "cc.json").read_text())
+        assert (
+            sanitized["update_device_management_address"][0]["data"][0][
+                "managementIpAddress"
+            ]
+            == "switch01.corp.example.com"
+        )
+
+    def test_fqdn_redacted_when_device_names_enabled(self, tmp_path) -> None:
+        data = self._cc_data("switch01.corp.example.com")
+        input_file = tmp_path / "cc.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["catalyst_center"],
+            packs=PackConfig(enable=["device_names"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "cc.json").read_text())
+        result = sanitized["update_device_management_address"][0]["data"][0][
+            "managementIpAddress"
+        ]
+        assert "switch01" not in result
+        assert "corp.example.com" not in result
+        assert result == "DEVICE-001.redacted.local"
+
+    def test_ip_address_preserved_by_ip_scanner(self, tmp_path) -> None:
+        data = self._cc_data("10.50.1.1")
+        input_file = tmp_path / "cc.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            profiles=["catalyst_center"],
+            packs=PackConfig(enable=["device_names"]),
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "cc.json").read_text())
+        result = sanitized["update_device_management_address"][0]["data"][0][
+            "managementIpAddress"
+        ]
+        assert "10.50.1.1" not in result
+        assert "DEVICE-" not in result

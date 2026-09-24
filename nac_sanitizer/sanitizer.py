@@ -12,7 +12,7 @@ from typing import Any
 from nac_sanitizer import __version__
 from nac_sanitizer.config.models import RedactionRule, SanitizerConfig
 from nac_sanitizer.engine.ip_allocator import IPAllocator
-from nac_sanitizer.engine.ip_scanner import IPScanner
+from nac_sanitizer.engine.ip_scanner import IPScanner, is_ip_like
 from nac_sanitizer.engine.resolver import PathResolver
 from nac_sanitizer.engine.strategies import StrategyRegistry
 from nac_sanitizer.rosetta.writer import RosettaWriter
@@ -83,8 +83,6 @@ class Sanitizer:
 
         Returns a summary of what would be redacted.
         """
-        from nac_sanitizer.engine.ip_scanner import is_ip_like
-
         rules = self._build_rule_set()
         input_files = self._discover_input_files(input_path)
 
@@ -123,8 +121,6 @@ class Sanitizer:
 
     def _count_ip_values(self, node: object) -> int:
         """Count IP-like string values in a JSON tree."""
-        from nac_sanitizer.engine.ip_scanner import is_ip_like
-
         count = 0
         if isinstance(node, dict):
             for value in node.values():
@@ -330,7 +326,7 @@ class Sanitizer:
             for key in node:
                 value = node[key]
                 if key in rules and isinstance(value, (str, int, float)):
-                    if value != "" and value is not None:
+                    if value != "" and value is not None and not is_ip_like(str(value)):
                         rule = rules[key]
                         try:
                             sanitized = self._strategies.apply(
@@ -388,6 +384,8 @@ class Sanitizer:
             if not isinstance(original, (str, int, float)):
                 continue
             if original == "" or original is None:
+                continue
+            if is_ip_like(str(original)):
                 continue
             try:
                 sanitized = self._strategies.apply(

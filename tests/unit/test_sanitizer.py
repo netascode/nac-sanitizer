@@ -578,3 +578,36 @@ class TestUnwrapJsonStringsUnit:
         sanitizer._rewrap_json_strings(unwrapped)
         assert data["blob"] == outer
         assert json.loads(data["blob"]) == {"nested_blob": inner}
+
+
+@pytest.mark.unit
+class TestIPSkipGuard:
+    """IP-like values already handled by the IP scanner should not be
+    re-processed by strategy rules (issue #178)."""
+
+    def test_ip_values_not_reprocessed_by_strategy_rules(self, tmp_path) -> None:
+        data = {
+            "devices": [
+                {"managementIpAddress": "10.50.1.1"},
+            ]
+        }
+        input_file = tmp_path / "input.json"
+        input_file.write_text(json.dumps(data))
+
+        config = SanitizerConfig(
+            custom_rules=[
+                RedactionRule(
+                    path="$..managementIpAddress",
+                    strategy="hostname_map",
+                    category="DEVICE_NAMES",
+                ),
+            ]
+        )
+        sanitizer = Sanitizer(config)
+        output_dir = tmp_path / "output"
+        sanitizer.run(input_file, output_dir)
+
+        sanitized = json.loads((output_dir / "input.json").read_text())
+        result = sanitized["devices"][0]["managementIpAddress"]
+        assert "DEVICE-" not in result
+        assert "10.50.1.1" not in result

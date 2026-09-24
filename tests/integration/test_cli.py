@@ -260,7 +260,7 @@ class TestLogFile:
         config_file = tmp_path / "config.yaml"
         config_file.write_text(
             "custom_rules:\n"
-            '  - path: "$..mgmt_ip"\n'
+            '  - path: "$..hostname"\n'
             "    strategy: nonexistent_strategy\n"
             '    category: "TEST"\n'
         )
