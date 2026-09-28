@@ -8539,3 +8539,288 @@ class TestCatalystCenterExtendedTemplateNetworkProfileName:
         template = self._template(sanitized)
         assert template["networkProfileDetails"] is None
         assert template["name"].startswith("TEMPLATE_METADATA-")
+
+
+@pytest.mark.unit
+class TestCatalystCenterWirelessNames:
+    """Issue #211: wireless SSID, WLAN/policy, wireless and RF profile names."""
+
+    WIRELESS_NAMES = [
+        "$.wireless_profile[*].data[*].wirelessProfileName",
+        "$.wireless_profile[*].data[*].ssidDetails[*].ssidName",
+        "$.wireless_profile[*].data[*].ssidDetails[*].wlanProfileName",
+        "$.wireless_profile[*].data[*].ssidDetails[*].policyProfileName",
+        "$.site[*].children.wireless_ssid[*][*].data[*].ssid",
+        "$.site[*].children.wireless_ssid[*][*].data[*].profileName",
+        "$.site[*].children.wireless_ssid[*][*].data[*].policyProfileName",
+        "$.site[*].children.wireless_ssid[*][*].data[*].aclName",
+        "$.site[*].children.wireless_ssid[*][*].data[*].portalName",
+        "$.vlanToSsids[*].data[*].data[*].ssidDetails[*].name",
+        "$.wireless_rf_profile[*].data[*].rfProfileName",
+    ]
+    TOKEN_PREFIX = "WIRELESS_NAMES-"
+    SSID = "ACME-Corp"
+    WLAN_PROFILE = "ACME-Corp_profile"
+    POLICY_PROFILE = "ACME-Corp_policy"
+    WIRELESS_PROFILE = "ACME-Campus-Wireless"
+    RF_PROFILE = "ACME-HighDensity"
+    VLAN_NAME = "ACME_WIFI_VLAN"
+
+    def _cc_data(
+        self,
+        acl_name: str | None = "",
+        portal_name: str | None = "",
+        rf_profile_name: str = RF_PROFILE,
+        default_rf_profile: bool = False,
+    ) -> dict:
+        return {
+            "wireless_profile": [
+                {
+                    "data": [
+                        {
+                            "wirelessProfileName": self.WIRELESS_PROFILE,
+                            "ssidDetails": [
+                                {
+                                    "ssidName": self.SSID,
+                                    "wlanProfileName": self.WLAN_PROFILE,
+                                    "policyProfileName": self.POLICY_PROFILE,
+                                    "enableFabric": True,
+                                    "flexConnect": {
+                                        "enableFlexConnect": False,
+                                        "localToVlan": None,
+                                    },
+                                    "interfaceName": "management",
+                                }
+                            ],
+                        }
+                    ]
+                }
+            ],
+            "site": [
+                {
+                    "children": {
+                        "wireless_ssid": [
+                            [
+                                {
+                                    "data": [
+                                        {
+                                            "ssid": self.SSID,
+                                            "profileName": self.WLAN_PROFILE,
+                                            "policyProfileName": self.POLICY_PROFILE,
+                                            "aclName": acl_name,
+                                            "portalName": portal_name,
+                                            "openSsid": "",
+                                        }
+                                    ]
+                                }
+                            ]
+                        ]
+                    }
+                }
+            ],
+            "vlanToSsids": [
+                {
+                    "data": [
+                        {
+                            "data": [
+                                {
+                                    "vlanName": self.VLAN_NAME,
+                                    "vlanId": 1021,
+                                    "ssidDetails": [{"name": self.SSID}],
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ],
+            "wireless_rf_profile": [
+                {
+                    "data": [
+                        {
+                            "rfProfileName": rf_profile_name,
+                            "defaultRfProfile": default_rf_profile,
+                            "radioTypeAProperties": {"parentProfile": "CUSTOM"},
+                            "radioTypeBProperties": {"parentProfile": "HIGH"},
+                            "radioTypeCProperties": {"parentProfile": "TYPICAL"},
+                        }
+                    ]
+                }
+            ],
+        }
+
+    def _sanitize(self, tmp_path, data: dict, enable: list[str] | None = None) -> dict:
+        input_file = tmp_path / "cc.json"
+        input_file.write_text(json.dumps(data))
+        config = SanitizerConfig(
+            profiles=["catalyst_center"],
+            packs=PackConfig(enable=enable or []),
+        )
+        output_dir = tmp_path / "output"
+        Sanitizer(config).run(input_file, output_dir)
+        return json.loads((output_dir / "cc.json").read_text())
+
+    @staticmethod
+    def _wireless_profile(sanitized: dict) -> dict:
+        return sanitized["wireless_profile"][0]["data"][0]
+
+    @staticmethod
+    def _ssid_detail(sanitized: dict) -> dict:
+        return sanitized["wireless_profile"][0]["data"][0]["ssidDetails"][0]
+
+    @staticmethod
+    def _site_ssid(sanitized: dict) -> dict:
+        return sanitized["site"][0]["children"]["wireless_ssid"][0][0]["data"][0]
+
+    @staticmethod
+    def _vlan_entry(sanitized: dict) -> dict:
+        return sanitized["vlanToSsids"][0]["data"][0]["data"][0]
+
+    @staticmethod
+    def _rf_profile(sanitized: dict) -> dict:
+        return sanitized["wireless_rf_profile"][0]["data"][0]
+
+    def _is_token(self, value: object) -> bool:
+        return isinstance(value, str) and value.startswith(self.TOKEN_PREFIX)
+
+    def test_paths_registered_in_wireless_names_pack(self) -> None:
+        rules = ProfileRegistry.load_rules("catalyst_center")
+        pack_rules = [r for r in rules if r.category == "WIRELESS_NAMES"]
+        assert sorted(r.path for r in pack_rules) == sorted(self.WIRELESS_NAMES)
+        for rule in pack_rules:
+            assert rule.strategy == "token"
+            assert rule.tier == "optional"
+
+    def test_paths_not_claimed_by_other_packs(self) -> None:
+        rules = ProfileRegistry.load_rules("catalyst_center")
+        others = [
+            r
+            for r in rules
+            if r.path in self.WIRELESS_NAMES and r.category != "WIRELESS_NAMES"
+        ]
+        assert others == []
+
+    def test_every_path_matches_collector_shape(self) -> None:
+        resolver = PathResolver()
+        data = self._cc_data(acl_name="ACME-ACL", portal_name="ACME-Portal")
+        for path in self.WIRELESS_NAMES:
+            matches = resolver.find_matches(path, data)
+            assert len(matches) == 1, path
+            assert isinstance(matches[0].value, str), path
+            assert matches[0].value, path
+
+    def test_not_redacted_by_default(self, tmp_path) -> None:
+        sanitized = self._sanitize(tmp_path, self._cc_data())
+        assert self._wireless_profile(sanitized)["wirelessProfileName"] == (
+            self.WIRELESS_PROFILE
+        )
+        assert self._ssid_detail(sanitized)["ssidName"] == self.SSID
+        assert self._site_ssid(sanitized)["ssid"] == self.SSID
+        assert self._site_ssid(sanitized)["profileName"] == self.WLAN_PROFILE
+        assert self._vlan_entry(sanitized)["ssidDetails"][0]["name"] == self.SSID
+        assert self._rf_profile(sanitized)["rfProfileName"] == self.RF_PROFILE
+
+    def test_wireless_profile_redacted(self, tmp_path) -> None:
+        sanitized = self._sanitize(tmp_path, self._cc_data(), enable=["wireless_names"])
+        assert self._is_token(self._wireless_profile(sanitized)["wirelessProfileName"])
+        detail = self._ssid_detail(sanitized)
+        for key in ("ssidName", "wlanProfileName", "policyProfileName"):
+            assert self._is_token(detail[key]), key
+
+    def test_site_wireless_ssid_redacted(self, tmp_path) -> None:
+        data = self._cc_data(acl_name="ACME-ACL", portal_name="ACME-Portal")
+        sanitized = self._sanitize(tmp_path, data, enable=["wireless_names"])
+        site_ssid = self._site_ssid(sanitized)
+        for key in (
+            "ssid",
+            "profileName",
+            "policyProfileName",
+            "aclName",
+            "portalName",
+        ):
+            assert self._is_token(site_ssid[key]), key
+
+    def test_vlan_to_ssids_name_redacted(self, tmp_path) -> None:
+        sanitized = self._sanitize(tmp_path, self._cc_data(), enable=["wireless_names"])
+        assert self._is_token(self._vlan_entry(sanitized)["ssidDetails"][0]["name"])
+
+    def test_rf_profile_name_redacted(self, tmp_path) -> None:
+        sanitized = self._sanitize(tmp_path, self._cc_data(), enable=["wireless_names"])
+        assert self._is_token(self._rf_profile(sanitized)["rfProfileName"])
+
+    def test_builtin_rf_profile_name_also_tokenized(self, tmp_path) -> None:
+        data = self._cc_data(rf_profile_name="TYPICAL", default_rf_profile=True)
+        sanitized = self._sanitize(tmp_path, data, enable=["wireless_names"])
+        rf = self._rf_profile(sanitized)
+        assert self._is_token(rf["rfProfileName"])
+        assert rf["defaultRfProfile"] is True
+
+    def test_ssid_token_consistent_across_locations(self, tmp_path) -> None:
+        sanitized = self._sanitize(tmp_path, self._cc_data(), enable=["wireless_names"])
+        tokens = {
+            self._ssid_detail(sanitized)["ssidName"],
+            self._site_ssid(sanitized)["ssid"],
+            self._vlan_entry(sanitized)["ssidDetails"][0]["name"],
+        }
+        assert len(tokens) == 1
+        assert self._is_token(tokens.pop())
+
+    def test_wlan_and_policy_profile_tokens_consistent(self, tmp_path) -> None:
+        sanitized = self._sanitize(tmp_path, self._cc_data(), enable=["wireless_names"])
+        detail = self._ssid_detail(sanitized)
+        site_ssid = self._site_ssid(sanitized)
+        assert detail["wlanProfileName"] == site_ssid["profileName"]
+        assert detail["policyProfileName"] == site_ssid["policyProfileName"]
+        assert detail["wlanProfileName"] != detail["policyProfileName"]
+        assert detail["wlanProfileName"] != detail["ssidName"]
+
+    def test_shared_wlan_and_policy_name_share_token(self, tmp_path) -> None:
+        data = self._cc_data()
+        data["wireless_profile"][0]["data"][0]["ssidDetails"][0][
+            "policyProfileName"
+        ] = self.WLAN_PROFILE
+        sanitized = self._sanitize(tmp_path, data, enable=["wireless_names"])
+        detail = self._ssid_detail(sanitized)
+        assert detail["wlanProfileName"] == detail["policyProfileName"]
+
+    def test_enum_and_boolean_fields_untouched(self, tmp_path) -> None:
+        sanitized = self._sanitize(tmp_path, self._cc_data(), enable=["wireless_names"])
+        detail = self._ssid_detail(sanitized)
+        assert detail["enableFabric"] is True
+        assert detail["flexConnect"] == {
+            "enableFlexConnect": False,
+            "localToVlan": None,
+        }
+        assert detail["interfaceName"] == "management"
+        assert self._site_ssid(sanitized)["openSsid"] == ""
+        assert self._vlan_entry(sanitized)["vlanId"] == 1021
+        rf = self._rf_profile(sanitized)
+        assert rf["defaultRfProfile"] is False
+        assert rf["radioTypeAProperties"]["parentProfile"] == "CUSTOM"
+        assert rf["radioTypeBProperties"]["parentProfile"] == "HIGH"
+        assert rf["radioTypeCProperties"]["parentProfile"] == "TYPICAL"
+
+    def test_empty_strings_pass_through(self, tmp_path) -> None:
+        sanitized = self._sanitize(tmp_path, self._cc_data(), enable=["wireless_names"])
+        site_ssid = self._site_ssid(sanitized)
+        assert site_ssid["aclName"] == ""
+        assert site_ssid["portalName"] == ""
+
+    def test_nulls_pass_through(self, tmp_path) -> None:
+        data = self._cc_data(acl_name=None, portal_name=None)
+        sanitized = self._sanitize(tmp_path, data, enable=["wireless_names"])
+        site_ssid = self._site_ssid(sanitized)
+        assert site_ssid["aclName"] is None
+        assert site_ssid["portalName"] is None
+        assert self._is_token(site_ssid["ssid"])
+
+    def test_vlan_name_not_claimed_by_wireless_names(self, tmp_path) -> None:
+        sanitized = self._sanitize(tmp_path, self._cc_data(), enable=["wireless_names"])
+        assert self._vlan_entry(sanitized)["vlanName"] == self.VLAN_NAME
+
+    def test_vlan_name_tokenized_by_vlan_names_pack(self, tmp_path) -> None:
+        sanitized = self._sanitize(
+            tmp_path, self._cc_data(), enable=["wireless_names", "vlan_names"]
+        )
+        entry = self._vlan_entry(sanitized)
+        assert entry["vlanName"].startswith("VLAN_NAMES-")
+        assert self._is_token(entry["ssidDetails"][0]["name"])
