@@ -121,7 +121,7 @@ IP addresses are handled separately from profiles by a global [tree-walking scan
 
 **Site and Location:**
 
-- **site_names** — Area, building, and site names, name hierarchies, site hierarchies, and IP pool reservation group names
+- **site_names** — Area, building, and site names, name hierarchies, site hierarchies (including LAN Automation `discoveredDeviceSiteNameHierarchy`), and IP pool reservation group names
 - **physical_addresses** — Street addresses and country values in area/building/site objects
 - **domain_names** — DNS domain names and FQDNs (uses `preserve_format` to maintain dot structure)
 - **location_data** — Site name hierarchies and group name hierarchies (`siteNameHierarchy`, `groupNameHierarchy`)
