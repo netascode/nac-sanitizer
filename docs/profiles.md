@@ -17,7 +17,14 @@ nac-sanitizer profiles list
 
 ## Using Profiles
 
-Activate one or more profiles via CLI:
+When no profile is configured, `nac-sanitizer` detects it from the input:
+
+```bash
+nac-sanitizer sanitize nac-collector.zip -o output/
+# Detected profile catalyst_center for catalystcenter.json (by filename)
+```
+
+To choose the profile yourself, or to apply more than one, activate profiles via CLI:
 
 ```bash
 nac-sanitizer sanitize input.json --profile sdwan -o output/
@@ -31,6 +38,32 @@ profiles:
   - sdwan
   - ise
 ```
+
+## Profile Detection
+
+Detection runs only when neither `--profile` nor `profiles:` in the configuration file names a profile, and the configuration defines no `custom_rules`. Naming a profile always skips detection.
+
+Each input JSON file is checked on its own:
+
+1. **Filename** — nac-collector names its output after the product (`catalystcenter.json`, `ise.json`, `fmc.json`, `cdfmc.json`, `sdwan.json`). A matching filename selects that profile.
+2. **Top-level keys** — Otherwise, the file's top-level keys are compared with each profile's known collector endpoints. The profile with the most matches is chosen, as long as it matches at least two keys and no other profile matches as many.
+
+If any file cannot be matched to exactly one profile, the run stops with an error and writes no output. Pass `--profile` to continue.
+
+When a directory or ZIP contains files from different products, every detected profile is activated, and each profile's rules apply to all files.
+
+Each profile declares its fingerprint in a `detect` block:
+
+```yaml
+detect:
+  filenames:
+    - catalystcenter.json
+  keys:
+    - lan_automation
+    - network_devices
+```
+
+Keys should be endpoint names that only this product's collector output uses. Names shared between products, such as `device` and `network`, are left out.
 
 ## How Profiles Work
 

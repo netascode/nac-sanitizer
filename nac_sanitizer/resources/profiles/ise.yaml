@@ -2,6 +2,26 @@ name: ise
 description: "ISE (Identity Services Engine) collector output"
 version: "1.0"
 
+detect:
+  filenames:
+    - ise.json
+  keys:
+    - active_directory_join_point
+    - allowed_protocols
+    - authorization_profile
+    - device_admin_policy_set
+    - downloadable_acl
+    - endpoint_identity_group
+    - identity_source_sequence
+    - internal_user
+    - network_access_condition
+    - network_access_policy_set
+    - network_device
+    - network_device_group
+    - tacacs_profile
+    - trustsec_security_group
+    - user_identity_group
+
 packs:
   credentials:
     tier: default

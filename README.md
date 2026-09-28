@@ -43,7 +43,11 @@ uv tool install --reinstall git+https://github.com/netascode/nac-sanitizer.git
 ## Quick Start
 
 ```bash
-# Sanitize a .zip file from nac-collector (output is re-zipped by default)
+# Sanitize a .zip file from nac-collector (profile is detected automatically,
+# output is re-zipped by default)
+nac-sanitizer sanitize collector-output.zip -o sanitized/
+
+# Choose the profile explicitly instead of detecting it
 nac-sanitizer sanitize collector-output.zip --profile sdwan -o sanitized/
 
 # Sanitize a .zip but output uncompressed files instead

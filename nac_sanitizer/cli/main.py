@@ -5,13 +5,16 @@
 
 import logging
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import typer
 from rich.console import Console
 from rich.logging import RichHandler
 
 from nac_sanitizer import __version__
+
+if TYPE_CHECKING:
+    from nac_sanitizer.config.models import SanitizerConfig
 
 app = typer.Typer(add_completion=False)
 console = Console(stderr=True)
@@ -123,7 +126,6 @@ def sanitize(
         console.print(f"[bold red]Configuration error:[/bold red] {e}")
         raise typer.Exit(1) from e
 
-    sanitizer = Sanitizer(cfg)
     zip_input = is_zip_file(input_path)
     tmp_dir = None
 
@@ -132,6 +134,11 @@ def sanitize(
         if zip_input:
             tmp_dir = extract_zip(input_path)
             effective_input = tmp_dir
+
+        if not cfg.profiles and not cfg.custom_rules:
+            cfg = _with_detected_profiles(cfg, effective_input)
+
+        sanitizer = Sanitizer(cfg)
 
         if dry_run:
             try:
@@ -182,6 +189,26 @@ def sanitize(
     finally:
         if tmp_dir:
             cleanup_temp_dir(tmp_dir)
+
+
+def _with_detected_profiles(
+    cfg: "SanitizerConfig", input_path: Path
+) -> "SanitizerConfig":
+    """Return cfg with profiles inferred from the input, or exit on failure."""
+    from nac_sanitizer.profiles.detect import ProfileDetectionError, detect_profiles
+    from nac_sanitizer.sanitizer import discover_input_files
+
+    try:
+        detections = detect_profiles(discover_input_files(input_path))
+    except ProfileDetectionError as e:
+        console.print(f"[bold red]Profile error:[/bold red] {e}")
+        console.print("  Specify the profile explicitly with --profile.")
+        raise typer.Exit(1) from e
+
+    profiles = sorted({d.profile for d in detections})
+    for d in detections:
+        console.print(f"Detected profile {d.profile} for {d.source.name} ({d.reason})")
+    return cfg.model_copy(update={"profiles": profiles})
 
 
 @app.command()

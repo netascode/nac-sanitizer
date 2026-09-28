@@ -281,6 +281,98 @@ class TestLogFile:
 
 
 @pytest.mark.integration
+class TestProfileDetection:
+    """Issue #22: infer the profile when none is configured."""
+
+    CC_DATA = {
+        "lan_automation": [
+            {"data": [{"hostNamePrefix": "BLDGA-SW-", "discoveredDeviceList": []}]}
+        ],
+        "network_devices": [
+            {"data": [{"hostname": "access-sw-01", "managementIpAddress": "10.50.1.1"}]}
+        ],
+        "template": [{"data": [{"templateContent": "hostname access-sw-01"}]}],
+    }
+
+    def _sanitize(self, input_path, tmp_path, *extra: str):
+        return runner.invoke(
+            app,
+            ["sanitize", str(input_path), "-o", str(tmp_path / "output"), *extra],
+        )
+
+    def test_detects_profile_from_keys(self, tmp_path) -> None:
+        input_file = tmp_path / "export.json"
+        input_file.write_text(json.dumps(self.CC_DATA))
+        result = self._sanitize(input_file, tmp_path)
+        assert result.exit_code == 0, result.output
+        assert "Detected profile catalyst_center for export.json" in result.output
+
+        sanitized = json.loads((tmp_path / "output" / "export.json").read_text())
+        template = sanitized["template"][0]["data"][0]["templateContent"]
+        assert "access-sw-01" not in template
+
+    def test_detects_profile_from_collector_zip(self, tmp_path) -> None:
+        zip_path = tmp_path / "nac-collector.zip"
+        with zipfile.ZipFile(zip_path, "w") as zf:
+            zf.writestr("catalystcenter.json", json.dumps(self.CC_DATA))
+        result = self._sanitize(zip_path, tmp_path)
+        assert result.exit_code == 0, result.output
+        assert "Detected profile catalyst_center for catalystcenter.json" in (
+            result.output
+        )
+        assert "(by filename)" in result.output
+
+    def test_dry_run_detects_profile(self, tmp_path) -> None:
+        input_file = tmp_path / "export.json"
+        input_file.write_text(json.dumps(self.CC_DATA))
+        result = self._sanitize(input_file, tmp_path, "--dry-run")
+        assert result.exit_code == 0, result.output
+        assert "Detected profile catalyst_center" in result.output
+        assert "TEMPLATE_CONTENT" in result.output
+
+    def test_undetectable_input_fails(self, tmp_path) -> None:
+        input_file = tmp_path / "export.json"
+        input_file.write_text(json.dumps({"foo": [], "bar": []}))
+        result = self._sanitize(input_file, tmp_path)
+        assert result.exit_code == 1
+        assert "Could not detect a profile" in result.output
+        assert "--profile" in result.output
+        assert not (tmp_path / "output").exists()
+
+    def test_explicit_profile_skips_detection(self, tmp_path) -> None:
+        input_file = tmp_path / "export.json"
+        input_file.write_text(json.dumps({"foo": [], "bar": []}))
+        result = self._sanitize(input_file, tmp_path, "--profile", "ise")
+        assert result.exit_code == 0, result.output
+        assert "Detected profile" not in result.output
+
+    def test_profile_in_config_skips_detection(self, tmp_path) -> None:
+        input_file = tmp_path / "export.json"
+        input_file.write_text(json.dumps({"foo": [], "bar": []}))
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text("profiles:\n  - ise\n")
+        result = self._sanitize(input_file, tmp_path, "-c", str(config_file))
+        assert result.exit_code == 0, result.output
+        assert "Detected profile" not in result.output
+
+    def test_custom_rules_skip_detection(
+        self, sample_input_file, sample_config, tmp_path
+    ) -> None:
+        result = self._sanitize(sample_input_file, tmp_path, "-c", str(sample_config))
+        assert result.exit_code == 0, result.output
+        assert "Detected profile" not in result.output
+
+    def test_config_error_reported_before_detection(self, tmp_path) -> None:
+        input_file = tmp_path / "export.json"
+        input_file.write_text(json.dumps({"foo": []}))
+        bad_config = tmp_path / "bad.yaml"
+        bad_config.write_text("  :\n  - [invalid\n")
+        result = self._sanitize(input_file, tmp_path, "-c", str(bad_config))
+        assert result.exit_code == 1
+        assert "Configuration error" in result.output
+
+
+@pytest.mark.integration
 class TestZipInput:
     @pytest.fixture
     def sample_zip(self, tmp_path):
