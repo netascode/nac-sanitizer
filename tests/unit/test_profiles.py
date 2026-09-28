@@ -8253,3 +8253,100 @@ class TestCatalystCenterInheritedSiteNames:
             assert telemetry[key]["inheritedSiteName"] == value
         assert self._aaa_client(sanitized)["inheritedSiteName"] == value
         assert self._ssid(sanitized)["inheritedSiteName"] == value
+
+
+@pytest.mark.unit
+class TestCatalystCenterUpdateDeviceManagementAddressLocation:
+    """Issue #199: update_device_management_address location fields are redacted."""
+
+    SNMP_LOCATION_PATH = "$.update_device_management_address[*].data[*].snmpLocation"
+    LOCATION_NAME_PATH = "$.update_device_management_address[*].data[*].locationName"
+    SECTION = "update_device_management_address"
+    HIERARCHY = "Global/US-East/Building-A/Floor2"
+    LOCATION_NAME = "Building-A-Floor2"
+    DEFAULT_LOCATION = "default location"
+
+    def _cc_data(self, devices: list[dict]) -> dict:
+        return {self.SECTION: [{"data": devices}]}
+
+    def _sanitize(self, tmp_path, data: dict, enable: list[str] | None = None) -> dict:
+        input_file = tmp_path / "cc.json"
+        input_file.write_text(json.dumps(data))
+        config = SanitizerConfig(
+            profiles=["catalyst_center"],
+            packs=PackConfig(enable=enable or []),
+        )
+        output_dir = tmp_path / "output"
+        Sanitizer(config).run(input_file, output_dir)
+        return json.loads((output_dir / "cc.json").read_text())
+
+    @pytest.mark.parametrize("path", [SNMP_LOCATION_PATH, LOCATION_NAME_PATH])
+    def test_path_registered_in_site_names_pack(self, path: str) -> None:
+        rules = ProfileRegistry.load_rules("catalyst_center")
+        matching = [r for r in rules if r.path == path]
+        assert len(matching) == 1
+        assert matching[0].category == "SITE_NAMES"
+        assert matching[0].strategy == "token"
+        assert matching[0].tier == "optional"
+
+    def test_not_redacted_by_default(self, tmp_path) -> None:
+        data = self._cc_data(
+            [{"snmpLocation": self.HIERARCHY, "locationName": self.LOCATION_NAME}]
+        )
+        sanitized = self._sanitize(tmp_path, data)
+        device = sanitized[self.SECTION][0]["data"][0]
+        assert device["snmpLocation"] == self.HIERARCHY
+        assert device["locationName"] == self.LOCATION_NAME
+
+    def test_redacted_when_site_names_enabled(self, tmp_path) -> None:
+        data = self._cc_data(
+            [
+                {
+                    "id": "dev-001",
+                    "snmpLocation": self.HIERARCHY,
+                    "locationName": self.LOCATION_NAME,
+                }
+            ]
+        )
+        sanitized = self._sanitize(tmp_path, data, enable=["site_names"])
+        device = sanitized[self.SECTION][0]["data"][0]
+        assert device["snmpLocation"].startswith("SITE_NAMES-")
+        assert device["locationName"].startswith("SITE_NAMES-")
+        assert device["snmpLocation"] != device["locationName"]
+        assert device["id"] == "dev-001"
+
+    def test_default_location_placeholder_is_redacted(self, tmp_path) -> None:
+        """The engine has no value allowlist, so the vendor default is tokenized."""
+        data = self._cc_data([{"snmpLocation": self.DEFAULT_LOCATION}])
+        sanitized = self._sanitize(tmp_path, data, enable=["site_names"])
+        result = sanitized[self.SECTION][0]["data"][0]["snmpLocation"]
+        assert result != self.DEFAULT_LOCATION
+        assert result.startswith("SITE_NAMES-")
+
+    def test_empty_and_null_values_preserved(self, tmp_path) -> None:
+        data = self._cc_data(
+            [
+                {"snmpLocation": "", "locationName": None},
+                {"snmpLocation": None, "locationName": ""},
+            ]
+        )
+        sanitized = self._sanitize(tmp_path, data, enable=["site_names"])
+        devices = sanitized[self.SECTION][0]["data"]
+        assert devices[0]["snmpLocation"] == ""
+        assert devices[0]["locationName"] is None
+        assert devices[1]["snmpLocation"] is None
+        assert devices[1]["locationName"] == ""
+
+    def test_same_hierarchy_maps_to_same_token_as_network_devices(
+        self, tmp_path
+    ) -> None:
+        """Both collector copies of a device share one token per hierarchy."""
+        data = {
+            "network_devices": [{"data": [{"snmpLocation": self.HIERARCHY}]}],
+            self.SECTION: [{"data": [{"snmpLocation": self.HIERARCHY}]}],
+        }
+        sanitized = self._sanitize(tmp_path, data, enable=["site_names"])
+        nd_token = sanitized["network_devices"][0]["data"][0]["snmpLocation"]
+        udma_token = sanitized[self.SECTION][0]["data"][0]["snmpLocation"]
+        assert nd_token.startswith("SITE_NAMES-")
+        assert udma_token == nd_token
