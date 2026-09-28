@@ -2,6 +2,27 @@ name: fmc
 description: "FMC (Firewall Management Center) collector output"
 version: "1.0"
 
+detect:
+  filenames:
+    - fmc.json
+    - cdfmc.json
+  keys:
+    - access_control_policy
+    - domains
+    - ftd_nat_policy
+    - ftd_platform_settings
+    - host
+    - network_group
+    - port
+    - port_group
+    - range
+    - security_zone
+    - server_version
+    - smart_license
+    - fqdn
+    - url
+    - vpn_s2s
+
 packs:
   usernames:
     tier: default

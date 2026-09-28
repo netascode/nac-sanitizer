@@ -17,7 +17,8 @@ From lowest to highest precedence:
 Configuration files use YAML. All fields are optional.
 
 ```yaml
-# Which product profiles to activate
+# Which product profiles to activate. When omitted (and no custom_rules are
+# set), the profile is detected from the input. See docs/profiles.md.
 profiles:
   - sdwan
   - ise

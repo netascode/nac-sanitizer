@@ -2,6 +2,26 @@ name: catalyst_center
 description: "Catalyst Center (DNAC) collector output"
 version: "1.0"
 
+detect:
+  filenames:
+    - catalystcenter.json
+  keys:
+    - area
+    - building
+    - floor
+    - site
+    - fabric_site
+    - fabric_device
+    - fabric_virtual_network
+    - ip_pool
+    - ip_pool_reservation
+    - lan_automation
+    - network_devices
+    - template
+    - project
+    - transit_network
+    - wireless_enterprise_ssid
+
 packs:
   usernames:
     tier: optional

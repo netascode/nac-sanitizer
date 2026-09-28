@@ -20,6 +20,15 @@ from nac_sanitizer.rosetta.writer import RosettaWriter
 logger = logging.getLogger(__name__)
 
 
+def discover_input_files(path: Path) -> list[Path]:
+    """Find all JSON files to process."""
+    if path.is_file():
+        return [path]
+    files = sorted(path.rglob("*.json"))
+    logger.debug("Discovered %d input files in %s", len(files), path)
+    return files
+
+
 class Sanitizer:
     """Drives the end-to-end sanitization pipeline."""
 
@@ -49,7 +58,7 @@ class Sanitizer:
         Returns the path to the Rosetta Stone file.
         """
         rules = self._build_rule_set()
-        input_files = self._discover_input_files(input_path)
+        input_files = discover_input_files(input_path)
 
         output_path.mkdir(parents=True, exist_ok=True)
 
@@ -85,7 +94,7 @@ class Sanitizer:
         Returns a summary of what would be redacted.
         """
         rules = self._build_rule_set()
-        input_files = self._discover_input_files(input_path)
+        input_files = discover_input_files(input_path)
 
         summary: dict[str, int] = {}
         total_matches = 0
@@ -419,14 +428,6 @@ class Sanitizer:
                 rule.strategy,
                 applied,
             )
-
-    def _discover_input_files(self, path: Path) -> list[Path]:
-        """Find all JSON files to process."""
-        if path.is_file():
-            return [path]
-        files = sorted(path.rglob("*.json"))
-        logger.debug("Discovered %d input files in %s", len(files), path)
-        return files
 
     def _load_json(self, path: Path) -> object | None:
         """Load a JSON file, returning None if the file contains invalid JSON."""

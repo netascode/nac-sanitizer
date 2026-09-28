@@ -2,6 +2,26 @@ name: sdwan
 description: "SD-WAN (vManage) collector output"
 version: "1.0"
 
+detect:
+  filenames:
+    - sdwan.json
+  keys:
+    - centralized_policy
+    - cli_device_template
+    - configuration_group
+    - feature_device_template
+    - feature_templates
+    - localized_policy
+    - policy_group
+    - policy_object_feature_profile
+    - security_policy
+    - service_feature_profile
+    - site_list_policy_object
+    - system_feature_profile
+    - transport_feature_profile
+    - vedge_inventory
+    - vpn_list_policy_object
+
 packs:
   credentials:
     tier: default
