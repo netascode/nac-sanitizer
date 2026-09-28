@@ -7459,3 +7459,64 @@ class TestCatalystCenterLanAutomationHostNamePrefix:
         entries = sanitized["lan_automation"][0]["data"]
         assert "hostNamePrefix" not in entries[0]
         assert entries[1]["hostNamePrefix"] != "BLDGA-SW-"
+
+
+@pytest.mark.unit
+class TestCatalystCenterLanAutomationSiteHierarchy:
+    """Issue #190: lan_automation discoveredDeviceSiteNameHierarchy must be redacted."""
+
+    HIERARCHY = "Global/US-East/Building-A/Floor2"
+    PATH = "$.lan_automation[*].data[*].discoveredDeviceSiteNameHierarchy"
+
+    def _cc_data(self) -> dict:
+        return {
+            "lan_automation": [
+                {
+                    "data": [
+                        {
+                            "discoveredDeviceSiteNameHierarchy": self.HIERARCHY,
+                            "status": "COMPLETED",
+                        }
+                    ]
+                }
+            ],
+            "site": [{"data": [{"nameHierarchy": self.HIERARCHY}]}],
+        }
+
+    def _run(self, tmp_path, enable: list[str] | None = None) -> dict:
+        input_file = tmp_path / "cc.json"
+        input_file.write_text(json.dumps(self._cc_data()))
+        packs = PackConfig(enable=enable) if enable else PackConfig()
+        config = SanitizerConfig(profiles=["catalyst_center"], packs=packs)
+        output_dir = tmp_path / "output"
+        Sanitizer(config).run(input_file, output_dir)
+        return json.loads((output_dir / "cc.json").read_text())
+
+    def test_path_in_site_names_pack(self) -> None:
+        rules = ProfileRegistry.load_rules("catalyst_center")
+        site_rules = [r for r in rules if r.category == "SITE_NAMES"]
+        assert self.PATH in {r.path for r in site_rules}
+        assert all(r.tier == "optional" for r in site_rules)
+
+    def test_not_redacted_by_default(self, tmp_path) -> None:
+        sanitized = self._run(tmp_path)
+        entry = sanitized["lan_automation"][0]["data"][0]
+        assert entry["discoveredDeviceSiteNameHierarchy"] == self.HIERARCHY
+
+    def test_redacted_when_site_names_enabled(self, tmp_path) -> None:
+        sanitized = self._run(tmp_path, enable=["site_names"])
+        entry = sanitized["lan_automation"][0]["data"][0]
+        result = entry["discoveredDeviceSiteNameHierarchy"]
+        assert "US-East" not in result
+        assert "Building-A" not in result
+        assert result.startswith("SITE_NAMES-")
+        # Non-sensitive sibling fields preserved
+        assert entry["status"] == "COMPLETED"
+
+    def test_same_hierarchy_maps_to_same_token_as_name_hierarchy(
+        self, tmp_path
+    ) -> None:
+        sanitized = self._run(tmp_path, enable=["site_names"])
+        lan = sanitized["lan_automation"][0]["data"][0]
+        site = sanitized["site"][0]["data"][0]
+        assert lan["discoveredDeviceSiteNameHierarchy"] == site["nameHierarchy"]

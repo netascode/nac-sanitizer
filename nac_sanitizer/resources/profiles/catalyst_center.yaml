@@ -140,6 +140,7 @@ packs:
       - "$..siteHierarchy"
       - "$..siteNames[*]"
       - "$.ip_pool_reservation[*].data[*].groupName"
+      - "$.lan_automation[*].data[*].discoveredDeviceSiteNameHierarchy"
 
   physical_addresses:
     tier: optional
