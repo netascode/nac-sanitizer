@@ -7395,3 +7395,67 @@ class TestCatalystCenterManagementIpFQDN:
         ]
         assert "10.50.1.1" not in result
         assert "DEVICE-" not in result
+
+
+@pytest.mark.unit
+class TestCatalystCenterLanAutomationHostNamePrefix:
+    """Issue #191: lan_automation hostNamePrefix must be sanitized by device_names."""
+
+    _PATH = "$.lan_automation[*].data[*].hostNamePrefix"
+
+    def _cc_data(self, *entries: dict) -> dict:
+        return {"lan_automation": [{"data": list(entries)}]}
+
+    def _run(self, tmp_path, data: dict, packs: PackConfig | None = None) -> dict:
+        input_file = tmp_path / "cc.json"
+        input_file.write_text(json.dumps(data))
+        if packs is None:
+            config = SanitizerConfig(profiles=["catalyst_center"])
+        else:
+            config = SanitizerConfig(profiles=["catalyst_center"], packs=packs)
+        output_dir = tmp_path / "output"
+        Sanitizer(config).run(input_file, output_dir)
+        return json.loads((output_dir / "cc.json").read_text())
+
+    def test_path_in_device_names_pack(self) -> None:
+        rules = ProfileRegistry.load_rules("catalyst_center")
+        matching = [r for r in rules if r.path == self._PATH]
+        assert len(matching) == 1
+        assert matching[0].category == "DEVICE_NAMES"
+        assert matching[0].strategy == "hostname_map"
+        assert matching[0].tier == "optional"
+
+    def test_not_redacted_by_default(self, tmp_path) -> None:
+        data = self._cc_data({"hostNamePrefix": "BLDGA-SW-"})
+        sanitized = self._run(tmp_path, data)
+        entry = sanitized["lan_automation"][0]["data"][0]
+        assert entry["hostNamePrefix"] == "BLDGA-SW-"
+
+    @pytest.mark.parametrize("prefix", ["BLDGA-SW-", "BLDGA"])
+    def test_redacted_when_device_names_enabled(self, tmp_path, prefix) -> None:
+        data = self._cc_data({"hostNamePrefix": prefix, "discoveredDeviceList": []})
+        sanitized = self._run(tmp_path, data, packs=PackConfig(enable=["device_names"]))
+        result = sanitized["lan_automation"][0]["data"][0]["hostNamePrefix"]
+        assert "BLDGA" not in result
+        assert re.fullmatch(r"DEVICE-\d{3}", result)
+
+    def test_distinct_prefixes_map_to_distinct_ids(self, tmp_path) -> None:
+        data = self._cc_data(
+            {"hostNamePrefix": "BLDGA-SW-"},
+            {"hostNamePrefix": "BLDGA"},
+            {"hostNamePrefix": "BLDGA-SW-"},
+        )
+        sanitized = self._run(tmp_path, data, packs=PackConfig(enable=["device_names"]))
+        results = [e["hostNamePrefix"] for e in sanitized["lan_automation"][0]["data"]]
+        assert results[0] != results[1]
+        assert results[0] == results[2]
+
+    def test_entries_without_prefix_sanitize_cleanly(self, tmp_path) -> None:
+        data = self._cc_data(
+            {"discoveredDeviceSiteNameHierarchy": "Global/Site-A"},
+            {"hostNamePrefix": "BLDGA-SW-"},
+        )
+        sanitized = self._run(tmp_path, data, packs=PackConfig(enable=["device_names"]))
+        entries = sanitized["lan_automation"][0]["data"]
+        assert "hostNamePrefix" not in entries[0]
+        assert entries[1]["hostNamePrefix"] != "BLDGA-SW-"
