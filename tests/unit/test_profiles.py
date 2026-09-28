@@ -8442,3 +8442,100 @@ class TestCatalystCenterTemplateProjectName:
         assert sanitized["project"][0]["data"][0]["id"] == self.PROJECT_ID
         for obj in self._project_name_refs(sanitized):
             assert obj["projectId"] == self.PROJECT_ID
+
+
+@pytest.mark.unit
+class TestCatalystCenterExtendedTemplateNetworkProfileName:
+    """Issue #201: extended_templates networkProfileDetails profileName redaction."""
+
+    PROFILE_NAME_PATH = (
+        "$.extended_templates[*].data[*].data[*].networkProfileDetails[*].profileName"
+    )
+    PROFILE_UUID = "44444444-4444-4444-4444-444444444444"
+
+    def _cc_data(self, network_profile_details: list[dict] | None) -> dict:
+        return {
+            "extended_templates": [
+                {
+                    "data": [
+                        {
+                            "data": [
+                                {
+                                    "name": "branch-access-base",
+                                    "networkProfileDetails": network_profile_details,
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+
+    def _profile(self, name: str, profile_type: str, uuid: str) -> dict:
+        return {"profileName": name, "profileType": profile_type, "profileUuid": uuid}
+
+    def _sanitize(self, tmp_path, data: dict, enable: list[str] | None = None) -> dict:
+        input_file = tmp_path / "cc.json"
+        input_file.write_text(json.dumps(data))
+        config = SanitizerConfig(
+            profiles=["catalyst_center"],
+            packs=PackConfig(enable=enable or []),
+        )
+        output_dir = tmp_path / "output"
+        Sanitizer(config).run(input_file, output_dir)
+        return json.loads((output_dir / "cc.json").read_text())
+
+    @staticmethod
+    def _template(sanitized: dict) -> dict:
+        return sanitized["extended_templates"][0]["data"][0]["data"][0]
+
+    def test_path_registered_in_template_metadata_pack(self) -> None:
+        rules = ProfileRegistry.load_rules("catalyst_center")
+        matching = [r for r in rules if r.path == self.PROFILE_NAME_PATH]
+        assert len(matching) == 1
+        assert matching[0].category == "TEMPLATE_METADATA"
+        assert matching[0].strategy == "token"
+        assert matching[0].tier == "optional"
+
+    def test_not_redacted_by_default(self, tmp_path) -> None:
+        data = self._cc_data(
+            [self._profile("ACME-Branch-Switching", "switching", self.PROFILE_UUID)]
+        )
+        sanitized = self._sanitize(tmp_path, data)
+        profile = self._template(sanitized)["networkProfileDetails"][0]
+        assert profile["profileName"] == "ACME-Branch-Switching"
+
+    def test_redacted_when_template_metadata_enabled(self, tmp_path) -> None:
+        data = self._cc_data(
+            [self._profile("ACME-Branch-Switching", "switching", self.PROFILE_UUID)]
+        )
+        sanitized = self._sanitize(tmp_path, data, enable=["template_metadata"])
+        profile = self._template(sanitized)["networkProfileDetails"][0]
+        assert profile["profileName"].startswith("TEMPLATE_METADATA-")
+        assert profile["profileType"] == "switching"
+        assert profile["profileUuid"] == self.PROFILE_UUID
+
+    def test_multiple_profiles_all_redacted(self, tmp_path) -> None:
+        data = self._cc_data(
+            [
+                self._profile("ACME-Branch-Switching", "switching", self.PROFILE_UUID),
+                self._profile(
+                    "ACME-Branch-Wireless",
+                    "wireless",
+                    "55555555-5555-5555-5555-555555555555",
+                ),
+            ]
+        )
+        sanitized = self._sanitize(tmp_path, data, enable=["template_metadata"])
+        profiles = self._template(sanitized)["networkProfileDetails"]
+        names = [p["profileName"] for p in profiles]
+        assert all(n.startswith("TEMPLATE_METADATA-") for n in names)
+        assert names[0] != names[1]
+        assert [p["profileType"] for p in profiles] == ["switching", "wireless"]
+
+    def test_null_network_profile_details_sanitizes(self, tmp_path) -> None:
+        data = self._cc_data(None)
+        sanitized = self._sanitize(tmp_path, data, enable=["template_metadata"])
+        template = self._template(sanitized)
+        assert template["networkProfileDetails"] is None
+        assert template["name"].startswith("TEMPLATE_METADATA-")
