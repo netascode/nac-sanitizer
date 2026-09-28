@@ -185,6 +185,8 @@ packs:
       - "$.lan_automation[*].data[*].discoveredDeviceSiteNameHierarchy"
       - "$.network_devices[*].data[*].snmpLocation"
       - "$.network_devices[*].data[*].locationName"
+      - "$.update_device_management_address[*].data[*].snmpLocation"
+      - "$.update_device_management_address[*].data[*].locationName"
       - "$..inheritedGroupName"
       - "$..inheritedSiteName"
 
