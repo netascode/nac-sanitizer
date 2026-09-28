@@ -252,3 +252,4 @@ packs:
       - "$.template_version[*].data[*].data[*].projectName"
       - "$.extended_templates[*].data[*].data[*].projectName"
       - "$.project[*].data[*].templates[*].projectName"
+      - "$.extended_templates[*].data[*].data[*].networkProfileDetails[*].profileName"
