@@ -185,7 +185,7 @@ IP addresses are handled separately from profiles by a global [tree-walking scan
 
 **Templates:**
 
-- **template_metadata** — Template/project names, descriptions, parameter descriptions, version notes, and tag names across `template`, `extended_templates`, `template_version`, and `project` objects
+- **template_metadata** — Template/project names, descriptions, parameter descriptions, version notes, tag names, and `projectName` references across `template`, `extended_templates`, `template_version`, and `project` objects
 - **template_authors** — Template author fields and version info author fields (PII)
 - **image_names** — Software image filenames
 

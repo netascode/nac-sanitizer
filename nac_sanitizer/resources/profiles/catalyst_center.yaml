@@ -248,3 +248,7 @@ packs:
       - "$.project[*].data[*].name"
       - "$.project[*].data[*].description"
       - "$.project[*].data[*].templates[*].name"
+      - "$.template[*].data[*].projectName"
+      - "$.template_version[*].data[*].data[*].projectName"
+      - "$.extended_templates[*].data[*].data[*].projectName"
+      - "$.project[*].data[*].templates[*].projectName"

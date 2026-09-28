@@ -8350,3 +8350,95 @@ class TestCatalystCenterUpdateDeviceManagementAddressLocation:
         udma_token = sanitized[self.SECTION][0]["data"][0]["snmpLocation"]
         assert nd_token.startswith("SITE_NAMES-")
         assert udma_token == nd_token
+
+
+@pytest.mark.unit
+class TestCatalystCenterTemplateProjectName:
+    """Issue #200: template projectName fields must be redacted by template_metadata."""
+
+    PROJECT_NAME = "ACME-Branch-Templates"
+    PROJECT_ID = "3f2b8c1e-6a4d-4e2f-9b7a-1c5d8e9f0a12"
+    PROJECT_NAME_PATHS = [
+        "$.template[*].data[*].projectName",
+        "$.template_version[*].data[*].data[*].projectName",
+        "$.extended_templates[*].data[*].data[*].projectName",
+        "$.project[*].data[*].templates[*].projectName",
+    ]
+
+    def _cc_data(self) -> dict:
+        ref = {"projectName": self.PROJECT_NAME, "projectId": self.PROJECT_ID}
+        return {
+            "project": [
+                {
+                    "data": [
+                        {
+                            "id": self.PROJECT_ID,
+                            "name": self.PROJECT_NAME,
+                            "templates": [{"name": "branch-access-base", **ref}],
+                        }
+                    ]
+                }
+            ],
+            "template": [{"data": [{"name": "branch-access-base", **ref}]}],
+            "template_version": [
+                {"data": [{"data": [{"name": "branch-access-base", **ref}]}]}
+            ],
+            "extended_templates": [
+                {"data": [{"data": [{"name": "branch-access-base", **ref}]}]}
+            ],
+        }
+
+    @staticmethod
+    def _project_name_refs(sanitized: dict) -> list[dict]:
+        """Return the four objects that carry a projectName, one per location."""
+        return [
+            sanitized["template"][0]["data"][0],
+            sanitized["template_version"][0]["data"][0]["data"][0],
+            sanitized["extended_templates"][0]["data"][0]["data"][0],
+            sanitized["project"][0]["data"][0]["templates"][0],
+        ]
+
+    def _sanitize(self, tmp_path, enable: list[str] | None = None) -> dict:
+        input_file = tmp_path / "cc.json"
+        input_file.write_text(json.dumps(self._cc_data()))
+        config = SanitizerConfig(
+            profiles=["catalyst_center"],
+            packs=PackConfig(enable=enable or []),
+        )
+        output_dir = tmp_path / "output"
+        Sanitizer(config).run(input_file, output_dir)
+        return json.loads((output_dir / "cc.json").read_text())
+
+    @pytest.mark.parametrize("path", PROJECT_NAME_PATHS)
+    def test_path_registered_in_template_metadata_pack(self, path: str) -> None:
+        rules = ProfileRegistry.load_rules("catalyst_center")
+        matching = [r for r in rules if r.path == path]
+        assert len(matching) == 1
+        assert matching[0].category == "TEMPLATE_METADATA"
+        assert matching[0].strategy == "token"
+        assert matching[0].tier == "optional"
+
+    def test_not_redacted_by_default(self, tmp_path) -> None:
+        sanitized = self._sanitize(tmp_path)
+        for obj in self._project_name_refs(sanitized):
+            assert obj["projectName"] == self.PROJECT_NAME
+
+    def test_redacted_at_every_location_when_enabled(self, tmp_path) -> None:
+        sanitized = self._sanitize(tmp_path, enable=["template_metadata"])
+        assert self.PROJECT_NAME not in json.dumps(sanitized)
+        for obj in self._project_name_refs(sanitized):
+            assert obj["projectName"].startswith("TEMPLATE_METADATA-")
+
+    def test_same_token_as_project_name(self, tmp_path) -> None:
+        """projectName shares its token with project[*].data[*].name."""
+        sanitized = self._sanitize(tmp_path, enable=["template_metadata"])
+        project_token = sanitized["project"][0]["data"][0]["name"]
+        assert project_token.startswith("TEMPLATE_METADATA-")
+        for obj in self._project_name_refs(sanitized):
+            assert obj["projectName"] == project_token
+
+    def test_project_id_preserved(self, tmp_path) -> None:
+        sanitized = self._sanitize(tmp_path, enable=["template_metadata"])
+        assert sanitized["project"][0]["data"][0]["id"] == self.PROJECT_ID
+        for obj in self._project_name_refs(sanitized):
+            assert obj["projectId"] == self.PROJECT_ID
