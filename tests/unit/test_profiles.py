@@ -8088,3 +8088,168 @@ class TestCatalystCenterIseUserName:
         result = self._dtos(sanitized)[0]
         assert re.fullmatch(r"CREDENTIALS-\d{3}", result["password"])
         assert re.fullmatch(r"CREDENTIALS-\d{3}", result["sshkey"])
+
+
+@pytest.mark.unit
+class TestCatalystCenterInheritedSiteNames:
+    """Issue #203: inheritedGroupName and inheritedSiteName must be redacted."""
+
+    GROUP_PATH = "$..inheritedGroupName"
+    SITE_PATH = "$..inheritedSiteName"
+    SITE_NAME = "Building-A"
+    PARENT_SITE_NAME = "US-East"
+    TELEMETRY_KEYS = (
+        "applicationVisibility",
+        "snmpTraps",
+        "syslogs",
+        "wiredDataCollection",
+        "wirelessTelemetry",
+    )
+    GROUP_PARENTS = ("assign_credentials", "network", "site_settings")
+    # telemetry sub-objects + aaaClient + wireless_ssid
+    SITE_PATH_LOCATIONS = len(TELEMETRY_KEYS) + 2
+
+    def _cc_data(self, inherited: str | None = SITE_NAME) -> dict:
+        """Collector-shaped data; ``site[*].children.<name>`` is a list of lists."""
+        aaa_inherited = self.PARENT_SITE_NAME if inherited else inherited
+        setting = {
+            "key": "dns.server",
+            "groupUuid": "11111111-1111-1111-1111-111111111111",
+            "inheritedGroupUuid": "22222222-2222-2222-2222-222222222222",
+            "inheritedGroupName": inherited,
+        }
+        data: dict = {
+            parent: [{"data": [{"data": [dict(setting)]}]}]
+            for parent in self.GROUP_PARENTS
+        }
+        telemetry = {
+            key: {"enabled": True, "inheritedSiteName": inherited}
+            for key in self.TELEMETRY_KEYS
+        }
+        aaa = {"aaaClient": {"serverType": "ISE", "inheritedSiteName": aaa_inherited}}
+        ssid = {"ssid": "Corp", "inheritedSiteName": inherited}
+        data["site"] = [
+            {
+                "data": [{"name": self.SITE_NAME}],
+                "children": {
+                    "telemetry_settings": [[{"data": [telemetry]}]],
+                    "aaa_settings": [[{"data": [aaa]}]],
+                    "wireless_ssid": [[{"data": [ssid]}]],
+                },
+            }
+        ]
+        return data
+
+    def _sanitize(self, tmp_path, data: dict, enable: list[str] | None = None) -> dict:
+        input_file = tmp_path / "cc.json"
+        input_file.write_text(json.dumps(data))
+        config = SanitizerConfig(
+            profiles=["catalyst_center"],
+            packs=PackConfig(enable=enable or []),
+        )
+        output_dir = tmp_path / "output"
+        Sanitizer(config).run(input_file, output_dir)
+        return json.loads((output_dir / "cc.json").read_text())
+
+    @staticmethod
+    def _group_setting(sanitized: dict, parent: str) -> dict:
+        return sanitized[parent][0]["data"][0]["data"][0]
+
+    @staticmethod
+    def _telemetry(sanitized: dict) -> dict:
+        return sanitized["site"][0]["children"]["telemetry_settings"][0][0]["data"][0]
+
+    @staticmethod
+    def _aaa_client(sanitized: dict) -> dict:
+        children = sanitized["site"][0]["children"]
+        return children["aaa_settings"][0][0]["data"][0]["aaaClient"]
+
+    @staticmethod
+    def _ssid(sanitized: dict) -> dict:
+        return sanitized["site"][0]["children"]["wireless_ssid"][0][0]["data"][0]
+
+    @pytest.mark.parametrize("path", [GROUP_PATH, SITE_PATH])
+    def test_path_registered_in_site_names_pack(self, path: str) -> None:
+        rules = ProfileRegistry.load_rules("catalyst_center")
+        matching = [r for r in rules if r.path == path]
+        assert len(matching) == 1
+        assert matching[0].category == "SITE_NAMES"
+        assert matching[0].strategy == "token"
+        assert matching[0].tier == "optional"
+
+    def test_recursive_descent_reaches_every_location(self) -> None:
+        """``$..`` must descend through the list-of-lists under site children."""
+        resolver = PathResolver()
+        data = self._cc_data()
+        group_matches = resolver.find_matches(self.GROUP_PATH, data)
+        site_matches = resolver.find_matches(self.SITE_PATH, data)
+        assert len(group_matches) == len(self.GROUP_PARENTS)
+        assert len(site_matches) == self.SITE_PATH_LOCATIONS
+
+    def test_not_redacted_by_default(self, tmp_path) -> None:
+        sanitized = self._sanitize(tmp_path, self._cc_data())
+        for parent in self.GROUP_PARENTS:
+            setting = self._group_setting(sanitized, parent)
+            assert setting["inheritedGroupName"] == self.SITE_NAME
+        telemetry = self._telemetry(sanitized)
+        assert telemetry["syslogs"]["inheritedSiteName"] == self.SITE_NAME
+        aaa = self._aaa_client(sanitized)
+        assert aaa["inheritedSiteName"] == self.PARENT_SITE_NAME
+
+    @pytest.mark.parametrize("parent", GROUP_PARENTS)
+    def test_inherited_group_name_redacted(self, tmp_path, parent: str) -> None:
+        sanitized = self._sanitize(tmp_path, self._cc_data(), enable=["site_names"])
+        setting = self._group_setting(sanitized, parent)
+        assert setting["inheritedGroupName"].startswith("SITE_NAMES-")
+        # Non-sensitive sibling fields preserved
+        assert setting["key"] == "dns.server"
+        assert setting["groupUuid"] == "11111111-1111-1111-1111-111111111111"
+
+    @pytest.mark.parametrize("key", TELEMETRY_KEYS)
+    def test_telemetry_inherited_site_name_redacted(self, tmp_path, key: str) -> None:
+        sanitized = self._sanitize(tmp_path, self._cc_data(), enable=["site_names"])
+        telemetry = self._telemetry(sanitized)
+        assert telemetry[key]["inheritedSiteName"].startswith("SITE_NAMES-")
+        assert telemetry[key]["enabled"] is True
+
+    def test_aaa_client_inherited_site_name_redacted(self, tmp_path) -> None:
+        sanitized = self._sanitize(tmp_path, self._cc_data(), enable=["site_names"])
+        aaa = self._aaa_client(sanitized)
+        assert aaa["inheritedSiteName"].startswith("SITE_NAMES-")
+        assert aaa["serverType"] == "ISE"
+
+    def test_wireless_ssid_inherited_site_name_redacted(self, tmp_path) -> None:
+        sanitized = self._sanitize(tmp_path, self._cc_data(), enable=["site_names"])
+        ssid = self._ssid(sanitized)
+        assert ssid["inheritedSiteName"].startswith("SITE_NAMES-")
+        assert ssid["ssid"] == "Corp"
+
+    def test_same_name_maps_to_same_token_as_site_name(self, tmp_path) -> None:
+        sanitized = self._sanitize(tmp_path, self._cc_data(), enable=["site_names"])
+        site_token = sanitized["site"][0]["data"][0]["name"]
+        assert site_token.startswith("SITE_NAMES-")
+        for parent in self.GROUP_PARENTS:
+            setting = self._group_setting(sanitized, parent)
+            assert setting["inheritedGroupName"] == site_token
+        telemetry = self._telemetry(sanitized)
+        for key in self.TELEMETRY_KEYS:
+            assert telemetry[key]["inheritedSiteName"] == site_token
+        assert self._ssid(sanitized)["inheritedSiteName"] == site_token
+        # A different site name gets a different token
+        aaa_token = self._aaa_client(sanitized)["inheritedSiteName"]
+        assert aaa_token.startswith("SITE_NAMES-")
+        assert aaa_token != site_token
+
+    @pytest.mark.parametrize("value", ["", None])
+    def test_empty_and_null_pass_through(self, tmp_path, value) -> None:
+        sanitized = self._sanitize(
+            tmp_path, self._cc_data(inherited=value), enable=["site_names"]
+        )
+        for parent in self.GROUP_PARENTS:
+            setting = self._group_setting(sanitized, parent)
+            assert setting["inheritedGroupName"] == value
+        telemetry = self._telemetry(sanitized)
+        for key in self.TELEMETRY_KEYS:
+            assert telemetry[key]["inheritedSiteName"] == value
+        assert self._aaa_client(sanitized)["inheritedSiteName"] == value
+        assert self._ssid(sanitized)["inheritedSiteName"] == value

@@ -185,6 +185,8 @@ packs:
       - "$.lan_automation[*].data[*].discoveredDeviceSiteNameHierarchy"
       - "$.network_devices[*].data[*].snmpLocation"
       - "$.network_devices[*].data[*].locationName"
+      - "$..inheritedGroupName"
+      - "$..inheritedSiteName"
 
   physical_addresses:
     tier: optional
