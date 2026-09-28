@@ -143,6 +143,8 @@ packs:
       - "$..siteNames[*]"
       - "$.ip_pool_reservation[*].data[*].groupName"
       - "$.lan_automation[*].data[*].discoveredDeviceSiteNameHierarchy"
+      - "$.network_devices[*].data[*].snmpLocation"
+      - "$.network_devices[*].data[*].locationName"
 
   physical_addresses:
     tier: optional
