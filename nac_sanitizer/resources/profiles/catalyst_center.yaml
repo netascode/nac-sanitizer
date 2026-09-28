@@ -79,6 +79,8 @@ packs:
       - "$.lan_automation[*].data[*].discoveredDeviceList[*].name"
       - "$.lan_automation[*].data[*].hostNamePrefix"
       - "$.update_device_management_address[*].data[*].managementIpAddress"
+      - "$.network_devices[*].data[*].managementIpAddress"
+      - "$.network_devices[*].data[*].dnsResolvedManagementAddress"
 
   device_descriptions:
     tier: optional
