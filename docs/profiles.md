@@ -5,7 +5,7 @@ Product profiles are built-in collections of redaction rules specific to a produ
 ## Available Profiles
 
 - **`ise`** — Identity Services Engine (6 default packs, 25 optional packs)
-- **`catalyst_center`** — Catalyst Center / DNA Center (3 default packs, 22 optional packs)
+- **`catalyst_center`** — Catalyst Center / DNA Center (4 default packs, 22 optional packs)
 - **`sdwan`** — SD-WAN / vManage (4 default packs, 11 optional packs)
 - **`fmc`** — Firewall Management Center (1 default pack, 4 optional packs)
 
@@ -146,6 +146,7 @@ IP addresses are handled separately from profiles by a global [tree-walking scan
 
 ### Default Tier (always applied)
 
+- **credentials** — Passwords, SNMP communities, SNMPv3 keys, shared secrets, SSH keys, and wireless passphrases (`password`, `enablePassword`, `passwordList`, `enablePasswordList`, `readCommunity`, `writeCommunity`, `authPassword`, `privacyPassword`, `snmpAuthPassphrase`, `snmpPrivPassphrase`, `managementEnablePassword`, `sharedSecret`, `sshkey`, `passphrase`). Redacted whatever the API returns, including masked placeholders
 - **credential_descriptions** — Descriptions adjacent to CLI, SNMPv3, and NETCONF credentials (`cliCredential[*].description`, `snmpV3[*].description`, `netconfCredential[*].description`)
 - **user_pii** — User email, first name, and last name (`users[*].email`, `.firstName`, `.lastName`)
 - **template_content** — Configuration template bodies that may embed secrets (`templateContent`)

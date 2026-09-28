@@ -7704,3 +7704,286 @@ class TestCatalystCenterNetworkDeviceLocation:
         snmp_token = sanitized["network_devices"][0]["data"][0]["snmpLocation"]
         assert site_token.startswith("SITE_NAMES-")
         assert snmp_token == site_token
+
+
+@pytest.mark.unit
+class TestCatalystCenterCredentials:
+    """Issue #209: credential and secret fields must be redacted by default."""
+
+    CATEGORY = "CREDENTIALS"
+    PATHS = {
+        "$..password",
+        "$..enablePassword",
+        "$..passwordList",
+        "$..enablePasswordList",
+        "$..readCommunity",
+        "$..writeCommunity",
+        "$..authPassword",
+        "$..privacyPassword",
+        "$..snmpAuthPassphrase",
+        "$..snmpPrivPassphrase",
+        "$..managementEnablePassword",
+        "$..sharedSecret",
+        "$..sshkey",
+        "$..passphrase",
+    }
+    CLI_PASSWORD = "S3cr3t-Pass!"
+    ENABLE_PASSWORD = "En4ble-Pass!"
+    RO_COMMUNITY = "ro-community-01"
+    RW_COMMUNITY = "rw-community-01"
+    AUTH_PASSWORD = "Auth-Key-01"
+    PRIVACY_PASSWORD = "Priv-Key-01"
+    SHARED_SECRET = "radius-shared-01"
+    ISE_PASSWORD = "Ise-Admin-Pass!"
+    SSH_KEY = "ssh-ed25519 AAAAC3NzaExampleKeyOnly"
+    NESTED_SECRET = "tacacs-shared-02"
+    WIFI_PASSPHRASE = "Wifi-Passphrase-01"
+    PASSPHRASE_TYPE = "ASCII"
+    PASSPHRASE_UPDATE_TIME = "2026-01-01T00:00:00Z"
+
+    def _fixture(self) -> dict:
+        return {
+            "credentials_cli": [
+                {
+                    "data": [
+                        {
+                            "cliCredential": [
+                                {
+                                    "username": "netops",
+                                    "password": self.CLI_PASSWORD,
+                                    "enablePassword": self.ENABLE_PASSWORD,
+                                }
+                            ],
+                            "snmpV2cRead": [
+                                {
+                                    "description": "ro",
+                                    "readCommunity": self.RO_COMMUNITY,
+                                }
+                            ],
+                            "snmpV2cWrite": [
+                                {
+                                    "description": "rw",
+                                    "writeCommunity": self.RW_COMMUNITY,
+                                }
+                            ],
+                            "snmpV3": [
+                                {
+                                    "username": "snmpuser",
+                                    "authPassword": self.AUTH_PASSWORD,
+                                    "privacyPassword": self.PRIVACY_PASSWORD,
+                                }
+                            ],
+                        }
+                    ]
+                }
+            ],
+            "authentication_policy_server": [
+                {
+                    "data": [
+                        {
+                            "sharedSecret": self.SHARED_SECRET,
+                            "ciscoIseDtos": [
+                                {
+                                    "userName": "ccadmin",
+                                    "password": self.ISE_PASSWORD,
+                                    "sshkey": self.SSH_KEY,
+                                }
+                            ],
+                        }
+                    ]
+                }
+            ],
+            "assign_credentials": [
+                {
+                    "data": [
+                        {
+                            "data": [
+                                {
+                                    "key": "aaa.server",
+                                    "value": [{"sharedSecret": self.NESTED_SECRET}],
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ],
+            "site": [
+                {
+                    "children": {
+                        "wireless_ssid": [
+                            [
+                                {
+                                    "data": [
+                                        {
+                                            "ssid": "corp-wifi",
+                                            "passphrase": self.WIFI_PASSPHRASE,
+                                            "passphraseType": self.PASSPHRASE_TYPE,
+                                            "passphraseUpdateTime": (
+                                                self.PASSPHRASE_UPDATE_TIME
+                                            ),
+                                            "isAuthKeyPSK": True,
+                                        }
+                                    ]
+                                }
+                            ]
+                        ]
+                    }
+                }
+            ],
+        }
+
+    def _sanitize(self, tmp_path, data: dict, disable: list[str] | None = None) -> dict:
+        input_file = tmp_path / "cc.json"
+        input_file.write_text(json.dumps(data))
+        config = SanitizerConfig(
+            profiles=["catalyst_center"],
+            packs=PackConfig(disable=disable or []),
+        )
+        output_dir = tmp_path / "output"
+        Sanitizer(config).run(input_file, output_dir)
+        return json.loads((output_dir / "cc.json").read_text())
+
+    @staticmethod
+    def _cli(sanitized: dict) -> dict:
+        return sanitized["credentials_cli"][0]["data"][0]
+
+    @staticmethod
+    def _ssid(sanitized: dict) -> dict:
+        return sanitized["site"][0]["children"]["wireless_ssid"][0][0]["data"][0]
+
+    def _secret_values(self, sanitized: dict) -> list:
+        cli = self._cli(sanitized)
+        aps = sanitized["authentication_policy_server"][0]["data"][0]
+        nested = sanitized["assign_credentials"][0]["data"][0]["data"][0]
+        return [
+            cli["cliCredential"][0]["password"],
+            cli["cliCredential"][0]["enablePassword"],
+            cli["snmpV2cRead"][0]["readCommunity"],
+            cli["snmpV2cWrite"][0]["writeCommunity"],
+            cli["snmpV3"][0]["authPassword"],
+            cli["snmpV3"][0]["privacyPassword"],
+            aps["sharedSecret"],
+            aps["ciscoIseDtos"][0]["password"],
+            aps["ciscoIseDtos"][0]["sshkey"],
+            nested["value"][0]["sharedSecret"],
+            self._ssid(sanitized)["passphrase"],
+        ]
+
+    def _originals(self) -> list[str]:
+        return [
+            self.CLI_PASSWORD,
+            self.ENABLE_PASSWORD,
+            self.RO_COMMUNITY,
+            self.RW_COMMUNITY,
+            self.AUTH_PASSWORD,
+            self.PRIVACY_PASSWORD,
+            self.SHARED_SECRET,
+            self.ISE_PASSWORD,
+            self.SSH_KEY,
+            self.NESTED_SECRET,
+            self.WIFI_PASSPHRASE,
+        ]
+
+    def test_all_paths_registered_as_default_token_rules(self) -> None:
+        rules = ProfileRegistry.load_rules("catalyst_center")
+        cred_rules = [r for r in rules if r.category == self.CATEGORY]
+        assert {r.path for r in cred_rules} == self.PATHS
+        assert all(r.strategy == "token" for r in cred_rules)
+        assert all(r.tier == "default" for r in cred_rules)
+
+    def test_paths_not_claimed_by_another_pack(self) -> None:
+        rules = ProfileRegistry.load_rules("catalyst_center")
+        others = {r.path for r in rules if r.category != self.CATEGORY}
+        assert not (others & self.PATHS)
+
+    def test_redacted_by_default(self, tmp_path) -> None:
+        sanitized = self._sanitize(tmp_path, self._fixture())
+        values = self._secret_values(sanitized)
+        for original, result in zip(self._originals(), values, strict=True):
+            assert result != original
+            assert result.startswith(f"{self.CATEGORY}-")
+        assert len(set(values)) == len(values)
+        serialized = json.dumps(sanitized)
+        for original in self._originals():
+            assert original not in serialized
+
+    def test_non_secret_neighbors_preserved(self, tmp_path) -> None:
+        sanitized = self._sanitize(tmp_path, self._fixture())
+        assert self._cli(sanitized)["snmpV2cRead"][0]["description"] == "ro"
+        assert self._ssid(sanitized)["ssid"] == "corp-wifi"
+
+    def test_redacted_when_other_pack_disabled(self, tmp_path) -> None:
+        sanitized = self._sanitize(
+            tmp_path, self._fixture(), disable=["credential_descriptions"]
+        )
+        for result in self._secret_values(sanitized):
+            assert result.startswith(f"{self.CATEGORY}-")
+
+    def test_not_redacted_when_credentials_disabled(self, tmp_path) -> None:
+        sanitized = self._sanitize(tmp_path, self._fixture(), disable=["credentials"])
+        assert self._secret_values(sanitized) == self._originals()
+
+    def test_similar_keys_untouched(self, tmp_path) -> None:
+        ssid = self._ssid(self._sanitize(tmp_path, self._fixture()))
+        assert ssid["passphraseType"] == self.PASSPHRASE_TYPE
+        assert ssid["passphraseUpdateTime"] == self.PASSPHRASE_UPDATE_TIME
+        assert ssid["isAuthKeyPSK"] is True
+
+    def test_empty_and_null_values_preserved(self, tmp_path) -> None:
+        data = {
+            "credentials_cli": [
+                {
+                    "data": [
+                        {
+                            "cliCredential": [
+                                {"password": "", "enablePassword": None},
+                                {"password": None, "enablePassword": ""},
+                            ],
+                            "snmpV2cRead": [{"readCommunity": ""}],
+                            "snmpV3": [{"authPassword": None, "privacyPassword": ""}],
+                        }
+                    ]
+                }
+            ],
+            "authentication_policy_server": [
+                {"data": [{"sharedSecret": None, "ciscoIseDtos": [{"sshkey": ""}]}]}
+            ],
+            "discovery": [{"data": [{"passwordList": [], "enablePasswordList": None}]}],
+        }
+        sanitized = self._sanitize(tmp_path, data)
+        assert sanitized == data
+
+    def test_password_lists_redacted(self, tmp_path) -> None:
+        data = {
+            "discovery": [
+                {
+                    "data": [
+                        {
+                            "passwordList": [self.CLI_PASSWORD, ""],
+                            "enablePasswordList": [self.ENABLE_PASSWORD],
+                        }
+                    ]
+                }
+            ]
+        }
+        entry = self._sanitize(tmp_path, data)["discovery"][0]["data"][0]
+        assert entry["passwordList"][0].startswith(f"{self.CATEGORY}-")
+        assert entry["passwordList"][1] == ""
+        assert entry["enablePasswordList"][0].startswith(f"{self.CATEGORY}-")
+
+    def test_same_secret_maps_to_one_token(self, tmp_path) -> None:
+        data = {
+            "credentials_cli": [
+                {"data": [{"cliCredential": [{"password": self.CLI_PASSWORD}]}]}
+            ],
+            "authentication_policy_server": [
+                {"data": [{"ciscoIseDtos": [{"password": self.CLI_PASSWORD}]}]}
+            ],
+            "discovery": [{"data": [{"passwordList": [self.CLI_PASSWORD]}]}],
+        }
+        sanitized = self._sanitize(tmp_path, data)
+        cli = sanitized["credentials_cli"][0]["data"][0]["cliCredential"][0]
+        ise = sanitized["authentication_policy_server"][0]["data"][0]["ciscoIseDtos"][0]
+        listed = sanitized["discovery"][0]["data"][0]["passwordList"][0]
+        assert cli["password"].startswith(f"{self.CATEGORY}-")
+        assert cli["password"] == ise["password"] == listed

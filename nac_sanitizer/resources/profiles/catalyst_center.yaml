@@ -23,6 +23,25 @@ detect:
     - wireless_enterprise_ssid
 
 packs:
+  credentials:
+    tier: default
+    strategy: token
+    paths:
+      - "$..password"
+      - "$..enablePassword"
+      - "$..passwordList"
+      - "$..enablePasswordList"
+      - "$..readCommunity"
+      - "$..writeCommunity"
+      - "$..authPassword"
+      - "$..privacyPassword"
+      - "$..snmpAuthPassphrase"
+      - "$..snmpPrivPassphrase"
+      - "$..managementEnablePassword"
+      - "$..sharedSecret"
+      - "$..sshkey"
+      - "$..passphrase"
+
   usernames:
     tier: optional
     strategy: token
