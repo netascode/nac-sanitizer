@@ -7987,3 +7987,104 @@ class TestCatalystCenterCredentials:
         listed = sanitized["discovery"][0]["data"][0]["passwordList"][0]
         assert cli["password"].startswith(f"{self.CATEGORY}-")
         assert cli["password"] == ise["password"] == listed
+
+
+@pytest.mark.unit
+class TestCatalystCenterIseUserName:
+    """Issue #202: ciscoIseDtos userName must be redacted by the usernames pack."""
+
+    USERNAME_PATH = "$.authentication_policy_server[*].data[*].ciscoIseDtos[*].userName"
+    USERNAME = "ccadmin"
+    SUBSCRIBER_NAME = "pxgrid_client_A1B2C3D4"
+    MASKED = "********"
+
+    def _ise_dto(self, **overrides) -> dict:
+        dto = {
+            "description": "Primary PAN",
+            "fqdn": "ise-pan-01.corp.example.com",
+            "role": "PRIMARY",
+            "type": "ISE",
+            "trustState": "TRUSTED",
+            "userName": self.USERNAME,
+            "subscriberName": self.SUBSCRIBER_NAME,
+        }
+        dto.update(overrides)
+        return dto
+
+    def _cc_data(self, dtos: list[dict]) -> dict:
+        return {"authentication_policy_server": [{"data": [{"ciscoIseDtos": dtos}]}]}
+
+    def _sanitize(self, tmp_path, data: dict, enable: list[str] | None = None) -> dict:
+        input_file = tmp_path / "cc.json"
+        input_file.write_text(json.dumps(data))
+        config = SanitizerConfig(
+            profiles=["catalyst_center"],
+            packs=PackConfig(enable=enable or []),
+        )
+        output_dir = tmp_path / "output"
+        Sanitizer(config).run(input_file, output_dir)
+        return json.loads((output_dir / "cc.json").read_text())
+
+    @staticmethod
+    def _dtos(sanitized: dict) -> list[dict]:
+        return sanitized["authentication_policy_server"][0]["data"][0]["ciscoIseDtos"]
+
+    def test_path_registered_in_usernames_pack(self) -> None:
+        rules = ProfileRegistry.load_rules("catalyst_center")
+        matching = [r for r in rules if r.path == self.USERNAME_PATH]
+        assert len(matching) == 1
+        assert matching[0].category == "USERNAMES"
+        assert matching[0].strategy == "token"
+        assert matching[0].tier == "optional"
+
+    def test_not_redacted_by_default(self, tmp_path) -> None:
+        sanitized = self._sanitize(tmp_path, self._cc_data([self._ise_dto()]))
+        assert self._dtos(sanitized)[0]["userName"] == self.USERNAME
+
+    def test_redacted_when_usernames_enabled(self, tmp_path) -> None:
+        sanitized = self._sanitize(
+            tmp_path, self._cc_data([self._ise_dto()]), enable=["usernames"]
+        )
+        dto = self._dtos(sanitized)[0]
+        assert dto["userName"] == "USERNAMES-001"
+        assert dto["role"] == "PRIMARY"
+        assert dto["type"] == "ISE"
+        assert dto["trustState"] == "TRUSTED"
+
+    def test_subscriber_name_not_covered(self, tmp_path) -> None:
+        """subscriberName is a generated pxGrid client ID and is left untouched."""
+        sanitized = self._sanitize(
+            tmp_path, self._cc_data([self._ise_dto()]), enable=["usernames"]
+        )
+        assert self._dtos(sanitized)[0]["subscriberName"] == self.SUBSCRIBER_NAME
+
+    def test_multiple_ise_nodes_all_redacted(self, tmp_path) -> None:
+        dtos = [
+            self._ise_dto(userName="ccadmin"),
+            self._ise_dto(role="SECONDARY", userName="ccadmin-backup"),
+            self._ise_dto(role="PXGRID", userName="ccadmin"),
+        ]
+        sanitized = self._sanitize(tmp_path, self._cc_data(dtos), enable=["usernames"])
+        result = [d["userName"] for d in self._dtos(sanitized)]
+        assert result == ["USERNAMES-001", "USERNAMES-002", "USERNAMES-001"]
+
+    def test_token_matches_lowercase_username_field(self, tmp_path) -> None:
+        data = {
+            "users": [{"data": [{"username": self.USERNAME}]}],
+            **self._cc_data([self._ise_dto()]),
+        }
+        sanitized = self._sanitize(tmp_path, data, enable=["usernames"])
+        user_token = sanitized["users"][0]["data"][0]["username"]
+        ise_token = self._dtos(sanitized)[0]["userName"]
+        assert user_token.startswith("USERNAMES-")
+        assert ise_token == user_token
+
+    @pytest.mark.parametrize("enable", [[], ["usernames"]])
+    def test_password_and_sshkey_redacted_by_credentials_pack(
+        self, tmp_path, enable
+    ) -> None:
+        dto = self._ise_dto(password=self.MASKED, sshkey=self.MASKED)
+        sanitized = self._sanitize(tmp_path, self._cc_data([dto]), enable=enable)
+        result = self._dtos(sanitized)[0]
+        assert re.fullmatch(r"CREDENTIALS-\d{3}", result["password"])
+        assert re.fullmatch(r"CREDENTIALS-\d{3}", result["sshkey"])
