@@ -7520,3 +7520,86 @@ class TestCatalystCenterLanAutomationSiteHierarchy:
         lan = sanitized["lan_automation"][0]["data"][0]
         site = sanitized["site"][0]["data"][0]
         assert lan["discoveredDeviceSiteNameHierarchy"] == site["nameHierarchy"]
+
+
+@pytest.mark.unit
+class TestCatalystCenterNetworkDevicesManagementAddress:
+    """Issue #192: network_devices management address fields holding a hostname."""
+
+    MGMT_IP_PATH = "$.network_devices[*].data[*].managementIpAddress"
+    DNS_RESOLVED_PATH = "$.network_devices[*].data[*].dnsResolvedManagementAddress"
+    FQDN = "access-sw-01.corp.example.com"
+    IP = "10.1.1.1"
+    SANITIZED_FQDN = "DEVICE-001.redacted.local"
+    MGMT_FIELDS = ("managementIpAddress", "dnsResolvedManagementAddress")
+
+    def _run(self, tmp_path, device: dict, packs: list[str] | None = None) -> dict:
+        input_file = tmp_path / "cc.json"
+        input_file.write_text(json.dumps({"network_devices": [{"data": [device]}]}))
+        config = SanitizerConfig(
+            profiles=["catalyst_center"],
+            packs=PackConfig(enable=packs or []),
+        )
+        output_dir = tmp_path / "output"
+        Sanitizer(config).run(input_file, output_dir)
+        sanitized = json.loads((output_dir / "cc.json").read_text())
+        return sanitized["network_devices"][0]["data"][0]
+
+    def _device_names_paths(self) -> set[str]:
+        rules = ProfileRegistry.load_rules("catalyst_center")
+        return {r.path for r in rules if r.category == "DEVICE_NAMES"}
+
+    def test_device_names_includes_management_ip_address_path(self) -> None:
+        assert self.MGMT_IP_PATH in self._device_names_paths()
+
+    def test_device_names_includes_dns_resolved_management_address_path(
+        self,
+    ) -> None:
+        assert self.DNS_RESOLVED_PATH in self._device_names_paths()
+
+    @pytest.mark.parametrize("field", MGMT_FIELDS)
+    def test_fqdn_redacted_when_device_names_enabled(self, tmp_path, field) -> None:
+        result = self._run(tmp_path, {field: self.FQDN}, ["device_names"])[field]
+        assert "access-sw-01" not in result
+        assert "corp.example.com" not in result
+        assert result == self.SANITIZED_FQDN
+
+    @pytest.mark.parametrize("field", MGMT_FIELDS)
+    def test_fqdn_not_redacted_by_default(self, tmp_path, field) -> None:
+        result = self._run(tmp_path, {field: self.FQDN})[field]
+        assert result == self.FQDN
+
+    @pytest.mark.parametrize("field", MGMT_FIELDS)
+    def test_ip_value_handled_only_by_ip_scanner(self, tmp_path, field) -> None:
+        result = self._run(tmp_path, {field: self.IP}, ["device_names"])[field]
+        assert result != self.IP
+        assert "DEVICE-" not in result
+        assert "redacted.local" not in result
+
+    def test_ip_value_sanitized_consistently_across_fields(self, tmp_path) -> None:
+        device = dict.fromkeys(self.MGMT_FIELDS, self.IP)
+        result = self._run(tmp_path, device, ["device_names"])
+        assert result["managementIpAddress"] == result["dnsResolvedManagementAddress"]
+        assert result["managementIpAddress"] != self.IP
+
+    def test_fqdn_maps_consistently_with_hostname(self, tmp_path) -> None:
+        device = {"hostname": self.FQDN, **dict.fromkeys(self.MGMT_FIELDS, self.FQDN)}
+        result = self._run(tmp_path, device, ["hostnames", "device_names"])
+        assert result["hostname"] == self.SANITIZED_FQDN
+        assert result["managementIpAddress"] == result["hostname"]
+        assert result["dnsResolvedManagementAddress"] == result["hostname"]
+
+    def test_fqdn_shares_device_id_with_bare_hostname(self, tmp_path) -> None:
+        device = {"hostname": "access-sw-01", "managementIpAddress": self.FQDN}
+        result = self._run(tmp_path, device, ["hostnames", "device_names"])
+        assert result["hostname"] == "DEVICE-001"
+        assert result["managementIpAddress"] == self.SANITIZED_FQDN
+
+    def test_empty_dns_resolved_address_passes_through(self, tmp_path) -> None:
+        device = {
+            "managementIpAddress": self.FQDN,
+            "dnsResolvedManagementAddress": "",
+        }
+        result = self._run(tmp_path, device, ["device_names"])
+        assert result["dnsResolvedManagementAddress"] == ""
+        assert result["managementIpAddress"] == self.SANITIZED_FQDN

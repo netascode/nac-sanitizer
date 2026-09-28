@@ -139,7 +139,7 @@ IP addresses are handled separately from profiles by a global [tree-walking scan
 - **hostnames** — Device hostnames (`hostname`)
 - **serial_numbers** — Device serial numbers (`serialNumber`)
 - **mac_addresses** — MAC addresses (`macAddress`, `apEthernetMacAddress`, uses `preserve_format`)
-- **device_names** — Device FQDNs in non-hostname fields like replacements and LAN automation, including LAN automation hostname prefixes (`hostNamePrefix`) (uses `hostname_map`)
+- **device_names** — Device FQDNs in non-hostname fields like replacements, LAN automation (including hostname prefixes, `hostNamePrefix`), and management addresses (`managementIpAddress`, `dnsResolvedManagementAddress`; uses `hostname_map`)
 - **device_descriptions** — Device descriptions and management address descriptions
 
 **Fabric:**
