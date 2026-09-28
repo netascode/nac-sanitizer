@@ -253,3 +253,19 @@ packs:
       - "$.extended_templates[*].data[*].data[*].projectName"
       - "$.project[*].data[*].templates[*].projectName"
       - "$.extended_templates[*].data[*].data[*].networkProfileDetails[*].profileName"
+
+  wireless_names:
+    tier: optional
+    strategy: token
+    paths:
+      - "$.wireless_profile[*].data[*].wirelessProfileName"
+      - "$.wireless_profile[*].data[*].ssidDetails[*].ssidName"
+      - "$.wireless_profile[*].data[*].ssidDetails[*].wlanProfileName"
+      - "$.wireless_profile[*].data[*].ssidDetails[*].policyProfileName"
+      - "$.site[*].children.wireless_ssid[*][*].data[*].ssid"
+      - "$.site[*].children.wireless_ssid[*][*].data[*].profileName"
+      - "$.site[*].children.wireless_ssid[*][*].data[*].policyProfileName"
+      - "$.site[*].children.wireless_ssid[*][*].data[*].aclName"
+      - "$.site[*].children.wireless_ssid[*][*].data[*].portalName"
+      - "$.vlanToSsids[*].data[*].data[*].ssidDetails[*].name"
+      - "$.wireless_rf_profile[*].data[*].rfProfileName"

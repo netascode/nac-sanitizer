@@ -5,7 +5,7 @@ Product profiles are built-in collections of redaction rules specific to a produ
 ## Available Profiles
 
 - **`ise`** — Identity Services Engine (6 default packs, 25 optional packs)
-- **`catalyst_center`** — Catalyst Center / DNA Center (4 default packs, 22 optional packs)
+- **`catalyst_center`** — Catalyst Center / DNA Center (4 default packs, 23 optional packs)
 - **`sdwan`** — SD-WAN / vManage (4 default packs, 11 optional packs)
 - **`fmc`** — Firewall Management Center (1 default pack, 4 optional packs)
 
@@ -188,6 +188,10 @@ IP addresses are handled separately from profiles by a global [tree-walking scan
 - **template_metadata** — Template/project names, descriptions, parameter descriptions, version notes, tag names, `projectName` references, and network profile names across `template`, `extended_templates`, `template_version`, and `project` objects
 - **template_authors** — Template author fields and version info author fields (PII)
 - **image_names** — Software image filenames
+
+**Wireless:**
+
+- **wireless_names** — SSID names, WLAN and policy profile names, wireless network profile names, and RF profile names across `wireless_profile` (`wirelessProfileName`, `ssidDetails[*].ssidName`, `.wlanProfileName`, `.policyProfileName`), `site[*].children.wireless_ssid` (`ssid`, `profileName`, `policyProfileName`, `aclName`, `portalName`), `vlanToSsids` (`ssidDetails[*].name`), and `wireless_rf_profile` (`rfProfileName`). The same SSID or profile name maps to the same token in every location. Optional: add `wireless_names` to `packs.enable` (including any shared configuration file that enables packs by name). Catalyst Center's built-in RF profile names (`LOW`, `TYPICAL`, `HIGH`) are tokenized too; `parentProfile` enum values, booleans, `vlanId`, and `interfaceName` are left untouched, and `vlanName` stays under `vlan_names`
 
 ---
 
